@@ -41,7 +41,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    const Uint32 win_flags = SDL_WINDOW_RESIZABLE;
+    const Uint32 win_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_TRANSPARENT;
     SDL_Window* window     = SDL_CreateWindow("DQX Utility", 800, 600, win_flags);
     if (!window)
     {
@@ -52,21 +52,43 @@ int main(int argc, char** argv)
 
     SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
     if (renderer)
-    {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderClear(renderer);
-        SDL_RenderPresent(renderer);
-    }
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     bool running = true;
     while (running)
     {
         SDL_Event e;
-        if (SDL_WaitEventTimeout(&e, 100))
+        while (SDL_PollEvent(&e))
         {
             if (e.type == SDL_EVENT_QUIT)
                 running = false;
         }
+
+        if (renderer)
+        {
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+            SDL_RenderClear(renderer);
+
+            int render_width = 0;
+            int render_height = 0;
+            if (!SDL_GetRenderOutputSize(renderer, &render_width, &render_height))
+            {
+                SDL_GetWindowSize(window, &render_width, &render_height);
+            }
+
+            SDL_FRect rect;
+            rect.w = 160.0f;
+            rect.h = 120.0f;
+            rect.x = (static_cast<float>(render_width) - rect.w) * 0.5f;
+            rect.y = (static_cast<float>(render_height) - rect.h) * 0.5f;
+
+            SDL_SetRenderDrawColor(renderer, 255, 128, 0, 255);
+            SDL_RenderFillRect(renderer, &rect);
+
+            SDL_RenderPresent(renderer);
+        }
+
+        SDL_Delay(16);
     }
 
     if (renderer)
