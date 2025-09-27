@@ -62,6 +62,11 @@ endif()
 
 add_executable(dqx_utility
   src/main.cpp
+  src/AppContext.cpp
+  src/DialogWindow.cpp
+  src/FontManager.cpp
+  src/SettingsPanel.cpp
+  src/WindowRegistry.cpp
 )
 
 set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
