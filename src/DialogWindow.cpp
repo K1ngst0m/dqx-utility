@@ -7,6 +7,8 @@
 #include <cfloat>
 #include <cstdio>
 
+#include "IconUtils.hpp"
+
 namespace
 {
     constexpr ImVec4 kDialogBgColor      = ImVec4(0.0f, 0.0f, 0.0f, 0.78f);
@@ -17,11 +19,17 @@ namespace
 }
 
 // Creates a dialog window instance with default state values.
-DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_id)
+DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_id, const std::string& name)
     : font_manager_(font_manager)
 {
     (void)io;
-    label_ = "Dialog ##" + std::to_string(instance_id);
+
+    name_ = name;
+    id_suffix_ = "dialog_window_" + std::to_string(instance_id);
+    settings_id_suffix_ = "dialog_settings_" + std::to_string(instance_id);
+    overlay_id_suffix_ = "dialog_overlay_" + std::to_string(instance_id);
+    window_label_ = name_ + "###" + id_suffix_;
+    settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
 
     std::snprintf(state_.title.data(), state_.title.size(), "%s", reinterpret_cast<const char*>(u8"冒険ガイド"));
     std::snprintf(state_.body.data(), state_.body.size(), "%s", reinterpret_cast<const char*>(u8"メインコマンド『せんれき』の\nこれまでのおはなしを見ながら\n物語を進めていこう。"));
@@ -40,6 +48,8 @@ DialogWindow::~DialogWindow()
 void DialogWindow::render(ImGuiIO& io)
 {
     renderDialog(io);
+    renderDialogOverlay();
+    renderSettingsWindow(io);
 }
 
 // Renders the per-instance settings UI.
@@ -91,7 +101,7 @@ void DialogWindow::renderDialog(ImGuiIO& io)
         ImGuiWindowFlags_NoScrollbar |
         ImGuiWindowFlags_NoCollapse;
 
-    if (ImGui::Begin(label_.c_str(), nullptr, dialog_flags))
+    if (ImGui::Begin(window_label_.c_str(), nullptr, dialog_flags))
     {
         if (state_.font)
             ImGui::PushFont(state_.font);
@@ -139,6 +149,7 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     ImGui::PopStyleColor(3);
     ImGui::PopStyleVar(3);
+
 }
 
 // Internal helper for drawing the settings controls.
@@ -240,4 +251,78 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
     {
         state_.pending_reposition = true;
     }
+}
+
+// Draws an overlay icon when the dialog is hovered.
+void DialogWindow::renderDialogOverlay()
+{
+    ImVec2 mouse = ImGui::GetIO().MousePos;
+    if (!ImGui::IsMousePosValid(&mouse))
+        return;
+
+    const ImVec2 icon_size(28.0f, 28.0f);
+    const ImVec2 icon_offset(-icon_size.x - 16.0f, 16.0f);
+    const ImVec2 icon_pos(state_.window_pos.x + state_.window_size.x + icon_offset.x,
+                          state_.window_pos.y + icon_offset.y);
+
+    bool hovering_dialog = ImGui::IsMouseHoveringRect(state_.window_pos,
+        ImVec2(state_.window_pos.x + state_.window_size.x,
+               state_.window_pos.y + state_.window_size.y), false);
+
+    float target_visibility = hovering_dialog ? 0.5f : 0.0f;
+    float delta = target_visibility - overlay_visibility_;
+    overlay_visibility_ += delta * ImGui::GetIO().DeltaTime * 12.0f;
+    overlay_visibility_ = std::clamp(overlay_visibility_, 0.0f, 1.0f);
+    if (overlay_visibility_ <= 0.01f)
+        return;
+
+    ImGui::SetNextWindowPos(icon_pos, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 14.0f);
+
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar;
+
+    std::string overlay_label = "SettingsIcon###" + overlay_id_suffix_;
+    if (ImGui::Begin(overlay_label.c_str(), nullptr, flags))
+    {
+        ImVec2 cursor = ImGui::GetCursorScreenPos();
+        bool pressed = ImGui::InvisibleButton("##dialog_settings_toggle", icon_size);
+        bool hovered = ImGui::IsItemHovered();
+        if (pressed)
+            show_settings_window_ = !show_settings_window_;
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        ImVec2 center(cursor.x + icon_size.x * 0.5f, cursor.y + icon_size.y * 0.5f);
+        float combined_visibility = hovered ? 1.0f : overlay_visibility_;
+        DrawMenuIcon(draw_list, center, icon_size.x * 0.5f, combined_visibility, hovered);
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+}
+
+// Presents the per-instance settings window when requested.
+void DialogWindow::renderSettingsWindow(ImGuiIO& io)
+{
+    if (!show_settings_window_)
+        return;
+
+    ImGui::SetNextWindowSize(ImVec2(420.0f, 480.0f), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin(settings_window_label_.c_str(), &show_settings_window_))
+    {
+        renderSettingsPanel(io);
+    }
+    ImGui::End();
+}
+
+// Updates display names and ImGui labels after rename.
+void DialogWindow::rename(const char* new_name)
+{
+    if (!new_name || !new_name[0])
+        return;
+
+    name_ = new_name;
+    window_label_ = name_ + "###" + id_suffix_;
+    settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
 }

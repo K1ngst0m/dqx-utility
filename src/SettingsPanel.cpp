@@ -1,9 +1,9 @@
 #include "SettingsPanel.hpp"
 
 #include "DialogWindow.hpp"
-#include "FontManager.hpp"
 
 #include <imgui.h>
+#include <cstdio>
 
 namespace
 {
@@ -19,15 +19,17 @@ namespace
 }
 
 // Builds a settings panel tied to the window registry.
-SettingsPanel::SettingsPanel(WindowRegistry& registry, FontManager& font_manager, ImGuiIO& io)
-    : registry_(registry), io_(io)
+SettingsPanel::SettingsPanel(WindowRegistry& registry)
+    : registry_(registry)
 {
-    (void)font_manager;
 }
 
 // Renders the settings window with type/instance selectors.
-void SettingsPanel::render()
+void SettingsPanel::render(bool& open)
 {
+    if (!open)
+        return;
+
     ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(440.0f, 480.0f), ImGuiCond_FirstUseEver);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 16.0f));
@@ -39,24 +41,14 @@ void SettingsPanel::render()
     ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(1.0f, 1.0f, 1.0f, 0.92f));
 
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-    if (ImGui::Begin("Window Settings", nullptr, flags))
+    if (ImGui::Begin("Window Settings", &open, flags))
     {
         ImGui::TextUnformatted("Window Type");
         renderTypeSelector();
         ImGui::Separator();
 
-        auto windows = registry_.windowsByType(selected_type_);
-        renderInstanceSelector(windows);
-        ImGui::Separator();
-
-        if (!windows.empty() && selected_index_ >= 0 && selected_index_ < static_cast<int>(windows.size()))
-        {
-            windows[selected_index_]->renderSettings(io_);
-        }
-        else
-        {
-            ImGui::TextDisabled("No instance selected.");
-        }
+    auto windows = registry_.windowsByType(selected_type_);
+    renderInstanceSelector(windows);
     }
     ImGui::End();
 
@@ -103,7 +95,9 @@ void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows
         if (ImGui::Button("Add Dialog"))
         {
             registry_.createDialogWindow();
-            selected_index_ = static_cast<int>(registry_.windowsByType(UIWindowType::Dialog).size()) - 1;
+            auto filtered = registry_.windowsByType(UIWindowType::Dialog);
+            selected_index_ = static_cast<int>(filtered.size()) - 1;
+            previous_selected_index_ = -1;
         }
         ImGui::SameLine();
         ImGui::TextDisabled("Total: %zu", windows.size());
@@ -116,27 +110,62 @@ void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows
         return;
     }
 
-    std::vector<const char*> labels;
-    labels.reserve(windows.size());
-    for (UIWindow* window : windows)
-        labels.push_back(window->label());
+    if (selected_index_ >= static_cast<int>(windows.size()))
+        selected_index_ = static_cast<int>(windows.size()) - 1;
 
-    if (selected_index_ >= static_cast<int>(labels.size()))
-        selected_index_ = static_cast<int>(labels.size()) - 1;
-
-    ImGui::Spacing();
-    ImGui::TextUnformatted("Instance");
-    if (ImGui::BeginCombo("##window_instance_combo", labels[selected_index_]))
+    if (ImGui::BeginTable("InstanceTable", 3, ImGuiTableFlags_BordersInner | ImGuiTableFlags_RowBg))
     {
-        for (int i = 0; i < static_cast<int>(labels.size()); ++i)
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+        ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+        ImGui::TableHeadersRow();
+
+        for (int i = 0; i < static_cast<int>(windows.size()); ++i)
         {
-            const bool selected = (i == selected_index_);
-            if (ImGui::Selectable(labels[i], selected))
+            UIWindow* win = windows[i];
+            ImGui::TableNextRow();
+
+            ImGui::TableSetColumnIndex(0);
+            bool selected = (i == selected_index_);
+            if (ImGui::Selectable(win->displayName(), selected, ImGuiSelectableFlags_SpanAllColumns))
+            {
                 selected_index_ = i;
-            if (selected)
-                ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(kWindowTypes[static_cast<int>(selected_type_)].label);
+
+            ImGui::TableSetColumnIndex(2);
+            std::string remove_id = std::string("Remove##") + win->windowLabel();
+            if (ImGui::SmallButton(remove_id.c_str()))
+            {
+                registry_.removeWindow(win);
+                selected_index_ = 0;
+                previous_selected_index_ = -1;
+                ImGui::EndTable();
+                return;
+            }
         }
-        ImGui::EndCombo();
+
+        ImGui::EndTable();
     }
+
+    if (selected_index_ != previous_selected_index_)
+    {
+        previous_selected_index_ = selected_index_;
+        rename_buffer_.fill('\0');
+        UIWindow* current = windows[selected_index_];
+        std::snprintf(rename_buffer_.data(), rename_buffer_.size(), "%s", current->displayName());
+    }
+
     ImGui::Spacing();
+    ImGui::TextUnformatted("Rename Instance");
+    ImGui::InputText("##instance_rename", rename_buffer_.data(), rename_buffer_.size());
+    ImGui::SameLine();
+    if (ImGui::Button("Apply"))
+    {
+        UIWindow* current = windows[selected_index_];
+        current->rename(rename_buffer_.data());
+        std::snprintf(rename_buffer_.data(), rename_buffer_.size(), "%s", current->displayName());
+    }
 }

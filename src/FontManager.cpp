@@ -12,10 +12,10 @@ namespace
 {
     constexpr float kDialogFontSize = 28.0f;
     constexpr std::array<const char*, 8> kFontCandidates = {
-        "fonts/NotoSansJP-Medium.ttf",
-        "fonts/NotoSansCJKjp-Medium.otf",
-        "fonts/NotoSansCJK-Medium.ttc",
-        "fonts/NotoSansCJKjp-Medium.otf",
+        "assets/fonts/NotoSansJP-Medium.ttf",
+        "assets/fonts/NotoSansCJKjp-Medium.otf",
+        "assets/fonts/NotoSansCJK-Medium.ttc",
+        "assets/fonts/NotoSansCJKjp-Medium.otf",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/noto-cjk/NotoSansCJKjp-Regular.otf",
         "/Library/Fonts/Arial Unicode.ttf",

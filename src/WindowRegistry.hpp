@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 enum class UIWindowType
@@ -18,7 +19,9 @@ class UIWindow
 public:
     virtual ~UIWindow() = default;
     virtual UIWindowType type() const = 0;
-    virtual const char* label() const = 0;
+    virtual const char* displayName() const = 0;
+    virtual const char* windowLabel() const = 0;
+    virtual void rename(const char* new_name) = 0;
     virtual void render(ImGuiIO& io) = 0;
     virtual void renderSettings(ImGuiIO& io) = 0;
 };
@@ -30,13 +33,16 @@ public:
     WindowRegistry(FontManager& font_manager, ImGuiIO& io);
 
     DialogWindow& createDialogWindow();
+    void removeWindow(UIWindow* window);
 
     std::vector<std::unique_ptr<UIWindow>>& windows() { return windows_; }
     std::vector<UIWindow*> windowsByType(UIWindowType type);
 
 private:
+    std::string makeDialogName();
+
     FontManager& font_manager_;
     ImGuiIO& io_;
     std::vector<std::unique_ptr<UIWindow>> windows_;
-    int dialog_counter_ = 1;
+    int dialog_counter_ = 0;
 };
