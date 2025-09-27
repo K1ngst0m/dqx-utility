@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        config: [Debug, Release]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          choco install -y ninja llvm
+
+      - name: Configure
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            preset="linux-clang-${{ matrix.config == 'Debug' && 'debug' || 'release' }}"
+          else
+            preset="windows-clang-${{ matrix.config == 'Debug' && 'debug' || 'release' }}"
+          fi
+          cmake --preset "$preset"
+        shell: bash
+
+      - name: Build
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            preset="linux-clang-${{ matrix.config == 'Debug' && 'debug' || 'release' }}"
+          else
+            preset="windows-clang-${{ matrix.config == 'Debug' && 'debug' || 'release' }}"
+          fi
+          cmake --build --preset "$preset" --parallel
+        shell: bash
+
