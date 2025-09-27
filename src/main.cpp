@@ -4,6 +4,9 @@
 #include <plog/Appenders/ConsoleAppender.h>
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Initializers/RollingFileInitializer.h>
+#include <imgui.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
 #include <filesystem>
 
 static void SDLCALL sdl_log_bridge(void* userdata, int category, SDL_LogPriority priority, const char* message)
@@ -51,8 +54,40 @@ int main(int argc, char** argv)
     }
 
     SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
-    if (renderer)
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    if (!renderer)
+    {
+        SDL_LogCritical(SDL_LOG_CATEGORY_ERROR, "SDL_CreateRenderer failed: %s", SDL_GetError());
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    if (!ImGui_ImplSDL3_InitForSDLRenderer(window, renderer))
+    {
+        SDL_LogCritical(SDL_LOG_CATEGORY_ERROR, "ImGui_ImplSDL3_InitForSDLRenderer failed");
+        ImGui::DestroyContext();
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+    if (!ImGui_ImplSDLRenderer3_Init(renderer))
+    {
+        SDL_LogCritical(SDL_LOG_CATEGORY_ERROR, "ImGui_ImplSDLRenderer3_Init failed");
+        ImGui_ImplSDL3_Shutdown();
+        ImGui::DestroyContext();
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    bool show_demo_window = true;
 
     bool running = true;
     while (running)
@@ -60,39 +95,32 @@ int main(int argc, char** argv)
         SDL_Event e;
         while (SDL_PollEvent(&e))
         {
+            ImGui_ImplSDL3_ProcessEvent(&e);
             if (e.type == SDL_EVENT_QUIT)
                 running = false;
         }
 
-        if (renderer)
-        {
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-            SDL_RenderClear(renderer);
+        ImGui_ImplSDLRenderer3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
 
-            int render_width = 0;
-            int render_height = 0;
-            if (!SDL_GetRenderOutputSize(renderer, &render_width, &render_height))
-            {
-                SDL_GetWindowSize(window, &render_width, &render_height);
-            }
+        ImGui::ShowDemoWindow(&show_demo_window);
 
-            SDL_FRect rect;
-            rect.w = 160.0f;
-            rect.h = 120.0f;
-            rect.x = (static_cast<float>(render_width) - rect.w) * 0.5f;
-            rect.y = (static_cast<float>(render_height) - rect.h) * 0.5f;
+        ImGui::Render();
 
-            SDL_SetRenderDrawColor(renderer, 255, 128, 0, 255);
-            SDL_RenderFillRect(renderer, &rect);
-
-            SDL_RenderPresent(renderer);
-        }
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+        SDL_RenderClear(renderer);
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+        SDL_RenderPresent(renderer);
 
         SDL_Delay(16);
     }
 
-    if (renderer)
-        SDL_DestroyRenderer(renderer);
+    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
+
+    SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;

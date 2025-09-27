@@ -39,6 +39,26 @@ CPMAddPackage(
   DOWNLOAD_ONLY YES
 )
 
+CPMAddPackage(
+  NAME imgui
+  URL https://github.com/ocornut/imgui/archive/refs/tags/v1.92.3.tar.gz
+  URL_HASH SHA256=9212ee7c4718b1466a5d99e64bce3ef1965704afea4ba651f8d978d0791b7c7c
+)
+
+if(imgui_ADDED)
+  add_library(imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
+  )
+  target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+  target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
+endif()
+
 
 add_executable(dqx_utility
   src/main.cpp
@@ -46,7 +66,7 @@ add_executable(dqx_utility
 
 set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
 target_compile_features(dqx_utility PRIVATE cxx_std_20)
-target_link_libraries(dqx_utility PRIVATE SDL3::SDL3-static)
+target_link_libraries(dqx_utility PRIVATE SDL3::SDL3-static imgui)
 if(plog_SOURCE_DIR)
   target_include_directories(dqx_utility PRIVATE ${plog_SOURCE_DIR}/include)
 endif()
