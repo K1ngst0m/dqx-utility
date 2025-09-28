@@ -5,6 +5,7 @@
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <plog/Log.h>
+#include <cmath>
 
 // Constructs an empty context waiting for initialization.
 AppContext::AppContext() = default;
@@ -27,7 +28,7 @@ bool AppContext::initialize()
         return false;
     }
 
-    const Uint32 window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_TRANSPARENT;
+    const Uint32 window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_TRANSPARENT | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     window_ = SDL_CreateWindow("DQX Utility", 800, 600, window_flags);
     if (!window_)
     {
@@ -43,6 +44,8 @@ bool AppContext::initialize()
         shutdown();
         return false;
     }
+
+    updateRendererScale();
 
     SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
 
@@ -96,6 +99,34 @@ void AppContext::shutdown()
 bool AppContext::processEvent(const SDL_Event& event)
 {
     ImGui_ImplSDL3_ProcessEvent(&event);
+
+    if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
+        event.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED ||
+        event.type == SDL_EVENT_WINDOW_RESIZED)
+    {
+        if (window_ && renderer_)
+        {
+            const SDL_WindowID wid = SDL_GetWindowID(window_);
+            SDL_WindowEvent win_ev = event.window;
+            if (win_ev.windowID == wid)
+            {
+                is_resizing_ = true;
+                updateRendererScale();
+            }
+        }
+    }
+
+    if (event.type == SDL_EVENT_WINDOW_MOUSE_ENTER || event.type == SDL_EVENT_WINDOW_FOCUS_GAINED)
+    {
+        if (window_)
+        {
+            const SDL_WindowID wid = SDL_GetWindowID(window_);
+            SDL_WindowEvent win_ev = event.window;
+            if (win_ev.windowID == wid)
+                is_resizing_ = false;
+        }
+    }
+
     return event.type == SDL_EVENT_QUIT;
 }
 
@@ -121,4 +152,51 @@ void AppContext::endFrame()
 ImGuiIO& AppContext::imguiIO()
 {
     return ImGui::GetIO();
+}
+
+void AppContext::updateRendererScale()
+{
+    if (!window_ || !renderer_)
+        return;
+
+    const Uint32 flags = SDL_GetWindowFlags(window_);
+    if (flags & SDL_WINDOW_MINIMIZED)
+        return;
+
+    int w = 0, h = 0;
+    int pw = 0, ph = 0;
+    SDL_GetWindowSize(window_, &w, &h);
+    SDL_GetWindowSizeInPixels(window_, &pw, &ph);
+
+    float sx = (w > 0) ? (float)pw / (float)w : 1.0f;
+    float sy = (h > 0) ? (float)ph / (float)h : 1.0f;
+    if (sx <= 0.0f || !std::isfinite(sx)) sx = 1.0f;
+    if (sy <= 0.0f || !std::isfinite(sy)) sy = 1.0f;
+
+    auto quantize = [](float v) {
+        return std::round(v * 1000.0f) / 1000.0f;
+    };
+    sx = quantize(sx);
+    sy = quantize(sy);
+
+    float curx = 1.0f, cury = 1.0f;
+    SDL_GetRenderScale(renderer_, &curx, &cury);
+    float qcurx = quantize(curx);
+    float qcury = quantize(cury);
+    if (qcurx == sx && qcury == sy)
+        return;
+
+    if (SDL_SetRenderScale(renderer_, sx, sy) != 0)
+    {
+        if (is_resizing_)
+        {
+            PLOG_DEBUG << "SDL_SetRenderScale(" << sx << "," << sy << ") failed during resize: " << SDL_GetError();
+        }
+        else
+        {
+            PLOG_WARNING << "SDL_SetRenderScale(" << sx << "," << sy << ") failed: " << SDL_GetError()
+                         << " w=" << w << " h=" << h << " pw=" << pw << " ph=" << ph
+                         << " curx=" << curx << " cury=" << cury;
+        }
+    }
 }

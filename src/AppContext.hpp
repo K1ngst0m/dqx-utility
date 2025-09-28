@@ -23,7 +23,10 @@ public:
     ImGuiIO& imguiIO();
 
 private:
+    void updateRendererScale();
+
     SDL_Window* window_        = nullptr;
     SDL_Renderer* renderer_    = nullptr;
     bool initialized_          = false;
+    bool is_resizing_          = false;
 };

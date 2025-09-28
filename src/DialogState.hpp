@@ -2,6 +2,7 @@
 
 #include <array>
 #include <algorithm>
+#include <vector>
 #include <imgui.h>
 
 // DialogState stores per-instance dialog data and layout properties.
@@ -10,6 +11,7 @@ struct DialogState
     static constexpr std::size_t TitleBufferSize = 128;
     static constexpr std::size_t BodyBufferSize  = 1024;
     static constexpr std::size_t FontPathSize    = 512;
+    static constexpr std::size_t EntryBufferSize = 256;
 
     float width            = 580.0f;
     float height           = 220.0f;
@@ -19,11 +21,12 @@ struct DialogState
     float background_alpha = 0.78f;
     float font_size         = 28.0f;
     float font_base_size    = 28.0f;
-    bool show_title        = true;
 
-    std::array<char, TitleBufferSize> title{};
-    std::array<char, BodyBufferSize>  body{};
     std::array<char, FontPathSize>    font_path{};
+    std::vector<std::array<char, EntryBufferSize>> segments;
+    std::array<char, EntryBufferSize> append_buffer{};
+    int editing_index = -1;
+    std::array<char, BodyBufferSize> edit_buffer{};
 
     ImVec2 window_pos      = ImVec2(0.0f, 0.0f);
     ImVec2 window_size     = ImVec2(width, height);

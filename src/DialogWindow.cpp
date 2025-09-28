@@ -11,11 +11,13 @@
 
 namespace
 {
-    constexpr ImVec4 kDialogBgColor      = ImVec4(0.0f, 0.0f, 0.0f, 0.78f);
-    constexpr ImVec4 kDialogBorderColor  = ImVec4(1.0f, 1.0f, 1.0f, 0.92f);
-    constexpr ImVec4 kDialogTextColor    = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-    constexpr ImVec4 kDialogSeparator    = ImVec4(1.0f, 1.0f, 1.0f, 0.92f);
-    constexpr ImVec4 kWarningColor       = ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
+    constexpr ImVec4 kDialogBgColor           = ImVec4(0.0f, 0.0f, 0.0f, 0.78f);
+    constexpr ImVec4 kDialogBorderColor       = ImVec4(1.0f, 1.0f, 1.0f, 0.92f);
+    constexpr ImVec4 kDialogTextColor         = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    constexpr ImVec4 kDialogSeparator         = ImVec4(1.0f, 1.0f, 1.0f, 0.92f);
+    constexpr ImVec4 kWarningColor            = ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
+    constexpr float  kDialogSeparatorThickness = 3.0f;
+    constexpr float  kDialogSeparatorSpacing   = 6.0f;
 }
 
 // Creates a dialog window instance with default state values.
@@ -31,9 +33,10 @@ DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_
     window_label_ = name_ + "###" + id_suffix_;
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
 
-    std::snprintf(state_.title.data(), state_.title.size(), "%s", reinterpret_cast<const char*>(u8"冒険ガイド"));
-    std::snprintf(state_.body.data(), state_.body.size(), "%s", reinterpret_cast<const char*>(u8"メインコマンド『せんれき』の\nこれまでのおはなしを見ながら\n物語を進めていこう。"));
     state_.font_path.fill('\0');
+    state_.append_buffer.fill('\0');
+    state_.segments.emplace_back();
+    std::snprintf(state_.segments.back().data(), state_.segments.back().size(), "%s", reinterpret_cast<const char*>(u8"メインコマンド『せんれき』の\nこれまでのおはなしを見ながら\n物語を進めていこう。"));
 
     font_manager_.registerDialog(state_);
 }
@@ -114,19 +117,26 @@ void DialogWindow::renderDialog(ImGuiIO& io)
             ImGui::SetWindowFontScale(font_scale);
         }
 
-        if (state_.show_title && state_.title[0] != '\0')
-        {
-            ImGui::TextUnformatted(state_.title.data());
-            ImGui::Spacing();
-            ImGui::PushStyleColor(ImGuiCol_Separator, kDialogSeparator);
-            ImGui::Separator();
-            ImGui::PopStyleColor();
-        }
-
         const float wrap_width = std::max(40.0f, state_.width - state_.padding.x * 2.0f);
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap_width);
-        ImGui::TextUnformatted(state_.body.data());
-        ImGui::PopTextWrapPos();
+        for (size_t i = 0; i < state_.segments.size(); ++i)
+        {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap_width);
+            ImGui::TextUnformatted(state_.segments[i].data());
+            ImGui::PopTextWrapPos();
+            if (i + 1 < state_.segments.size())
+            {
+                ImGui::Dummy(ImVec2(0.0f, kDialogSeparatorSpacing));
+                ImDrawList* draw_list = ImGui::GetWindowDrawList();
+                ImVec2 win_pos = ImGui::GetWindowPos();
+                ImVec2 cr_min = ImGui::GetWindowContentRegionMin();
+                ImVec2 cr_max = ImGui::GetWindowContentRegionMax();
+                float x1 = win_pos.x + cr_min.x;
+                float x2 = win_pos.x + cr_max.x;
+                float y  = ImGui::GetCursorScreenPos().y;
+                draw_list->AddRectFilled(ImVec2(x1, y), ImVec2(x2, y + kDialogSeparatorThickness), ImGui::GetColorU32(kDialogSeparator));
+                ImGui::Dummy(ImVec2(0.0f, kDialogSeparatorSpacing + kDialogSeparatorThickness));
+            }
+        }
 
         if (active_font)
         {
@@ -158,28 +168,6 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 // Internal helper for drawing the settings controls.
 void DialogWindow::renderSettingsPanel(ImGuiIO& io)
 {
-    ImGui::TextUnformatted("Show Title");
-    ImGui::Checkbox("##dialog_show_title", &state_.show_title);
-    ImGui::Spacing();
-
-    const bool push_font = state_.font != nullptr;
-    if (push_font)
-        ImGui::PushFont(state_.font);
-
-    if (!state_.show_title)
-        ImGui::BeginDisabled();
-    ImGui::TextUnformatted("Title Text");
-    ImGui::InputText("##dialog_title_input", state_.title.data(), state_.title.size());
-    if (!state_.show_title)
-        ImGui::EndDisabled();
-    ImGui::Spacing();
-
-    ImGui::TextUnformatted("Body Text");
-    ImGui::InputTextMultiline("##dialog_body_input", state_.body.data(), state_.body.size(), ImVec2(-FLT_MIN, 140.0f));
-
-    if (push_font)
-        ImGui::PopFont();
-
     ImGui::Spacing();
 
     const float max_dialog_width  = std::max(200.0f, io.DisplaySize.x - 40.0f);
@@ -233,20 +221,145 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
     font_changed = ImGui::SliderFloat("##dialog_font_size_slider", &state_.font_size, min_font, max_font);
     ImGui::Spacing();
 
+    ImGui::Separator();
+    ImGui::TextDisabled("Debug Session");
+
+    // Use a scoped ID to avoid conflicts across instances
+    ImGui::PushID(settings_id_suffix_.c_str());
+
+    ImGui::Spacing();
     ImGui::TextUnformatted("Font Path");
-    float avail = ImGui::GetContentRegionAvail().x;
-    ImGui::SetNextItemWidth(std::max(220.0f, avail - 120.0f));
-    ImGui::InputText("##dialog_font_path_input", state_.font_path.data(), state_.font_path.size());
-    ImGui::SameLine();
-    if (ImGui::Button("Reload Font"))
     {
-        bool loaded = font_manager_.reloadFont(state_.font_path.data());
-        state_.has_custom_font = loaded;
+        const ImGuiStyle& style = ImGui::GetStyle();
+        float avail = ImGui::GetContentRegionAvail().x;
+        float btn_w = ImGui::CalcTextSize("Reload Font").x + style.FramePadding.x * 2.0f;
+        ImGui::SetNextItemWidth(std::max(220.0f, avail - btn_w - style.ItemSpacing.x));
+        ImGui::InputText("##font_path", state_.font_path.data(), state_.font_path.size());
+        ImGui::SameLine();
+        if (ImGui::Button("Reload Font"))
+        {
+            bool loaded = font_manager_.reloadFont(state_.font_path.data());
+            state_.has_custom_font = loaded;
+        }
+        ImGui::TextDisabled("Active font: %s", state_.has_custom_font ? "custom" : "default (ASCII only)");
+        if (!state_.has_custom_font)
+            ImGui::TextColored(kWarningColor, "No CJK font loaded; Japanese text may appear as '?' characters.");
     }
 
-    ImGui::TextDisabled("Active font: %s", state_.has_custom_font ? "custom" : "default (ASCII only)");
-    if (!state_.has_custom_font)
-        ImGui::TextColored(kWarningColor, "No CJK font loaded; Japanese text may appear as '?' characters.");
+    ImGui::Spacing();
+    ImGui::TextUnformatted("Appended Texts");
+
+    // Wrap list in a child region to ensure proper clipping
+    if (ImGui::BeginChild("SegmentsChild", ImVec2(0, 220.0f), ImGuiChildFlags_Border))
+    {
+        int to_delete = -1;
+        for (int i = 0; i < static_cast<int>(state_.segments.size()); ++i)
+        {
+            ImGui::PushID(i);
+            const ImGuiStyle& style = ImGui::GetStyle();
+            float row_avail = ImGui::GetContentRegionAvail().x;
+            // Reserve space for Edit and Delete buttons
+            float edit_w = ImGui::CalcTextSize("Edit").x + style.FramePadding.x * 2.0f;
+            float del_w  = ImGui::CalcTextSize("Delete").x + style.FramePadding.x * 2.0f;
+            float text_w = std::max(220.0f, row_avail - edit_w - del_w - style.ItemSpacing.x * 2.0f);
+
+            // Render single-line with ellipsis trimming
+            {
+                ImGui::BeginGroup();
+                ImVec2 start = ImGui::GetCursorScreenPos();
+                ImVec2 line_size(text_w, ImGui::GetTextLineHeight() + style.FramePadding.y * 2.0f);
+                ImGui::InvisibleButton("##line", line_size);
+                ImVec2 clip_min = start;
+                ImVec2 clip_max = ImVec2(start.x + text_w, start.y + line_size.y);
+                ImGui::PushClipRect(clip_min, clip_max, true);
+
+                const char* full = state_.segments[i].data();
+                std::string display = full;
+                ImVec2 full_sz = ImGui::CalcTextSize(display.c_str());
+                if (full_sz.x > text_w)
+                {
+                    std::string ell = display;
+                    const char* ellipsis = "...";
+                    // Trim until it fits
+                    while (!ell.empty())
+                    {
+                        ImVec2 sz = ImGui::CalcTextSize((ell + ellipsis).c_str());
+                        if (sz.x <= text_w)
+                        {
+                            display = ell + ellipsis;
+                            break;
+                        }
+                        ell.pop_back();
+                    }
+                    if (ell.empty())
+                        display = ellipsis; // fallback
+                }
+                ImGui::SetCursorScreenPos(ImVec2(start.x + style.FramePadding.x, start.y + style.FramePadding.y));
+                ImGui::TextUnformatted(display.c_str());
+                ImGui::PopClipRect();
+                ImGui::EndGroup();
+            }
+
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Edit"))
+            {
+                state_.editing_index = i;
+                std::snprintf(state_.edit_buffer.data(), state_.edit_buffer.size(), "%s", state_.segments[i].data());
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Delete"))
+                to_delete = i;
+            ImGui::PopID();
+        }
+        if (to_delete >= 0 && to_delete < static_cast<int>(state_.segments.size()))
+            state_.segments.erase(state_.segments.begin() + to_delete);
+    }
+    ImGui::EndChild();
+
+    // Full editor for selected entry
+    if (state_.editing_index >= 0 && state_.editing_index < static_cast<int>(state_.segments.size()))
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled("Editing Entry #%d", state_.editing_index);
+        ImVec2 box(0, 160.0f);
+        ImGui::InputTextMultiline("##full_editor", state_.edit_buffer.data(), state_.edit_buffer.size(), box);
+        if (ImGui::Button("Save"))
+        {
+            // Save back to segment (truncate to buffer size)
+            std::snprintf(state_.segments[state_.editing_index].data(), state_.segments[state_.editing_index].size(), "%s", state_.edit_buffer.data());
+            state_.editing_index = -1;
+            state_.edit_buffer[0] = '\0';
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            state_.editing_index = -1;
+            state_.edit_buffer[0] = '\0';
+        }
+    }
+
+    ImGui::Spacing();
+    ImGui::TextUnformatted("Append New Text");
+    {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        float append_avail = ImGui::GetContentRegionAvail().x;
+        float btn_w = ImGui::CalcTextSize("Append").x + style.FramePadding.x * 2.0f;
+        ImGui::SetNextItemWidth(std::max(220.0f, append_avail - btn_w - style.ItemSpacing.x));
+        ImGui::InputText("##append", state_.append_buffer.data(), state_.append_buffer.size());
+        ImGui::SameLine();
+        if (ImGui::Button("Append"))
+        {
+            if (state_.append_buffer[0] != '\0')
+            {
+                state_.segments.emplace_back();
+                std::snprintf(state_.segments.back().data(), state_.segments.back().size(), "%s", state_.append_buffer.data());
+                state_.append_buffer[0] = '\0';
+            }
+        }
+    }
+
+    ImGui::PopID();
+
 
     if (width_changed)
     {
