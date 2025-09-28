@@ -88,6 +88,8 @@ add_executable(dqx_utility
   src/translate/ITranslator.hpp
   src/translate/OpenAITranslator.cpp
   src/translate/OpenAITranslator.hpp
+  src/translate/LabelProcessor.cpp
+  src/translate/LabelProcessor.hpp
   src/config/ConfigManager.cpp
   src/config/ConfigManager.hpp
 )

@@ -15,6 +15,7 @@ struct ImGuiIO;
 
 namespace ipc { class TextSourceClient; }
 namespace translate { class ITranslator; }
+class LabelProcessor;
 
 class DialogWindow : public UIWindow
 {
@@ -64,4 +65,5 @@ private:
 
     std::unique_ptr<translate::ITranslator> translator_;
     std::uint64_t last_job_id_ = 0;
+    std::unique_ptr<LabelProcessor> label_processor_;
 };

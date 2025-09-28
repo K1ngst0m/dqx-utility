@@ -12,6 +12,7 @@
 #include "ipc/TextSourceClient.hpp"
 #include "translate/ITranslator.hpp"
 #include "translate/OpenAITranslator.hpp"
+#include "translate/LabelProcessor.hpp"
 #include "config/ConfigManager.hpp"
 
 namespace
@@ -61,6 +62,8 @@ DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_
     settings_id_suffix_ = "dialog_settings_" + std::to_string(instance_id);
     window_label_ = name_ + "###" + id_suffix_;
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
+    
+    label_processor_ = std::make_unique<LabelProcessor>();
 
     state_.font_path.fill('\0');
     state_.append_buffer.fill('\0');
@@ -123,6 +126,9 @@ void DialogWindow::applyPending()
         {
             if (translator_ && translator_->isReady())
             {
+                // Process labels before translation
+                std::string processed_text = label_processor_->processText(m.text);
+                
                 // Queue async translation job - original text will be replaced by translation
                 std::uint64_t job_id = 0;
                 std::string target_lang_str;
@@ -132,7 +138,7 @@ void DialogWindow::applyPending()
                 case DialogState::TargetLang::ZH_CN: target_lang_str = "zh-cn"; break;
                 case DialogState::TargetLang::ZH_TW: target_lang_str = "zh-tw"; break;
                 }
-                translator_->translate(m.text, "auto", target_lang_str, job_id);
+                translator_->translate(processed_text, "auto", target_lang_str, job_id);
                 last_job_id_ = job_id;
             }
             // Skip showing original text - only show translation when ready
