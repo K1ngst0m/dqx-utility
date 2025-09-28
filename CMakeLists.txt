@@ -45,6 +45,23 @@ CPMAddPackage(
   URL_HASH SHA256=9212ee7c4718b1466a5d99e64bce3ef1965704afea4ba651f8d978d0791b7c7c
 )
 
+CPMAddPackage(
+  NAME cpr
+  GITHUB_REPOSITORY libcpr/cpr
+  GIT_TAG 1.10.5
+  OPTIONS
+    "CPR_BUILD_TESTS OFF"
+    "CPR_BUILD_DOCS OFF"
+    "CPR_USE_SYSTEM_CURL ON"
+)
+
+CPMAddPackage(
+  NAME tomlplusplus
+  GITHUB_REPOSITORY marzer/tomlplusplus
+  GIT_TAG v3.4.0
+  DOWNLOAD_ONLY YES
+)
+
 if(imgui_ADDED)
   add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp
@@ -68,11 +85,22 @@ add_executable(dqx_utility
   src/SettingsPanel.cpp
   src/WindowRegistry.cpp
   src/ipc/TextSourceClient.cpp
+  src/translate/ITranslator.hpp
+  src/translate/OpenAITranslator.cpp
+  src/translate/OpenAITranslator.hpp
+  src/config/ConfigManager.cpp
+  src/config/ConfigManager.hpp
 )
 
 set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
 target_compile_features(dqx_utility PRIVATE cxx_std_20)
 target_link_libraries(dqx_utility PRIVATE SDL3::SDL3-static imgui)
+if(cpr_ADDED)
+  target_link_libraries(dqx_utility PRIVATE cpr::cpr)
+endif()
+if(tomlplusplus_SOURCE_DIR)
+  target_include_directories(dqx_utility PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
+endif()
 if(plog_SOURCE_DIR)
   target_include_directories(dqx_utility PRIVATE ${plog_SOURCE_DIR}/include)
 endif()

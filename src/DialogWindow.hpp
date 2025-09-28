@@ -14,6 +14,7 @@
 struct ImGuiIO;
 
 namespace ipc { class TextSourceClient; }
+namespace translate { class ITranslator; }
 
 class DialogWindow : public UIWindow
 {
@@ -30,6 +31,10 @@ public:
     void renderSettings(ImGuiIO& io) override;
 
     DialogState& state() { return state_; }
+
+    // Exposed for config manager apply
+    void initTranslatorIfEnabled();
+    void autoConnectIPC();
 private:
     struct PendingMsg { std::string text; std::string lang; std::uint64_t seq = 0; };
 
@@ -56,4 +61,7 @@ private:
     std::uint64_t last_applied_seq_ = 0;
     bool appended_since_last_frame_ = false;
     std::array<char, 512> last_error_{};
+
+    std::unique_ptr<translate::ITranslator> translator_;
+    std::uint64_t last_job_id_ = 0;
 };

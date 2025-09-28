@@ -1,0 +1,52 @@
+#pragma once
+
+#include "ITranslator.hpp"
+
+#include <atomic>
+#include <mutex>
+#include <thread>
+#include <queue>
+
+namespace translate
+{
+    // OpenAI-compatible translation service with async processing
+    // Uses worker thread to handle HTTP requests without blocking UI
+    class OpenAITranslator : public ITranslator
+    {
+    public:
+        OpenAITranslator();
+        ~OpenAITranslator() override;
+
+        bool init(const TranslatorConfig& cfg) override;
+        bool isReady() const override;
+        void shutdown() override;
+        bool translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id) override;
+        bool drain(std::vector<Completed>& out) override;
+        const char* lastError() const override { return last_error_.c_str(); }
+
+    private:
+        struct Job
+        {
+            std::uint64_t id;
+            std::string text;
+            std::string src;
+            std::string dst;
+        };
+
+        void workerLoop();
+        bool doRequest(const std::string& text, const std::string& target_lang, std::string& out_text);
+        static std::string normalizeURL(const std::string& base_url);
+        static std::string escapeJSON(const std::string& s);
+        static bool extractContent(const std::string& body, std::string& out);
+
+        TranslatorConfig cfg_{};
+        std::atomic<bool> running_{false};
+        std::thread worker_;
+        std::mutex q_mtx_;
+        std::queue<Job> queue_;
+        std::mutex r_mtx_;
+        std::vector<Completed> results_;
+        std::uint64_t next_id_ = 1;
+        std::string last_error_;
+    };
+}

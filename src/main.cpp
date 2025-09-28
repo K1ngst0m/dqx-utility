@@ -3,6 +3,7 @@
 #include "SettingsPanel.hpp"
 #include "WindowRegistry.hpp"
 #include "IconUtils.hpp"
+#include "config/ConfigManager.hpp"
 
 #include <SDL3/SDL.h>
 #include <plog/Appenders/ConsoleAppender.h>
@@ -96,7 +97,16 @@ int main(int argc, char** argv)
     ImGuiIO& io = app.imguiIO();
     FontManager font_manager(io);
     WindowRegistry registry(font_manager, io);
-    registry.createDialogWindow();
+
+    // Init config manager and bind to registry
+    static ConfigManager cfg_mgr;
+    ConfigManager_Set(&cfg_mgr);
+    cfg_mgr.setRegistry(&registry);
+
+    // Load config at startup; if no dialogs loaded, create a default one
+    cfg_mgr.loadAtStartup();
+    if (registry.windowsByType(UIWindowType::Dialog).empty())
+        registry.createDialogWindow();
 
     SettingsPanel settings_panel(registry);
 
@@ -134,5 +144,7 @@ int main(int argc, char** argv)
         SDL_Delay(16);
     }
 
+    // Save config on quit
+    if (auto* cm = ConfigManager_Get()) cm->saveAll();
     return 0;
 }

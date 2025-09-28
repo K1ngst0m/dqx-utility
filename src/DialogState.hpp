@@ -10,8 +10,19 @@ struct DialogState
     static constexpr std::size_t TitleBufferSize = 128;
     static constexpr std::size_t BodyBufferSize  = 1024;
     static constexpr std::size_t FontPathSize    = 512;
-    static constexpr std::size_t EntryBufferSize = 256;
+    static constexpr std::size_t EntryBufferSize = 2048;
     static constexpr std::size_t PortfilePathSize = 512;
+    static constexpr std::size_t LangSize = 32;
+    static constexpr std::size_t URLSize = 256;
+    static constexpr std::size_t ModelSize = 128;
+    static constexpr std::size_t ApiKeySize = 256;
+
+    enum class TargetLang
+    {
+        EN_US = 0,
+        ZH_CN = 1,
+        ZH_TW = 2
+    };
 
     float width            = 580.0f;
     float height           = 220.0f;
@@ -36,6 +47,12 @@ struct DialogState
 
     std::array<char, PortfilePathSize> portfile_path{};
     bool auto_scroll_to_new = true;
+
+    bool translate_enabled = false;
+    TargetLang target_lang_enum = TargetLang::EN_US;
+    std::array<char, URLSize>   openai_base_url{};
+    std::array<char, ModelSize> openai_model{};
+    std::array<char, ApiKeySize> openai_api_key{};
 
     ImFont* font = nullptr;
 };

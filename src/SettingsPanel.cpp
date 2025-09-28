@@ -1,6 +1,7 @@
 #include "SettingsPanel.hpp"
 
 #include "DialogWindow.hpp"
+#include "config/ConfigManager.hpp"
 
 #include <imgui.h>
 #include <cstdio>
@@ -43,22 +44,14 @@ void SettingsPanel::render(bool& open)
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
     if (ImGui::Begin("Window Settings", &open, flags))
     {
-        static bool style_init = false;
-        static ImGuiStyle base_style;
-        if (!style_init)
-        {
-            base_style = ImGui::GetStyle();
-            style_init = true;
-        }
-
-        static float ui_scale = 1.0f;
+        float ui_scale = 1.0f;
+        if (auto* cm = ConfigManager_Get())
+            ui_scale = cm->getUIScale();
         ImGui::TextUnformatted("UI Scale");
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::SliderFloat("##ui_scale_slider", &ui_scale, 0.75f, 2.0f, "%.2fx"))
         {
-            ImGui::GetStyle() = base_style;
-            ImGui::GetStyle().ScaleAllSizes(ui_scale);
-            ImGui::GetIO().FontGlobalScale = ui_scale;
+            if (auto* cm = ConfigManager_Get()) cm->setUIScale(ui_scale);
         }
 
         ImGui::Separator();
