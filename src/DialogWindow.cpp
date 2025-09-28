@@ -6,8 +6,10 @@
 #include <algorithm>
 #include <cfloat>
 #include <cstdio>
+#include <cstring>
 
 #include "IconUtils.hpp"
+#include "ipc/TextSourceClient.hpp"
 
 namespace
 {
@@ -20,7 +22,6 @@ namespace
     constexpr float  kDialogSeparatorSpacing   = 6.0f;
 }
 
-// Creates a dialog window instance with default state values.
 DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_id, const std::string& name)
     : font_manager_(font_manager)
 {
@@ -37,19 +38,64 @@ DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_
     state_.append_buffer.fill('\0');
     state_.segments.emplace_back();
     std::snprintf(state_.segments.back().data(), state_.segments.back().size(), "%s", reinterpret_cast<const char*>(u8"メインコマンド『せんれき』の\nこれまでのおはなしを見ながら\n物語を進めていこう。"));
+    state_.portfile_path.fill('\0');
+    std::snprintf(state_.portfile_path.data(), state_.portfile_path.size(), "%s", "../dqxc/ipc.port");
 
     font_manager_.registerDialog(state_);
 }
 
-// Ensures the dialog state is unregistered when destroyed.
 DialogWindow::~DialogWindow()
 {
     font_manager_.unregisterDialog(state_);
+    if (client_)
+        client_->disconnect();
 }
 
-// Renders the dialog preview each frame.
+void DialogWindow::applyPending()
+{
+    // Pull from client inbox first
+    if (client_ && client_->isConnected())
+    {
+        std::vector<ipc::Incoming> msgs;
+        if (client_->poll(msgs))
+        {
+            std::lock_guard<std::mutex> lock(pending_mutex_);
+            for (auto& m : msgs)
+            {
+                if (m.type == "dialog")
+                {
+                    PendingMsg pm; pm.text = std::move(m.text); pm.lang = std::move(m.lang); pm.seq = m.seq;
+                    pending_.push_back(std::move(pm));
+                }
+            }
+        }
+    }
+
+    std::vector<PendingMsg> local;
+    {
+        std::lock_guard<std::mutex> lock(pending_mutex_);
+        local.swap(pending_);
+    }
+    if (local.empty())
+        return;
+    appended_since_last_frame_ = true;
+    for (auto& m : local)
+    {
+        state_.segments.emplace_back();
+        std::snprintf(state_.segments.back().data(), state_.segments.back().size(), "%s", m.text.c_str());
+        if (m.seq > 0)
+        {
+            last_applied_seq_ = m.seq;
+            if (client_)
+                client_->sendAck(last_applied_seq_);
+        }
+    }
+}
+
 void DialogWindow::render(ImGuiIO& io)
 {
+    appended_since_last_frame_ = false;
+    applyPending();
     renderDialog(io);
     renderDialogOverlay();
     renderSettingsWindow(io);
@@ -61,7 +107,6 @@ void DialogWindow::renderSettings(ImGuiIO& io)
     renderSettingsPanel(io);
 }
 
-// Internal helper for drawing the dialog window.
 void DialogWindow::renderDialog(ImGuiIO& io)
 {
     const float max_dialog_width  = std::max(200.0f, io.DisplaySize.x - 40.0f);
@@ -102,7 +147,6 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     const ImGuiWindowFlags dialog_flags = ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_NoScrollbar |
         ImGuiWindowFlags_NoCollapse;
 
     if (ImGui::Begin(window_label_.c_str(), nullptr, dialog_flags))
@@ -144,6 +188,12 @@ void DialogWindow::renderDialog(ImGuiIO& io)
             ImGui::PopFont();
         }
 
+        // Auto-scroll to bottom when new content is appended
+        if (state_.auto_scroll_to_new && appended_since_last_frame_)
+        {
+            ImGui::SetScrollHereY(1.0f);
+        }
+
         const bool was_pending_resize = state_.pending_resize;
 
         state_.window_pos  = ImGui::GetWindowPos();
@@ -162,10 +212,8 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     ImGui::PopStyleColor(3);
     ImGui::PopStyleVar(3);
-
 }
 
-// Internal helper for drawing the settings controls.
 void DialogWindow::renderSettingsPanel(ImGuiIO& io)
 {
     ImGui::Spacing();
@@ -222,9 +270,46 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
     ImGui::Spacing();
 
     ImGui::Separator();
+    ImGui::TextDisabled("Text Source (IPC)");
+
+    ImGui::Checkbox("Auto-scroll to new", &state_.auto_scroll_to_new);
+
+    ImGui::TextUnformatted("Portfile Path");
+    {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        float avail = ImGui::GetContentRegionAvail().x;
+        float btn_w = ImGui::CalcTextSize("Connect").x + style.FramePadding.x * 2.0f + ImGui::CalcTextSize("Disconnect").x + style.FramePadding.x * 2.0f + style.ItemSpacing.x;
+        ImGui::SetNextItemWidth(std::max(220.0f, avail - btn_w - style.ItemSpacing.x));
+        ImGui::InputText("##portfile_path", state_.portfile_path.data(), state_.portfile_path.size());
+        ImGui::SameLine();
+        bool connected = client_ && client_->isConnected();
+        if (!connected)
+        {
+            if (ImGui::Button("Connect"))
+            {
+                if (!client_) client_ = std::make_unique<ipc::TextSourceClient>();
+                last_error_.fill('\0');
+                if (!client_->connectFromPortfile(state_.portfile_path.data()))
+                {
+                    std::snprintf(last_error_.data(), last_error_.size(), "%s", client_->lastError());
+                }
+            }
+        }
+        else
+        {
+            if (ImGui::Button("Disconnect"))
+            {
+                client_->disconnect();
+            }
+        }
+        ImGui::TextDisabled("Status: %s", (client_ && client_->isConnected()) ? "Connected" : "Disconnected");
+        if (last_error_[0] != '\0')
+            ImGui::TextColored(kWarningColor, "%s", last_error_.data());
+    }
+
+    ImGui::Separator();
     ImGui::TextDisabled("Debug Session");
 
-    // Use a scoped ID to avoid conflicts across instances
     ImGui::PushID(settings_id_suffix_.c_str());
 
     ImGui::Spacing();
@@ -424,13 +509,12 @@ void DialogWindow::renderDialogOverlay()
     ImGui::PopStyleVar(2);
 }
 
-// Presents the per-instance settings window when requested.
 void DialogWindow::renderSettingsWindow(ImGuiIO& io)
 {
     if (!show_settings_window_)
         return;
 
-    ImGui::SetNextWindowSize(ImVec2(420.0f, 480.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(420.0f, 520.0f), ImGuiCond_FirstUseEver);
     if (ImGui::Begin(settings_window_label_.c_str(), &show_settings_window_))
     {
         renderSettingsPanel(io);

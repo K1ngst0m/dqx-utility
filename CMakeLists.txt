@@ -67,6 +67,7 @@ add_executable(dqx_utility
   src/FontManager.cpp
   src/SettingsPanel.cpp
   src/WindowRegistry.cpp
+  src/ipc/TextSourceClient.cpp
 )
 
 set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")

@@ -5,10 +5,16 @@
 #include "WindowRegistry.hpp"
 
 #include <string>
+#include <mutex>
+#include <vector>
+#include <memory>
+#include <cstdint>
+#include <array>
 
 struct ImGuiIO;
 
-// DialogWindow renders a single dialog instance and its settings pane.
+namespace ipc { class TextSourceClient; }
+
 class DialogWindow : public UIWindow
 {
 public:
@@ -25,10 +31,13 @@ public:
 
     DialogState& state() { return state_; }
 private:
+    struct PendingMsg { std::string text; std::string lang; std::uint64_t seq = 0; };
+
     void renderDialog(ImGuiIO& io);
     void renderSettingsPanel(ImGuiIO& io);
     void renderSettingsWindow(ImGuiIO& io);
     void renderDialogOverlay();
+    void applyPending();
 
     FontManager& font_manager_;
     DialogState state_{};
@@ -40,4 +49,11 @@ private:
     std::string overlay_id_suffix_;
     bool show_settings_window_ = false;
     float overlay_visibility_ = 0.0f;
+
+    std::unique_ptr<ipc::TextSourceClient> client_;
+    std::mutex pending_mutex_;
+    std::vector<PendingMsg> pending_;
+    std::uint64_t last_applied_seq_ = 0;
+    bool appended_since_last_frame_ = false;
+    std::array<char, 512> last_error_{};
 };

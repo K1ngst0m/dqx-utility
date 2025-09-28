@@ -5,13 +5,13 @@
 #include <vector>
 #include <imgui.h>
 
-// DialogState stores per-instance dialog data and layout properties.
 struct DialogState
 {
     static constexpr std::size_t TitleBufferSize = 128;
     static constexpr std::size_t BodyBufferSize  = 1024;
     static constexpr std::size_t FontPathSize    = 512;
     static constexpr std::size_t EntryBufferSize = 256;
+    static constexpr std::size_t PortfilePathSize = 512;
 
     float width            = 580.0f;
     float height           = 220.0f;
@@ -33,6 +33,9 @@ struct DialogState
     bool pending_reposition = true;
     bool pending_resize     = true;
     bool has_custom_font    = false;
+
+    std::array<char, PortfilePathSize> portfile_path{};
+    bool auto_scroll_to_new = true;
 
     ImFont* font = nullptr;
 };
