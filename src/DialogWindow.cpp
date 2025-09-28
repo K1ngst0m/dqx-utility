@@ -91,7 +91,9 @@ void DialogWindow::renderDialog(ImGuiIO& io)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, state_.padding);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, state_.rounding);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, state_.border_thickness);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, kDialogBgColor);
+    ImVec4 dialog_bg = kDialogBgColor;
+    dialog_bg.w = state_.background_alpha;
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, dialog_bg);
     ImGui::PushStyleColor(ImGuiCol_Border, kDialogBorderColor);
     ImGui::PushStyleColor(ImGuiCol_Text, kDialogTextColor);
 
