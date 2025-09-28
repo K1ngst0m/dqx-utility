@@ -59,7 +59,6 @@ DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_
     name_ = name;
     id_suffix_ = "dialog_window_" + std::to_string(instance_id);
     settings_id_suffix_ = "dialog_settings_" + std::to_string(instance_id);
-    overlay_id_suffix_ = "dialog_overlay_" + std::to_string(instance_id);
     window_label_ = name_ + "###" + id_suffix_;
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
 
@@ -176,7 +175,7 @@ void DialogWindow::render(ImGuiIO& io)
     }
 
     renderDialog(io);
-    renderDialogOverlay();
+    renderDialogContextMenu();
     renderSettingsWindow(io);
 }
 
@@ -689,53 +688,39 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         state_.pending_resize = state_.pending_resize;
 }
 
-// Draws an overlay icon when the dialog is hovered.
-void DialogWindow::renderDialogOverlay()
+// Handle right-click context menu for dialog window
+void DialogWindow::renderDialogContextMenu()
 {
-    ImVec2 mouse = ImGui::GetIO().MousePos;
-    if (!ImGui::IsMousePosValid(&mouse))
-        return;
+    // Check if mouse is within this dialog window bounds
+    ImVec2 mouse_pos = ImGui::GetIO().MousePos;
+    bool within_dialog = ImGui::IsMousePosValid(&mouse_pos) &&
+        ImGui::IsMouseHoveringRect(state_.window_pos,
+            ImVec2(state_.window_pos.x + state_.window_size.x,
+                   state_.window_pos.y + state_.window_size.y), false);
 
-    const ImVec2 icon_size(28.0f, 28.0f);
-    const ImVec2 icon_offset(-icon_size.x - 16.0f, 16.0f);
-    const ImVec2 icon_pos(state_.window_pos.x + state_.window_size.x + icon_offset.x,
-                          state_.window_pos.y + icon_offset.y);
-
-    bool hovering_dialog = ImGui::IsMouseHoveringRect(state_.window_pos,
-        ImVec2(state_.window_pos.x + state_.window_size.x,
-               state_.window_pos.y + state_.window_size.y), false);
-
-    float target_visibility = hovering_dialog ? 0.5f : 0.0f;
-    float delta = target_visibility - overlay_visibility_;
-    overlay_visibility_ += delta * ImGui::GetIO().DeltaTime * 12.0f;
-    overlay_visibility_ = std::clamp(overlay_visibility_, 0.0f, 1.0f);
-    if (overlay_visibility_ <= 0.01f)
-        return;
-
-    ImGui::SetNextWindowPos(icon_pos, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 14.0f);
-
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar;
-
-    std::string overlay_label = "SettingsIcon###" + overlay_id_suffix_;
-    if (ImGui::Begin(overlay_label.c_str(), nullptr, flags))
+    // Open context menu on right-click within dialog bounds
+    if (within_dialog && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
     {
-        ImVec2 cursor = ImGui::GetCursorScreenPos();
-        bool pressed = ImGui::InvisibleButton("##dialog_settings_toggle", icon_size);
-        bool hovered = ImGui::IsItemHovered();
-        if (pressed)
-            show_settings_window_ = !show_settings_window_;
-
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        ImVec2 center(cursor.x + icon_size.x * 0.5f, cursor.y + icon_size.y * 0.5f);
-        float combined_visibility = hovered ? 1.0f : overlay_visibility_;
-        DrawMenuIcon(draw_list, center, icon_size.x * 0.5f, combined_visibility, hovered);
+        ImGui::OpenPopup(("DialogContextMenu###" + id_suffix_).c_str());
     }
-    ImGui::End();
-    ImGui::PopStyleVar(2);
+
+    // Render the context menu
+    std::string popup_id = "DialogContextMenu###" + id_suffix_;
+    if (ImGui::BeginPopup(popup_id.c_str()))
+    {
+        if (ImGui::MenuItem("Settings"))
+        {
+            show_settings_window_ = !show_settings_window_;
+        }
+        
+        if (ImGui::MenuItem("Remove"))
+        {
+            // Signal for removal - we'll handle this in the registry
+            should_be_removed_ = true;
+        }
+        
+        ImGui::EndPopup();
+    }
 }
 
 void DialogWindow::renderSettingsWindow(ImGuiIO& io)

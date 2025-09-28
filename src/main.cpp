@@ -2,6 +2,7 @@
 #include "FontManager.hpp"
 #include "SettingsPanel.hpp"
 #include "WindowRegistry.hpp"
+#include "DialogWindow.hpp"
 #include "IconUtils.hpp"
 #include "config/ConfigManager.hpp"
 
@@ -29,50 +30,49 @@ static void SDLCALL sdl_log_bridge(void* userdata, int category, SDL_LogPriority
     }
 }
 
-// Renders the floating settings toggle icon over the application window.
-static void render_settings_toggle(ImGuiIO& io, bool& show_manager)
+// Check if mouse is outside all dialog windows
+static bool is_mouse_outside_dialogs(ImGuiIO& io, WindowRegistry& registry)
 {
-    static float visibility = 0.0f;
-    const bool mouse_valid = ImGui::IsMousePosValid(&io.MousePos);
-    const bool inside_window = mouse_valid && io.MousePos.x >= 0.0f && io.MousePos.x <= io.DisplaySize.x &&
-        io.MousePos.y >= 0.0f && io.MousePos.y <= io.DisplaySize.y;
+    if (!ImGui::IsMousePosValid(&io.MousePos))
+        return false;
 
-    float target_visibility = inside_window ? 0.5f : 0.0f;
-    float delta = target_visibility - visibility;
-    visibility += delta * io.DeltaTime * 10.0f;
-    visibility = std::clamp(visibility, 0.0f, 1.0f);
-    if (visibility < 0.02f)
-        return;
-
-    const ImVec2 icon_size(36.0f, 36.0f);
-    const ImVec2 icon_pos(io.DisplaySize.x - icon_size.x - 24.0f, 24.0f);
-
-    ImGui::SetNextWindowPos(icon_pos, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 18.0f);
-
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar;
-
-    if (ImGui::Begin("SettingsToggle##app", nullptr, flags))
+    auto dialogs = registry.windowsByType(UIWindowType::Dialog);
+    for (auto* window : dialogs)
     {
-        ImVec2 cursor = ImGui::GetCursorScreenPos();
-        bool pressed = ImGui::InvisibleButton("##menu_toggle", icon_size);
-        bool hovered = ImGui::IsItemHovered();
-        if (pressed)
-            show_manager = !show_manager;
-
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        ImVec2 center(cursor.x + icon_size.x * 0.5f, cursor.y + icon_size.y * 0.5f);
-        float target = hovered ? 1.0f : (inside_window ? 0.5f : 0.0f);
-        float local_delta = target - visibility;
-        visibility += local_delta * io.DeltaTime * 12.0f;
-        visibility = std::clamp(visibility, 0.0f, 1.0f);
-        DrawMenuIcon(draw_list, center, icon_size.x * 0.5f, visibility, hovered);
+        auto* dialog = dynamic_cast<DialogWindow*>(window);
+        if (dialog)
+        {
+            const auto& state = dialog->state();
+            bool within_dialog = ImGui::IsMouseHoveringRect(state.window_pos,
+                ImVec2(state.window_pos.x + state.window_size.x,
+                       state.window_pos.y + state.window_size.y), false);
+            if (within_dialog)
+                return false;
+        }
     }
-    ImGui::End();
-    ImGui::PopStyleVar(2);
+    return true;
+}
+
+// Handle global right-click context menu
+static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bool& show_manager)
+{
+    // Open global context menu on right-click outside all dialog windows
+    if (is_mouse_outside_dialogs(io, registry) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+    {
+        ImGui::OpenPopup("GlobalContextMenu");
+    }
+
+    // Render the global context menu
+    if (ImGui::BeginPopup("GlobalContextMenu"))
+    {
+        if (ImGui::MenuItem("Window Settings"))
+        {
+            if (!show_manager)  // Only open if not already open
+                show_manager = true;
+        }
+        
+        ImGui::EndPopup();
+    }
 }
 
 int main(int argc, char** argv)
@@ -136,7 +136,10 @@ int main(int argc, char** argv)
                 window->render(io);
         }
 
-        render_settings_toggle(io, show_manager);
+        // Process any dialog windows marked for removal
+        registry.processRemovals();
+
+        render_global_context_menu(io, registry, show_manager);
         if (show_manager)
             settings_panel.render(show_manager);
 

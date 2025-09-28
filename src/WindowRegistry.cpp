@@ -42,6 +42,20 @@ std::vector<UIWindow*> WindowRegistry::windowsByType(UIWindowType type)
     return filtered;
 }
 
+// Process removal requests from dialog windows
+void WindowRegistry::processRemovals()
+{
+    windows_.erase(std::remove_if(windows_.begin(), windows_.end(),
+        [](const std::unique_ptr<UIWindow>& window) {
+            if (window->type() == UIWindowType::Dialog)
+            {
+                auto* dialog = dynamic_cast<DialogWindow*>(window.get());
+                return dialog && dialog->shouldBeRemoved();
+            }
+            return false;
+        }), windows_.end());
+}
+
 // Generates a sequential dialog name using alphabetic suffixes.
 std::string WindowRegistry::makeDialogName()
 {

@@ -34,6 +34,7 @@ public:
 
     DialogWindow& createDialogWindow();
     void removeWindow(UIWindow* window);
+    void processRemovals(); // Remove windows marked for removal
 
     std::vector<std::unique_ptr<UIWindow>>& windows() { return windows_; }
     std::vector<UIWindow*> windowsByType(UIWindowType type);

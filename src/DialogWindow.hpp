@@ -35,13 +35,14 @@ public:
     // Exposed for config manager apply
     void initTranslatorIfEnabled();
     void autoConnectIPC();
+    bool shouldBeRemoved() const { return should_be_removed_; }
 private:
     struct PendingMsg { std::string text; std::string lang; std::uint64_t seq = 0; };
 
     void renderDialog(ImGuiIO& io);
     void renderSettingsPanel(ImGuiIO& io);
     void renderSettingsWindow(ImGuiIO& io);
-    void renderDialogOverlay();
+    void renderDialogContextMenu();
     void applyPending();
 
     FontManager& font_manager_;
@@ -51,9 +52,8 @@ private:
     std::string settings_window_label_;
     std::string id_suffix_;
     std::string settings_id_suffix_;
-    std::string overlay_id_suffix_;
     bool show_settings_window_ = false;
-    float overlay_visibility_ = 0.0f;
+    bool should_be_removed_ = false;
 
     std::unique_ptr<ipc::TextSourceClient> client_;
     std::mutex pending_mutex_;

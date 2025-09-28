@@ -3,6 +3,7 @@
 #include "DialogWindow.hpp"
 #include "config/ConfigManager.hpp"
 
+#include <algorithm>
 #include <imgui.h>
 #include <cstdio>
 
@@ -152,8 +153,24 @@ void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows
             if (ImGui::SmallButton(remove_id.c_str()))
             {
                 registry_.removeWindow(win);
-                selected_index_ = 0;
+                
+                // Update the windows list after removal
+                auto updated_windows = registry_.windowsByType(selected_type_);
+                
+                // Reset state after removal
+                if (updated_windows.empty())
+                {
+                    selected_index_ = 0;
+                }
+                else
+                {
+                    // If we removed the selected window, clamp to valid range
+                    selected_index_ = std::clamp(selected_index_, 0, static_cast<int>(updated_windows.size()) - 1);
+                }
+                
                 previous_selected_index_ = -1;
+                rename_buffer_.fill('\0');
+                
                 ImGui::EndTable();
                 return;
             }
