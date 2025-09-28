@@ -54,6 +54,15 @@ void FontManager::ensureFont(DialogState& state)
     }
     state.font = current_font_;
     state.has_custom_font = has_custom_font_;
+    if (current_font_ && current_font_->LegacySize > 0.0f)
+    {
+        float previous_base = state.font_base_size;
+        state.font_base_size = current_font_->LegacySize;
+        if (previous_base > 0.0f)
+            state.font_size = state.font_size / previous_base * state.font_base_size;
+        else if (state.font_size <= 0.0f)
+            state.font_size = state.font_base_size;
+    }
 }
 
 // Attempts to reload the atlas with a user-provided font.
@@ -84,6 +93,15 @@ void FontManager::assignFontToDialogs(ImFont* font, bool custom)
             continue;
         state->font = font;
         state->has_custom_font = custom;
+        if (font && font->LegacySize > 0.0f)
+        {
+            float previous_base = state->font_base_size;
+            state->font_base_size = font->LegacySize;
+            if (previous_base > 0.0f)
+                state->font_size = state->font_size / previous_base * state->font_base_size;
+            else if (state->font_size <= 0.0f)
+                state->font_size = state->font_base_size;
+        }
     }
 }
 

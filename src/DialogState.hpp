@@ -13,10 +13,12 @@ struct DialogState
 
     float width            = 580.0f;
     float height           = 220.0f;
-    float vertical_ratio   = 0.75f;
     ImVec2 padding         = ImVec2(24.0f, 18.0f);
     float rounding         = 16.0f;
     float border_thickness = 2.0f;
+    float background_alpha = 0.78f;
+    float font_size         = 28.0f;
+    float font_base_size    = 28.0f;
     bool show_title        = true;
 
     std::array<char, TitleBufferSize> title{};

@@ -66,7 +66,6 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     state_.width  = std::clamp(state_.width, 200.0f, max_dialog_width);
     state_.height = std::clamp(state_.height, 80.0f, max_dialog_height);
-    state_.vertical_ratio   = std::clamp(state_.vertical_ratio, 0.1f, 0.9f);
     state_.padding.x        = std::clamp(state_.padding.x, 4.0f, 80.0f);
     state_.padding.y        = std::clamp(state_.padding.y, 4.0f, 80.0f);
     state_.rounding         = std::clamp(state_.rounding, 0.0f, 32.0f);
@@ -74,7 +73,7 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     if (state_.pending_reposition)
     {
-        const ImVec2 anchor(io.DisplaySize.x * 0.5f, io.DisplaySize.y * state_.vertical_ratio);
+        const ImVec2 anchor(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.75f);
         ImGui::SetNextWindowPos(anchor, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     }
     else
@@ -103,8 +102,15 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     if (ImGui::Begin(window_label_.c_str(), nullptr, dialog_flags))
     {
-        if (state_.font)
-            ImGui::PushFont(state_.font);
+        ImFont* active_font = state_.font;
+        float font_scale = 1.0f;
+        if (active_font && state_.font_base_size > 0.0f)
+            font_scale = std::max(0.3f, state_.font_size / state_.font_base_size);
+        if (active_font)
+        {
+            ImGui::PushFont(active_font);
+            ImGui::SetWindowFontScale(font_scale);
+        }
 
         if (state_.show_title && state_.title[0] != '\0')
         {
@@ -120,11 +126,13 @@ void DialogWindow::renderDialog(ImGuiIO& io)
         ImGui::TextUnformatted(state_.body.data());
         ImGui::PopTextWrapPos();
 
-        if (state_.font)
+        if (active_font)
+        {
+            ImGui::SetWindowFontScale(1.0f);
             ImGui::PopFont();
+        }
 
-        const bool was_pending_reposition = state_.pending_reposition;
-        const bool was_pending_resize     = state_.pending_resize;
+        const bool was_pending_resize = state_.pending_resize;
 
         state_.window_pos  = ImGui::GetWindowPos();
         state_.window_size = ImGui::GetWindowSize();
@@ -133,13 +141,6 @@ void DialogWindow::renderDialog(ImGuiIO& io)
         {
             state_.width  = state_.window_size.x;
             state_.height = state_.window_size.y;
-        }
-
-        if (!was_pending_reposition)
-        {
-            const float win_center_y = state_.window_pos.y + state_.window_size.y * 0.5f;
-            const float display_h    = std::max(1.0f, io.DisplaySize.y);
-            state_.vertical_ratio = std::clamp(win_center_y / display_h, 0.1f, 0.9f);
         }
 
         state_.pending_reposition = false;
@@ -190,7 +191,8 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
 
     bool width_changed   = false;
     bool height_changed  = false;
-    bool anchor_changed  = false;
+    bool alpha_changed   = false;
+    bool font_changed    = false;
 
     ImGui::TextUnformatted("Dialog Width");
     set_slider_width();
@@ -200,11 +202,6 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
     ImGui::TextUnformatted("Dialog Height");
     set_slider_width();
     height_changed = ImGui::SliderFloat("##dialog_height_slider", &state_.height, 80.0f, max_dialog_height);
-    ImGui::Spacing();
-
-    ImGui::TextUnformatted("Vertical Anchor");
-    set_slider_width();
-    anchor_changed = ImGui::SliderFloat("##dialog_anchor_slider", &state_.vertical_ratio, 0.1f, 0.9f);
     ImGui::Spacing();
 
     ImGui::TextUnformatted("Padding XY");
@@ -220,6 +217,18 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
     ImGui::TextUnformatted("Border Thickness");
     set_slider_width();
     ImGui::SliderFloat("##dialog_border_slider", &state_.border_thickness, 0.5f, 6.0f);
+    ImGui::Spacing();
+
+    ImGui::TextUnformatted("Background Opacity");
+    set_slider_width();
+    alpha_changed = ImGui::SliderFloat("##dialog_bg_alpha_slider", &state_.background_alpha, 0.0f, 1.0f);
+    ImGui::Spacing();
+
+    ImGui::TextUnformatted("Font Size");
+    set_slider_width();
+    float min_font = std::max(8.0f, state_.font_base_size * 0.5f);
+    float max_font = state_.font_base_size * 2.5f;
+    font_changed = ImGui::SliderFloat("##dialog_font_size_slider", &state_.font_size, min_font, max_font);
     ImGui::Spacing();
 
     ImGui::TextUnformatted("Font Path");
@@ -247,10 +256,8 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         state_.window_size.y   = state_.height;
         state_.pending_resize  = true;
     }
-    if (anchor_changed)
-    {
-        state_.pending_reposition = true;
-    }
+    if (alpha_changed || font_changed)
+        state_.pending_resize = state_.pending_resize;
 }
 
 // Draws an overlay icon when the dialog is hovered.
