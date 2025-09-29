@@ -216,13 +216,9 @@ void TextSourceClient::recvLoop()
     char buf[512];
     while (running_.load())
     {
-#if defined(_WIN32)
-        int n = ::recv(sock_, buf, (int)sizeof(buf), 0);
-#else
-        ssize_t n = ::recv(sock_, buf, sizeof(buf), 0);
-#endif
+        ptrdiff_t n = ::recv(sock_, buf, sizeof(buf), 0);
         if (n <= 0) break;
-        for (ssize_t i = 0; i < n; ++i)
+        for (ptrdiff_t i = 0; i < n; ++i)
         {
             char c = buf[i];
             if (c == '\n')

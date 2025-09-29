@@ -48,7 +48,7 @@ CPMAddPackage(
   OPTIONS
     "CPR_BUILD_TESTS OFF"
     "CPR_BUILD_DOCS OFF"
-    "CPR_USE_SYSTEM_CURL ON"
+    "CPR_USE_SYSTEM_CURL OFF"
 )
 
 CPMAddPackage(
@@ -124,7 +124,9 @@ if(cpr_ADDED)
 endif()
 if(tomlplusplus_SOURCE_DIR)
   target_include_directories(dqx_utility PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
-  target_compile_options(dqx_utility PRIVATE -Wno-deprecated-literal-operator)
+  if(NOT MSVC)
+    target_compile_options(dqx_utility PRIVATE -Wno-deprecated-literal-operator)
+  endif()
 endif()
 if(plog_SOURCE_DIR)
   target_include_directories(dqx_utility PRIVATE ${plog_SOURCE_DIR}/include)
@@ -170,7 +172,9 @@ if(BUILD_TESTS AND Catch2_ADDED)
   endif()
   if(tomlplusplus_SOURCE_DIR)
     target_include_directories(dqx_utility_lib PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
-    target_compile_options(dqx_utility_lib PRIVATE -Wno-deprecated-literal-operator)
+    if(NOT MSVC)
+      target_compile_options(dqx_utility_lib PRIVATE -Wno-deprecated-literal-operator)
+    endif()
   endif()
   if(plog_SOURCE_DIR)
     target_include_directories(dqx_utility_lib PRIVATE ${plog_SOURCE_DIR}/include)
