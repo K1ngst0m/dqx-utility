@@ -138,9 +138,7 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
     std::string src = normalizeLanguageCode(src_lang);
     std::string dst = normalizeLanguageCode(dst_lang);
     
-    // Create JSON payload - need proper JSON escaping
     std::string escaped_text = text;
-    // Simple JSON string escaping
     std::size_t pos = 0;
     while ((pos = escaped_text.find('\"', pos)) != std::string::npos) {
         escaped_text.replace(pos, 1, "\\\"");
@@ -274,13 +272,19 @@ std::string GoogleTranslator::escapeUrl(const std::string& s)
 }
 std::string GoogleTranslator::extractTranslationFromJSON(const std::string& body)
 {
-    // Parse Google Cloud Translation API JSON response
-    // Format: {"data":{"translations":[{"translatedText":"..."}]}}
-    const std::string key = "\"translatedText\":\"";
+    const std::string key = "\"translatedText\"";
     size_t start = body.find(key);
     if (start == std::string::npos) return "";
     
-    start += key.length();
+    start = body.find(':', start);
+    if (start == std::string::npos) return "";
+    ++start;
+    
+    while (start < body.size() && std::isspace(body[start])) ++start;
+    
+    if (start >= body.size() || body[start] != '\"') return "";
+    ++start;
+    
     size_t end = start;
     bool escaped = false;
     
@@ -313,7 +317,6 @@ std::string GoogleTranslator::extractTranslationFromJSON(const std::string& body
     
     std::string result = body.substr(start, end - start);
     
-    // Simple unescape
     std::string unescaped;
     for (size_t i = 0; i < result.size(); ++i)
     {
@@ -338,8 +341,6 @@ std::string GoogleTranslator::extractTranslationFromJSON(const std::string& body
 
 std::string GoogleTranslator::extractTranslationFromFreeAPI(const std::string& body)
 {
-    // Parse Google Translate free API response 
-    // Format: [[["translated text","original text",null,null,3]],null,"ja"]
     const std::string pattern = "[[[\"";
     size_t start = body.find(pattern);
     if (start == std::string::npos) return "";
@@ -377,7 +378,6 @@ std::string GoogleTranslator::extractTranslationFromFreeAPI(const std::string& b
     
     std::string result = body.substr(start, end - start);
     
-    // Simple unescape
     std::string unescaped;
     for (size_t i = 0; i < result.size(); ++i)
     {
@@ -412,14 +412,12 @@ std::string GoogleTranslator::normalizeLanguageCode(const std::string& lang_code
 
 std::string GoogleTranslator::testConnection()
 {
-    // Test both APIs if available
     std::string test_text = "Hello";
     std::string target_lang = cfg_.target_lang.empty() ? "zh-cn" : cfg_.target_lang;
     std::string result;
     
     if (!cfg_.api_key.empty())
     {
-        // Test paid API
         if (tryPaidAPI(test_text, "en", target_lang, result))
         {
             if (result.empty())
@@ -428,7 +426,6 @@ std::string GoogleTranslator::testConnection()
         }
         else
         {
-            // Paid API failed, test free API
             if (tryFreeAPI(test_text, "en", target_lang, result))
             {
                 if (result.empty())
@@ -443,7 +440,6 @@ std::string GoogleTranslator::testConnection()
     }
     else
     {
-        // Test free API only
         if (tryFreeAPI(test_text, "en", target_lang, result))
         {
             if (result.empty())

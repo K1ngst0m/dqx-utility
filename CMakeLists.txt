@@ -58,6 +58,21 @@ CPMAddPackage(
   DOWNLOAD_ONLY YES
 )
 
+# Testing framework - only add if testing is enabled
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  option(BUILD_TESTS "Build tests" ON)
+else()
+  option(BUILD_TESTS "Build tests" OFF)
+endif()
+
+if(BUILD_TESTS)
+  CPMAddPackage(
+    NAME Catch2
+    GITHUB_REPOSITORY catchorg/Catch2
+    GIT_TAG v3.7.1
+  )
+endif()
+
 if(imgui_ADDED)
   add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp
@@ -120,3 +135,76 @@ if(WIN32)
 endif()
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES src/main.cpp)
+
+# Tests configuration
+if(BUILD_TESTS AND Catch2_ADDED)
+  enable_testing()
+  
+  # Create a library with the source code (excluding main.cpp) for testing
+  add_library(dqx_utility_lib STATIC
+    src/AppContext.cpp
+    src/DialogWindow.cpp
+    src/FontManager.cpp
+    src/SettingsPanel.cpp
+    src/WindowRegistry.cpp
+    src/ProcessDetector.cpp
+    src/WineDetector.cpp
+    src/ipc/TextSourceClient.cpp
+    src/translate/ITranslator.hpp
+    src/translate/OpenAITranslator.cpp
+    src/translate/OpenAITranslator.hpp
+    src/translate/GoogleTranslator.cpp
+    src/translate/GoogleTranslator.hpp
+    src/translate/TranslatorFactory.cpp
+    src/translate/LabelProcessor.cpp
+    src/translate/LabelProcessor.hpp
+    src/config/ConfigManager.cpp
+    src/config/ConfigManager.hpp
+  )
+  
+  # Apply same configuration as main executable
+  target_compile_features(dqx_utility_lib PRIVATE cxx_std_20)
+  target_link_libraries(dqx_utility_lib PRIVATE SDL3::SDL3-static imgui)
+  if(cpr_ADDED)
+    target_link_libraries(dqx_utility_lib PRIVATE cpr::cpr)
+  endif()
+  if(tomlplusplus_SOURCE_DIR)
+    target_include_directories(dqx_utility_lib PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
+    target_compile_options(dqx_utility_lib PRIVATE -Wno-deprecated-literal-operator)
+  endif()
+  if(plog_SOURCE_DIR)
+    target_include_directories(dqx_utility_lib PRIVATE ${plog_SOURCE_DIR}/include)
+  endif()
+  
+  if(MSVC)
+    target_compile_options(dqx_utility_lib PRIVATE /W4 /permissive-)
+  else()
+    target_compile_options(dqx_utility_lib PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+  
+  # Test executable
+  add_executable(dqx_utility_tests
+    tests/test_main.cpp
+    tests/utils/mock_http.cpp
+    tests/translate/test_translator_factory.cpp
+    tests/translate/test_openai_translator.cpp
+    tests/translate/test_google_translator.cpp
+  )
+  
+  target_include_directories(dqx_utility_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+  
+  target_link_libraries(dqx_utility_tests PRIVATE
+    dqx_utility_lib
+    Catch2::Catch2WithMain
+  )
+  
+  # Register tests with CTest
+  include(CTest)
+  if(Catch2_SOURCE_DIR)
+    list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
+    include(Catch)
+    catch_discover_tests(dqx_utility_tests)
+  endif()
+endif()
