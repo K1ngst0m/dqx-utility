@@ -65,7 +65,7 @@ static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bo
     // Render the global context menu
     if (ImGui::BeginPopup("GlobalContextMenu"))
     {
-        if (ImGui::MenuItem("Window Settings"))
+        if (ImGui::MenuItem("Global Settings"))
         {
             if (!show_manager)  // Only open if not already open
                 show_manager = true;

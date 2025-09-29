@@ -473,6 +473,36 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             {
                 initTranslatorIfEnabled();
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Test") && !testing_connection_)
+            {
+                testing_connection_ = true;
+                test_result_ = "Testing connection...";
+                // Create temporary translator for testing
+                auto temp_translator = std::make_unique<translate::OpenAITranslator>();
+                translate::TranslatorConfig test_cfg;
+                test_cfg.backend = translate::Backend::OpenAI;
+                switch (state_.target_lang_enum)
+                {
+                case DialogState::TargetLang::EN_US: test_cfg.target_lang = "en-us"; break;
+                case DialogState::TargetLang::ZH_CN: test_cfg.target_lang = "zh-cn"; break;
+                case DialogState::TargetLang::ZH_TW: test_cfg.target_lang = "zh-tw"; break;
+                }
+                test_cfg.base_url = state_.openai_base_url.data();
+                test_cfg.model = state_.openai_model.data();
+                test_cfg.api_key = state_.openai_api_key.data();
+                
+                if (temp_translator->init(test_cfg))
+                {
+                    test_result_ = temp_translator->testConnection();
+                }
+                else
+                {
+                    test_result_ = "Error: Failed to initialize translator for testing";
+                }
+                temp_translator->shutdown();
+                testing_connection_ = false;
+            }
         }
         else
         {
@@ -481,15 +511,85 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
                 translator_->shutdown();
                 translator_.reset();
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Test") && !testing_connection_)
+            {
+                testing_connection_ = true;
+                test_result_ = "Testing connection...";
+                test_result_ = translator_->testConnection();
+                testing_connection_ = false;
+            }
         }
 
         const char* status = (translator_ && translator_->isReady()) ? "Ready" : "Not Ready";
         ImGui::SameLine(); ImGui::TextDisabled("Status: %s", status);
-        ImGui::SameLine(); if (ImGui::SmallButton("Reinit")) initTranslatorIfEnabled();
+        ImGui::SameLine(); if (ImGui::SmallButton("Refresh")) initTranslatorIfEnabled();
         if (translator_)
         {
             const char* err = translator_->lastError();
             if (err && err[0]) ImGui::TextColored(kWarningColor, "%s", err);
+        }
+        
+        // Show test results if available
+        if (!test_result_.empty())
+        {
+            ImVec4 color;
+            if (test_result_.find("Success:") == 0)
+                color = ImVec4(0.0f, 0.8f, 0.0f, 1.0f);  // Green for success
+            else if (test_result_.find("Warning:") == 0)
+                color = ImVec4(1.0f, 0.8f, 0.0f, 1.0f);  // Yellow for warning
+            else if (test_result_.find("Error:") == 0 || test_result_.find("Testing") == 0)
+                color = ImVec4(0.9f, 0.2f, 0.2f, 1.0f);  // Red for error/testing
+            else
+                color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);  // Grey for other
+            
+            ImGui::TextColored(color, "%s", test_result_.c_str());
+            if (ImGui::SmallButton("Clear Test Result"))
+            {
+                test_result_.clear();
+            }
+        }
+        
+        ImGui::Unindent();
+        ImGui::Spacing();
+    }
+
+    // STATUS SECTION
+    if (ImGui::CollapsingHeader("Status"))
+    {
+        ImGui::Indent();
+        
+        // Translation Status
+        ImGui::TextUnformatted("Translation:");
+        ImGui::SameLine();
+        if (!state_.translate_enabled)
+        {
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "● Disabled");
+        }
+        else if (translator_ && translator_->isReady())
+        {
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "● OK");
+        }
+        else
+        {
+            const char* error_msg = (translator_ && translator_->lastError() && translator_->lastError()[0]) ? translator_->lastError() : "Not Ready";
+            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "● %s", error_msg);
+        }
+        
+        // IPC Connection Status
+        ImGui::TextUnformatted("IPC Connection:");
+        ImGui::SameLine();
+        if (client_ && client_->isConnected())
+        {
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "● Connected");
+        }
+        else if (last_error_[0] != '\0')
+        {
+            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "● Error");
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "● Disconnected");
         }
         
         ImGui::Unindent();

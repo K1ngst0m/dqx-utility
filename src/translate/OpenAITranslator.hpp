@@ -23,6 +23,7 @@ namespace translate
         bool translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id) override;
         bool drain(std::vector<Completed>& out) override;
         const char* lastError() const override { return last_error_.c_str(); }
+        std::string testConnection() override;
 
     private:
         struct Job

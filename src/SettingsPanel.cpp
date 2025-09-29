@@ -1,6 +1,7 @@
 #include "SettingsPanel.hpp"
 
 #include "DialogWindow.hpp"
+#include "ProcessDetector.hpp"
 #include "config/ConfigManager.hpp"
 
 #include <algorithm>
@@ -43,25 +44,44 @@ void SettingsPanel::render(bool& open)
     ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(1.0f, 1.0f, 1.0f, 0.92f));
 
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-    if (ImGui::Begin("Window Settings", &open, flags))
+    if (ImGui::Begin("Global Settings", &open, flags))
     {
-        float ui_scale = 1.0f;
-        if (auto* cm = ConfigManager_Get())
-            ui_scale = cm->getUIScale();
-        ImGui::TextUnformatted("UI Scale");
-        ImGui::SetNextItemWidth(220.0f);
-        if (ImGui::SliderFloat("##ui_scale_slider", &ui_scale, 0.75f, 2.0f, "%.2fx"))
+        if (ImGui::CollapsingHeader("Status", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            if (auto* cm = ConfigManager_Get()) cm->setUIScale(ui_scale);
+            bool dqx_running = ProcessDetector::isProcessRunning("DQXGame.exe");
+            ImVec4 status_color = dqx_running ? ImVec4(0.2f, 0.8f, 0.2f, 1.0f) : ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
+            const char* status_symbol = dqx_running ? "●" : "●";
+            const char* status_text = dqx_running ? "Running" : "Not Running";
+            
+            ImGui::TextColored(status_color, "%s", status_symbol);
+            ImGui::SameLine();
+            ImGui::TextUnformatted("DQXGame.exe:");
+            ImGui::SameLine();
+            ImGui::TextUnformatted(status_text);
+        }
+        
+        if (ImGui::CollapsingHeader("Appearance", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            float ui_scale = 1.0f;
+            if (auto* cm = ConfigManager_Get())
+                ui_scale = cm->getUIScale();
+            ImGui::TextUnformatted("UI Scale");
+            ImGui::SetNextItemWidth(220.0f);
+            if (ImGui::SliderFloat("##ui_scale_slider", &ui_scale, 0.75f, 2.0f, "%.2fx"))
+            {
+                if (auto* cm = ConfigManager_Get()) cm->setUIScale(ui_scale);
+            }
         }
 
-        ImGui::Separator();
-        ImGui::TextUnformatted("Window Type");
-        renderTypeSelector();
-        ImGui::Separator();
+        if (ImGui::CollapsingHeader("Window Management", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::TextUnformatted("Window Type");
+            renderTypeSelector();
+            ImGui::Separator();
 
-        auto windows = registry_.windowsByType(selected_type_);
-        renderInstanceSelector(windows);
+            auto windows = registry_.windowsByType(selected_type_);
+            renderInstanceSelector(windows);
+        }
     }
     ImGui::End();
 

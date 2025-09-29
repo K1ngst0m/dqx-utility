@@ -237,3 +237,42 @@ bool OpenAITranslator::doRequest(const std::string& text, const std::string& tar
     out_text = std::move(content);
     return true;
 }
+
+std::string OpenAITranslator::testConnection()
+{
+    if (cfg_.api_key.empty() || cfg_.model.empty() || cfg_.base_url.empty())
+        return "Error: Missing configuration (API key, model, or base URL)";
+    
+    // Step 1: Check base URL connection
+    std::string models_url = cfg_.base_url;
+    if (!models_url.empty() && models_url.back() == '/') 
+        models_url.pop_back();
+    models_url += "/v1/models";
+    
+    cpr::Header auth_headers{{"Authorization", std::string("Bearer ") + cfg_.api_key}};
+    auto models_response = cpr::Get(cpr::Url{models_url}, auth_headers);
+    
+    if (models_response.error)
+        return "Error: Cannot connect to base URL - " + models_response.error.message;
+    
+    if (models_response.status_code < 200 || models_response.status_code >= 300)
+        return "Error: Base URL returned HTTP " + std::to_string(models_response.status_code);
+    
+    // Step 2: Check if model is available
+    bool model_found = models_response.text.find('"' + cfg_.model + '"') != std::string::npos;
+    if (!model_found)
+        return "Warning: Model '" + cfg_.model + "' not found in available models list";
+    
+    // Step 3: Simple translation test
+    std::string test_text = "Hello";
+    std::string target_lang = cfg_.target_lang.empty() ? "zh-cn" : cfg_.target_lang;
+    std::string result;
+    
+    if (!doRequest(test_text, target_lang, result))
+        return "Error: Test translation failed - " + last_error_;
+    
+    if (result.empty())
+        return "Error: Test translation returned empty result";
+    
+    return "Success: Connection test passed, model responded correctly";
+}

@@ -36,5 +36,6 @@ namespace translate
         virtual bool translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id) = 0;
         virtual bool drain(std::vector<Completed>& out) = 0;
         virtual const char* lastError() const = 0;
+        virtual std::string testConnection() = 0;
     };
 }
