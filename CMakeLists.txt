@@ -6,11 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(MSVC)
-  add_compile_options(/W4 /permissive-)
-else()
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
 
 set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
 if(NOT EXISTS ${CPM_DOWNLOAD_LOCATION})
@@ -30,6 +25,7 @@ CPMAddPackage(
     "SDL_DISABLE_UNINSTALL ON"
     "SDL_SHARED OFF"
     "SDL_STATIC ON"
+    "SDL_AUDIO OFF"
 )
 
 CPMAddPackage(
@@ -94,6 +90,12 @@ add_executable(dqx_utility
   src/config/ConfigManager.hpp
 )
 
+if(MSVC)
+  target_compile_options(dqx_utility PRIVATE /W4 /permissive-)
+else()
+  target_compile_options(dqx_utility PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
 target_compile_features(dqx_utility PRIVATE cxx_std_20)
 target_link_libraries(dqx_utility PRIVATE SDL3::SDL3-static imgui)
@@ -102,6 +104,7 @@ if(cpr_ADDED)
 endif()
 if(tomlplusplus_SOURCE_DIR)
   target_include_directories(dqx_utility PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
+  target_compile_options(dqx_utility PRIVATE -Wno-deprecated-literal-operator)
 endif()
 if(plog_SOURCE_DIR)
   target_include_directories(dqx_utility PRIVATE ${plog_SOURCE_DIR}/include)
