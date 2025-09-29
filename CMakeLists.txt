@@ -81,6 +81,7 @@ add_executable(dqx_utility
   src/SettingsPanel.cpp
   src/WindowRegistry.cpp
   src/ProcessDetector.cpp
+  src/WineDetector.cpp
   src/ipc/TextSourceClient.cpp
   src/translate/ITranslator.hpp
   src/translate/OpenAITranslator.cpp

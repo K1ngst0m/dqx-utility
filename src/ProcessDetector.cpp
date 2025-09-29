@@ -1,4 +1,5 @@
 #include "ProcessDetector.hpp"
+#include "WineDetector.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -91,3 +92,13 @@ bool ProcessDetector::isProcessRunningUnix(const std::string& processName)
     return false;
 }
 #endif
+
+std::optional<WineEnvironment> ProcessDetector::detectWineEnvironment(const std::string& processName)
+{
+#ifdef _WIN32
+    // Wine detection not applicable on Windows
+    return std::nullopt;
+#else
+    return WineDetector::detectWineEnvironment(processName);
+#endif
+}
