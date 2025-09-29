@@ -24,10 +24,12 @@ struct DialogsSnapshot
         bool auto_scroll = true;
         std::string portfile_path;
         bool translate_enabled = false;
+        int translation_backend = 0; // 0=OpenAI, 1=Google
         std::string target_lang; // "en-us" | "zh-cn" | "zh-tw"
         std::string base_url;
         std::string model;
         std::string api_key;
+        std::string google_api_key;
         // GUI properties
         float width = 580.0f;
         float height = 220.0f;
@@ -95,6 +97,7 @@ static DialogsSnapshot snapshot_from_registry(WindowRegistry* registry)
         e.auto_scroll = st.auto_scroll_to_new;
         e.portfile_path = st.portfile_path.data();
         e.translate_enabled = st.translate_enabled;
+        e.translation_backend = static_cast<int>(st.translation_backend);
         switch (st.target_lang_enum)
         {
         case DialogState::TargetLang::EN_US: e.target_lang = "en-us"; break;
@@ -104,6 +107,7 @@ static DialogsSnapshot snapshot_from_registry(WindowRegistry* registry)
         e.base_url = st.openai_base_url.data();
         e.model = st.openai_model.data();
         e.api_key = st.openai_api_key.data();
+        e.google_api_key = st.google_api_key.data();
         // GUI properties
         e.width = st.width;
         e.height = st.height;
@@ -142,10 +146,12 @@ bool ConfigManager::saveAll()
         t.insert("auto_scroll_to_new", e.auto_scroll);
         t.insert("portfile_path", e.portfile_path);
         t.insert("translate_enabled", e.translate_enabled);
+        t.insert("translation_backend", e.translation_backend);
         t.insert("target_lang", e.target_lang);
         t.insert("openai_base_url", e.base_url);
         t.insert("openai_model", e.model);
         t.insert("openai_api_key", e.api_key);
+        t.insert("google_api_key", e.google_api_key);
         // GUI properties
         t.insert("width", e.width);
         t.insert("height", e.height);
@@ -191,12 +197,14 @@ static bool apply_entry_to_dialog(const DialogsSnapshot::Entry& e, DialogWindow*
     st.auto_scroll_to_new = e.auto_scroll;
     std::snprintf(st.portfile_path.data(), st.portfile_path.size(), "%s", e.portfile_path.c_str());
     st.translate_enabled = e.translate_enabled;
+    st.translation_backend = static_cast<DialogState::TranslationBackend>(e.translation_backend);
     if (e.target_lang == "en-us") st.target_lang_enum = DialogState::TargetLang::EN_US;
     else if (e.target_lang == "zh-cn") st.target_lang_enum = DialogState::TargetLang::ZH_CN;
     else if (e.target_lang == "zh-tw") st.target_lang_enum = DialogState::TargetLang::ZH_TW;
     std::snprintf(st.openai_base_url.data(), st.openai_base_url.size(), "%s", e.base_url.c_str());
     std::snprintf(st.openai_model.data(), st.openai_model.size(), "%s", e.model.c_str());
     std::snprintf(st.openai_api_key.data(), st.openai_api_key.size(), "%s", e.api_key.c_str());
+    std::snprintf(st.google_api_key.data(), st.google_api_key.size(), "%s", e.google_api_key.c_str());
     // GUI properties
     st.width = e.width;
     st.height = e.height;
@@ -278,10 +286,12 @@ bool ConfigManager::loadAndApply()
                 if (auto v = tbl["auto_scroll_to_new"].value<bool>()) e.auto_scroll = *v;
                 if (auto v = tbl["portfile_path"].value<std::string>()) e.portfile_path = *v;
                 if (auto v = tbl["translate_enabled"].value<bool>()) e.translate_enabled = *v;
+                if (auto v = tbl["translation_backend"].value<int>()) e.translation_backend = *v;
                 if (auto v = tbl["target_lang"].value<std::string>()) e.target_lang = *v;
                 if (auto v = tbl["openai_base_url"].value<std::string>()) e.base_url = *v;
                 if (auto v = tbl["openai_model"].value<std::string>()) e.model = *v;
                 if (auto v = tbl["openai_api_key"].value<std::string>()) e.api_key = *v;
+                if (auto v = tbl["google_api_key"].value<std::string>()) e.google_api_key = *v;
                 // GUI properties
                 if (auto v = tbl["width"].value<float>()) e.width = *v;
                 if (auto v = tbl["height"].value<float>()) e.height = *v;

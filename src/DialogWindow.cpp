@@ -11,7 +11,6 @@
 #include "IconUtils.hpp"
 #include "ipc/TextSourceClient.hpp"
 #include "translate/ITranslator.hpp"
-#include "translate/OpenAITranslator.hpp"
 #include "translate/LabelProcessor.hpp"
 #include "config/ConfigManager.hpp"
 
@@ -315,7 +314,7 @@ void DialogWindow::initTranslatorIfEnabled()
         return;
     }
     translate::TranslatorConfig cfg;
-    cfg.backend = translate::Backend::OpenAI;
+    cfg.backend = static_cast<translate::Backend>(state_.translation_backend);
     switch (state_.target_lang_enum)
     {
     case DialogState::TargetLang::EN_US: cfg.target_lang = "en-us"; break;
@@ -324,9 +323,16 @@ void DialogWindow::initTranslatorIfEnabled()
     }
     cfg.base_url = state_.openai_base_url.data();
     cfg.model = state_.openai_model.data();
-    cfg.api_key = state_.openai_api_key.data();
-    translator_ = std::make_unique<translate::OpenAITranslator>();
-    if (!translator_->init(cfg))
+    if (state_.translation_backend == DialogState::TranslationBackend::OpenAI)
+    {
+        cfg.api_key = state_.openai_api_key.data();
+    }
+    else if (state_.translation_backend == DialogState::TranslationBackend::Google)
+    {
+        cfg.api_key = state_.google_api_key.data();
+    }
+    translator_ = translate::createTranslator(cfg.backend);
+    if (!translator_ || !translator_->init(cfg))
     {
         translator_.reset();
     }
@@ -443,6 +449,15 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         
         ImGui::Checkbox("Enable Translation", &state_.translate_enabled);
         
+        ImGui::TextUnformatted("Backend");
+        const char* backend_items[] = { "OpenAI-compatible", "Google Translate" };
+        int current_backend = static_cast<int>(state_.translation_backend);
+        ImGui::SetNextItemWidth(220.0f);
+        if (ImGui::Combo("##translation_backend", &current_backend, backend_items, IM_ARRAYSIZE(backend_items)))
+        {
+            state_.translation_backend = static_cast<DialogState::TranslationBackend>(current_backend);
+        }
+        
         ImGui::TextUnformatted("Target Language");
         const char* lang_items[] = { "English (US)", "Chinese (Simplified)", "Chinese (Traditional)" };
         int current_lang = static_cast<int>(state_.target_lang_enum);
@@ -452,19 +467,29 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             state_.target_lang_enum = static_cast<DialogState::TargetLang>(current_lang);
         }
 
-        ImGui::TextDisabled("Backend: OpenAI-compatible");
-        ImGui::TextUnformatted("Base URL");
-        ImGui::SetNextItemWidth(300.0f);
-        ImGui::InputText("##openai_base", state_.openai_base_url.data(), state_.openai_base_url.size());
-        ImGui::TextDisabled("Examples: https://api.openai.com, http://localhost:8000, http://127.0.0.1:11434/v1");
+        // Show backend-specific configuration
+        if (state_.translation_backend == DialogState::TranslationBackend::OpenAI)
+        {
+            ImGui::TextUnformatted("Base URL");
+            ImGui::SetNextItemWidth(300.0f);
+            ImGui::InputText("##openai_base", state_.openai_base_url.data(), state_.openai_base_url.size());
+            ImGui::TextDisabled("Examples: https://api.openai.com, http://localhost:8000, http://127.0.0.1:11434/v1");
 
-        ImGui::TextUnformatted("Model");
-        ImGui::SetNextItemWidth(300.0f);
-        ImGui::InputText("##openai_model", state_.openai_model.data(), state_.openai_model.size());
+            ImGui::TextUnformatted("Model");
+            ImGui::SetNextItemWidth(300.0f);
+            ImGui::InputText("##openai_model", state_.openai_model.data(), state_.openai_model.size());
 
-        ImGui::TextUnformatted("API Key");
-        ImGui::SetNextItemWidth(300.0f);
-        ImGui::InputText("##openai_key", state_.openai_api_key.data(), state_.openai_api_key.size(), ImGuiInputTextFlags_Password);
+            ImGui::TextUnformatted("API Key");
+            ImGui::SetNextItemWidth(300.0f);
+            ImGui::InputText("##openai_key", state_.openai_api_key.data(), state_.openai_api_key.size(), ImGuiInputTextFlags_Password);
+        }
+        else if (state_.translation_backend == DialogState::TranslationBackend::Google)
+        {
+            ImGui::TextUnformatted("API Key (Optional)");
+            ImGui::SetNextItemWidth(300.0f);
+            ImGui::InputText("##google_key", state_.google_api_key.data(), state_.google_api_key.size(), ImGuiInputTextFlags_Password);
+            ImGui::TextDisabled("Leave empty to use free tier. Paid API requires Google Cloud credentials.");
+        }
 
         bool ready = translator_ && translator_->isReady();
         if (!ready)
@@ -479,9 +504,8 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
                 testing_connection_ = true;
                 test_result_ = "Testing connection...";
                 // Create temporary translator for testing
-                auto temp_translator = std::make_unique<translate::OpenAITranslator>();
                 translate::TranslatorConfig test_cfg;
-                test_cfg.backend = translate::Backend::OpenAI;
+                test_cfg.backend = static_cast<translate::Backend>(state_.translation_backend);
                 switch (state_.target_lang_enum)
                 {
                 case DialogState::TargetLang::EN_US: test_cfg.target_lang = "en-us"; break;
@@ -490,9 +514,17 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
                 }
                 test_cfg.base_url = state_.openai_base_url.data();
                 test_cfg.model = state_.openai_model.data();
-                test_cfg.api_key = state_.openai_api_key.data();
+                if (state_.translation_backend == DialogState::TranslationBackend::OpenAI)
+                {
+                    test_cfg.api_key = state_.openai_api_key.data();
+                }
+                else if (state_.translation_backend == DialogState::TranslationBackend::Google)
+                {
+                    test_cfg.api_key = state_.google_api_key.data();
+                }
                 
-                if (temp_translator->init(test_cfg))
+                auto temp_translator = translate::createTranslator(test_cfg.backend);
+                if (temp_translator && temp_translator->init(test_cfg))
                 {
                     test_result_ = temp_translator->testConnection();
                 }
@@ -500,7 +532,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
                 {
                     test_result_ = "Error: Failed to initialize translator for testing";
                 }
-                temp_translator->shutdown();
+                if (temp_translator) temp_translator->shutdown();
                 testing_connection_ = false;
             }
         }

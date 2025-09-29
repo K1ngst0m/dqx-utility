@@ -3,12 +3,14 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <memory>
 
 namespace translate
 {
     enum class Backend
     {
-        OpenAI = 0
+        OpenAI = 0,
+        Google = 1
     };
 
     struct TranslatorConfig
@@ -38,4 +40,7 @@ namespace translate
         virtual const char* lastError() const = 0;
         virtual std::string testConnection() = 0;
     };
+
+    // Factory function to create translators based on backend type
+    std::unique_ptr<ITranslator> createTranslator(Backend backend);
 }

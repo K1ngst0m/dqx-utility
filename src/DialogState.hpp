@@ -24,6 +24,12 @@ struct DialogState
         ZH_TW = 2
     };
 
+    enum class TranslationBackend
+    {
+        OpenAI = 0,
+        Google = 1
+    };
+
     float width            = 580.0f;
     float height           = 220.0f;
     ImVec2 padding         = ImVec2(24.0f, 18.0f);
@@ -49,10 +55,12 @@ struct DialogState
     bool auto_scroll_to_new = true;
 
     bool translate_enabled = false;
+    TranslationBackend translation_backend = TranslationBackend::OpenAI;
     TargetLang target_lang_enum = TargetLang::EN_US;
     std::array<char, URLSize>   openai_base_url{};
     std::array<char, ModelSize> openai_model{};
     std::array<char, ApiKeySize> openai_api_key{};
+    std::array<char, ApiKeySize> google_api_key{};
 
     ImFont* font = nullptr;
 };
