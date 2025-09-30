@@ -16,6 +16,9 @@ public:
     void render(bool& open);
 
 private:
+    void renderStatusSection();
+    void renderWindowManagementSection();
+    void renderAppearanceSection();
     void renderTypeSelector();
     void renderInstanceSelector(const std::vector<UIWindow*>& windows);
     void renderDQXClaritySection();

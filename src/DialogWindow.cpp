@@ -586,47 +586,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         ImGui::Spacing();
     }
 
-    // STATUS SECTION
-    if (ImGui::CollapsingHeader("Status"))
-    {
-        ImGui::Indent();
-        
-        // Translation Status
-        ImGui::TextUnformatted("Translation:");
-        ImGui::SameLine();
-        if (!state_.translate_enabled)
-        {
-            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "● Disabled");
-        }
-        else if (translator_ && translator_->isReady())
-        {
-            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "● OK");
-        }
-        else
-        {
-            const char* error_msg = (translator_ && translator_->lastError() && translator_->lastError()[0]) ? translator_->lastError() : "Not Ready";
-            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "● %s", error_msg);
-        }
-        
-        // IPC Connection Status
-        ImGui::TextUnformatted("IPC Connection:");
-        ImGui::SameLine();
-        if (client_ && client_->isConnected())
-        {
-            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "● Connected");
-        }
-        else if (last_error_[0] != '\0')
-        {
-            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "● Error");
-        }
-        else
-        {
-            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "● Disconnected");
-        }
-        
-        ImGui::Unindent();
-        ImGui::Spacing();
-    }
+    renderStatusSection();
 
     // DEBUG SECTION
     if (ImGui::CollapsingHeader("Debug"))
@@ -883,4 +843,46 @@ void DialogWindow::rename(const char* new_name)
     name_ = new_name;
     window_label_ = name_ + "###" + id_suffix_;
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
+}
+
+void DialogWindow::renderStatusSection()
+{
+    if (ImGui::CollapsingHeader("Status"))
+    {
+        ImGui::Indent();
+
+        ImGui::TextUnformatted("Translation:");
+        ImGui::SameLine();
+        if (!state_.translate_enabled)
+        {
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "● Disabled");
+        }
+        else if (translator_ && translator_->isReady())
+        {
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "● OK");
+        }
+        else
+        {
+            const char* error_msg = (translator_ && translator_->lastError() && translator_->lastError()[0]) ? translator_->lastError() : "Not Ready";
+            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "● %s", error_msg);
+        }
+
+        ImGui::TextUnformatted("IPC Connection:");
+        ImGui::SameLine();
+        if (client_ && client_->isConnected())
+        {
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "● Connected");
+        }
+        else if (last_error_[0] != '\0')
+        {
+            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "● Error");
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "● Disconnected");
+        }
+
+        ImGui::Unindent();
+        ImGui::Spacing();
+    }
 }
