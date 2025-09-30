@@ -43,9 +43,9 @@ static bool is_mouse_outside_dialogs(ImGuiIO& io, WindowRegistry& registry)
         if (dialog)
         {
             const auto& state = dialog->state();
-            bool within_dialog = ImGui::IsMouseHoveringRect(state.window_pos,
-                ImVec2(state.window_pos.x + state.window_size.x,
-                       state.window_pos.y + state.window_size.y), false);
+            bool within_dialog = ImGui::IsMouseHoveringRect(state.ui_state().window_pos,
+                ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
+                       state.ui_state().window_pos.y + state.ui_state().window_size.y), false);
             if (within_dialog)
                 return false;
         }

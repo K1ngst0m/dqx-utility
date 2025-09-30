@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DialogState.hpp"
+#include "state/DialogStateManager.hpp"
 #include "FontManager.hpp"
 #include "WindowRegistry.hpp"
 
@@ -31,7 +31,7 @@ public:
     void render(ImGuiIO& io) override;
     void renderSettings(ImGuiIO& io) override;
 
-    DialogState& state() { return state_; }
+    DialogStateManager& state() { return state_; }
 
     // Exposed for config manager apply
     void initTranslatorIfEnabled();
@@ -52,7 +52,7 @@ private:
     void applyPending();
 
     FontManager& font_manager_;
-    DialogState state_{};
+    DialogStateManager state_{};
     std::string name_;
     std::string window_label_;
     std::string settings_window_label_;

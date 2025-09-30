@@ -30,20 +30,20 @@ FontManager::FontManager(ImGuiIO& io)
 }
 
 // Keeps track of dialog states that need font updates.
-void FontManager::registerDialog(DialogState& state)
+void FontManager::registerDialog(UIState& state)
 {
     dialogs_.push_back(&state);
     ensureFont(state);
 }
 
 // Removes a dialog state from update tracking.
-void FontManager::unregisterDialog(DialogState& state)
+void FontManager::unregisterDialog(UIState& state)
 {
     dialogs_.erase(std::remove(dialogs_.begin(), dialogs_.end(), &state), dialogs_.end());
 }
 
 // Makes sure the dialog has an assigned font.
-void FontManager::ensureFont(DialogState& state)
+void FontManager::ensureFont(UIState& state)
 {
     if (!current_font_)
     {
@@ -87,7 +87,7 @@ bool FontManager::reloadFont(const char* path)
 void FontManager::assignFontToDialogs(ImFont* font, bool custom)
 {
     has_custom_font_ = custom;
-    for (DialogState* state : dialogs_)
+    for (UIState* state : dialogs_)
     {
         if (!state)
             continue;

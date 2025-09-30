@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DialogState.hpp"
+#include "state/UIState.hpp"
 
 #include <vector>
 
@@ -13,10 +13,10 @@ class FontManager
 public:
     FontManager(ImGuiIO& io);
 
-    void registerDialog(DialogState& state);
-    void unregisterDialog(DialogState& state);
+    void registerDialog(UIState& state);
+    void unregisterDialog(UIState& state);
 
-    void ensureFont(DialogState& state);
+    void ensureFont(UIState& state);
     bool reloadFont(const char* path);
 
     ImFont* currentFont() const { return current_font_; }
@@ -28,7 +28,7 @@ private:
     ImFont* loadFallbackFont(bool& custom_loaded);
 
     ImGuiIO& io_;
-    std::vector<DialogState*> dialogs_;
+    std::vector<UIState*> dialogs_;
     ImFont* current_font_ = nullptr;
     bool has_custom_font_ = false;
 };

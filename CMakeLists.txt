@@ -44,7 +44,7 @@ CPMAddPackage(
 CPMAddPackage(
   NAME cpr
   GITHUB_REPOSITORY libcpr/cpr
-  GIT_TAG 1.10.5
+  GIT_TAG 1.12.0
   OPTIONS
     "CPR_BUILD_TESTS OFF"
     "CPR_BUILD_DOCS OFF"
