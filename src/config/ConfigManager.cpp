@@ -15,6 +15,87 @@ namespace fs = std::filesystem;
 
 static ConfigManager* g_cfg_mgr = nullptr;
 
+static toml::table dialogStateToToml(const std::string& name, const DialogState& state)
+{
+    toml::table t;
+    t.insert("name", name);
+    t.insert("auto_scroll_to_new", state.auto_scroll_to_new);
+    t.insert("portfile_path", std::string(state.portfile_path.data()));
+    t.insert("translate_enabled", state.translate_enabled);
+    t.insert("translation_backend", static_cast<int>(state.translation_backend));
+
+    std::string target_lang;
+    switch (state.target_lang_enum)
+    {
+    case DialogState::TargetLang::EN_US: target_lang = "en-us"; break;
+    case DialogState::TargetLang::ZH_CN: target_lang = "zh-cn"; break;
+    case DialogState::TargetLang::ZH_TW: target_lang = "zh-tw"; break;
+    }
+    t.insert("target_lang", target_lang);
+
+    t.insert("openai_base_url", std::string(state.openai_base_url.data()));
+    t.insert("openai_model", std::string(state.openai_model.data()));
+    t.insert("openai_api_key", std::string(state.openai_api_key.data()));
+    t.insert("google_api_key", std::string(state.google_api_key.data()));
+
+    // GUI properties
+    t.insert("width", state.width);
+    t.insert("height", state.height);
+    t.insert("padding_x", state.padding.x);
+    t.insert("padding_y", state.padding.y);
+    t.insert("rounding", state.rounding);
+    t.insert("border_thickness", state.border_thickness);
+    t.insert("background_alpha", state.background_alpha);
+    t.insert("font_size", state.font_size);
+    t.insert("font_path", std::string(state.font_path.data()));
+
+    return t;
+}
+
+static bool tomlToDialogState(const toml::table& t, DialogState& state, std::string& name)
+{
+    auto name_val = t["name"].value<std::string>();
+    if (!name_val) return false;
+    name = *name_val;
+
+    if (auto v = t["auto_scroll_to_new"].value<bool>()) state.auto_scroll_to_new = *v;
+    if (auto v = t["portfile_path"].value<std::string>())
+        std::snprintf(state.portfile_path.data(), state.portfile_path.size(), "%s", v->c_str());
+    if (auto v = t["translate_enabled"].value<bool>()) state.translate_enabled = *v;
+    if (auto v = t["translation_backend"].value<int>())
+        state.translation_backend = static_cast<DialogState::TranslationBackend>(*v);
+
+    if (auto v = t["target_lang"].value<std::string>())
+    {
+        if (*v == "en-us") state.target_lang_enum = DialogState::TargetLang::EN_US;
+        else if (*v == "zh-cn") state.target_lang_enum = DialogState::TargetLang::ZH_CN;
+        else if (*v == "zh-tw") state.target_lang_enum = DialogState::TargetLang::ZH_TW;
+    }
+
+    if (auto v = t["openai_base_url"].value<std::string>())
+        std::snprintf(state.openai_base_url.data(), state.openai_base_url.size(), "%s", v->c_str());
+    if (auto v = t["openai_model"].value<std::string>())
+        std::snprintf(state.openai_model.data(), state.openai_model.size(), "%s", v->c_str());
+    if (auto v = t["openai_api_key"].value<std::string>())
+        std::snprintf(state.openai_api_key.data(), state.openai_api_key.size(), "%s", v->c_str());
+    if (auto v = t["google_api_key"].value<std::string>())
+        std::snprintf(state.google_api_key.data(), state.google_api_key.size(), "%s", v->c_str());
+
+    // GUI properties
+    if (auto v = t["width"].value<double>()) state.width = static_cast<float>(*v);
+    if (auto v = t["height"].value<double>()) state.height = static_cast<float>(*v);
+    if (auto v = t["padding_x"].value<double>()) state.padding.x = static_cast<float>(*v);
+    if (auto v = t["padding_y"].value<double>()) state.padding.y = static_cast<float>(*v);
+    if (auto v = t["rounding"].value<double>()) state.rounding = static_cast<float>(*v);
+    if (auto v = t["border_thickness"].value<double>()) state.border_thickness = static_cast<float>(*v);
+    if (auto v = t["background_alpha"].value<double>()) state.background_alpha = static_cast<float>(*v);
+    if (auto v = t["font_size"].value<double>()) state.font_size = static_cast<float>(*v);
+    if (auto v = t["font_path"].value<std::string>())
+        std::snprintf(state.font_path.data(), state.font_path.size(), "%s", v->c_str());
+
+    return true;
+}
+
 // Snapshot of all dialog window states for config save/load
 struct DialogsSnapshot
 {

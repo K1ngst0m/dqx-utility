@@ -13,6 +13,7 @@
 #include "translate/ITranslator.hpp"
 #include "translate/LabelProcessor.hpp"
 #include "config/ConfigManager.hpp"
+#include "UITheme.hpp"
 
 namespace
 {
@@ -40,16 +41,6 @@ namespace
     }
 }
 
-namespace
-{
-    constexpr ImVec4 kDialogBgColor           = ImVec4(0.0f, 0.0f, 0.0f, 0.78f);
-    constexpr ImVec4 kDialogBorderColor       = ImVec4(1.0f, 1.0f, 1.0f, 0.92f);
-    constexpr ImVec4 kDialogTextColor         = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-    constexpr ImVec4 kDialogSeparator         = ImVec4(1.0f, 1.0f, 1.0f, 0.92f);
-    constexpr ImVec4 kWarningColor            = ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
-    constexpr float  kDialogSeparatorThickness = 3.0f;
-    constexpr float  kDialogSeparatorSpacing   = 6.0f;
-}
 
 DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_id, const std::string& name)
     : font_manager_(font_manager)
@@ -227,15 +218,7 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     ImGui::SetNextWindowSizeConstraints(ImVec2(200.0f, 80.0f), ImVec2(max_dialog_width, io.DisplaySize.y));
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, state_.padding);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, state_.rounding);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, state_.border_thickness);
-    ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.0f);
-    ImVec4 dialog_bg = kDialogBgColor;
-    dialog_bg.w = state_.background_alpha;
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, dialog_bg);
-    ImGui::PushStyleColor(ImGuiCol_Border, kDialogBorderColor);
-    ImGui::PushStyleColor(ImGuiCol_Text, kDialogTextColor);
+    UITheme::pushDialogStyle(state_.background_alpha, state_.padding, state_.rounding, state_.border_thickness);
 
     const ImGuiWindowFlags dialog_flags = ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoSavedSettings |
@@ -261,7 +244,7 @@ void DialogWindow::renderDialog(ImGuiIO& io)
             ImGui::PopTextWrapPos();
             if (i + 1 < state_.segments.size())
             {
-                ImGui::Dummy(ImVec2(0.0f, kDialogSeparatorSpacing));
+                ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing()));
                 ImDrawList* draw_list = ImGui::GetWindowDrawList();
                 ImVec2 win_pos = ImGui::GetWindowPos();
                 ImVec2 cr_min = ImGui::GetWindowContentRegionMin();
@@ -269,8 +252,8 @@ void DialogWindow::renderDialog(ImGuiIO& io)
                 float x1 = win_pos.x + cr_min.x;
                 float x2 = win_pos.x + cr_max.x;
                 float y  = ImGui::GetCursorScreenPos().y;
-                draw_list->AddRectFilled(ImVec2(x1, y), ImVec2(x2, y + kDialogSeparatorThickness), ImGui::GetColorU32(kDialogSeparator));
-                ImGui::Dummy(ImVec2(0.0f, kDialogSeparatorSpacing + kDialogSeparatorThickness));
+                draw_list->AddRectFilled(ImVec2(x1, y), ImVec2(x2, y + UITheme::dialogSeparatorThickness()), ImGui::GetColorU32(UITheme::dialogSeparatorColor()));
+                ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing() + UITheme::dialogSeparatorThickness()));
             }
         }
 
@@ -302,8 +285,7 @@ void DialogWindow::renderDialog(ImGuiIO& io)
     }
     ImGui::End();
 
-    ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar(4);
+    UITheme::popDialogStyle();
 }
 
 void DialogWindow::initTranslatorIfEnabled()
@@ -389,7 +371,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         if (!ok)
         {
             ImGui::SameLine();
-            ImGui::TextColored(kWarningColor, "%s", "Failed to save config; see logs.");
+            ImGui::TextColored(UITheme::warningColor(), "%s", "Failed to save config; see logs.");
         }
     }
     ImGui::Spacing();
@@ -559,7 +541,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         if (translator_)
         {
             const char* err = translator_->lastError();
-            if (err && err[0]) ImGui::TextColored(kWarningColor, "%s", err);
+            if (err && err[0]) ImGui::TextColored(UITheme::warningColor(), "%s", err);
         }
         
         // Show test results if available
@@ -626,7 +608,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             }
             ImGui::TextDisabled("Status: %s", (client_ && client_->isConnected()) ? "Connected" : "Disconnected");
             if (last_error_[0] != '\0')
-                ImGui::TextColored(kWarningColor, "%s", last_error_.data());
+                ImGui::TextColored(UITheme::warningColor(), "%s", last_error_.data());
         }
         
         ImGui::Spacing();
@@ -649,7 +631,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             }
             ImGui::TextDisabled("Active font: %s", state_.has_custom_font ? "custom" : "default (ASCII only)");
             if (!state_.has_custom_font)
-                ImGui::TextColored(kWarningColor, "No CJK font loaded; Japanese text may appear as '?' characters.");
+                ImGui::TextColored(UITheme::warningColor(), "No CJK font loaded; Japanese text may appear as '?' characters.");
         }
         
         ImGui::Spacing();
@@ -855,31 +837,31 @@ void DialogWindow::renderStatusSection()
         ImGui::SameLine();
         if (!state_.translate_enabled)
         {
-            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "● Disabled");
+            ImGui::TextColored(UITheme::disabledColor(), "● Disabled");
         }
         else if (translator_ && translator_->isReady())
         {
-            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "● OK");
+            ImGui::TextColored(UITheme::successColor(), "● OK");
         }
         else
         {
             const char* error_msg = (translator_ && translator_->lastError() && translator_->lastError()[0]) ? translator_->lastError() : "Not Ready";
-            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "● %s", error_msg);
+            ImGui::TextColored(UITheme::errorColor(), "● %s", error_msg);
         }
 
         ImGui::TextUnformatted("IPC Connection:");
         ImGui::SameLine();
         if (client_ && client_->isConnected())
         {
-            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "● Connected");
+            ImGui::TextColored(UITheme::successColor(), "● Connected");
         }
         else if (last_error_[0] != '\0')
         {
-            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "● Error");
+            ImGui::TextColored(UITheme::errorColor(), "● Error");
         }
         else
         {
-            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "● Disconnected");
+            ImGui::TextColored(UITheme::disabledColor(), "● Disconnected");
         }
 
         ImGui::Unindent();

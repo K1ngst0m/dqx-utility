@@ -4,6 +4,7 @@
 #include "ProcessDetector.hpp"
 #include "DQXClarityLauncher.hpp"
 #include "config/ConfigManager.hpp"
+#include "UITheme.hpp"
 
 #include <algorithm>
 #include <imgui.h>
@@ -40,13 +41,7 @@ void SettingsPanel::render(bool& open)
 
     ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(440.0f, 480.0f), ImGuiCond_FirstUseEver);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f, 16.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.85f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 0.92f));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(1.0f, 1.0f, 1.0f, 0.92f));
+    UITheme::pushSettingsWindowStyle();
 
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
     if (ImGui::Begin("Global Settings", &open, flags))
@@ -65,8 +60,7 @@ void SettingsPanel::render(bool& open)
     }
     ImGui::End();
 
-    ImGui::PopStyleColor(4);
-    ImGui::PopStyleVar(3);
+    UITheme::popSettingsWindowStyle();
 }
 
 // Provides a combo box for selecting the active window type.
@@ -213,16 +207,16 @@ void SettingsPanel::renderDQXClaritySection()
     switch (status)
     {
         case DQXClarityStatus::Connected:
-            status_color = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);  // Green
+            status_color = UITheme::successColor();
             break;
         case DQXClarityStatus::Running:
-            status_color = ImVec4(0.8f, 0.8f, 0.2f, 1.0f);  // Yellow
+            status_color = UITheme::cautionColor();
             break;
         case DQXClarityStatus::Disconnected:
-            status_color = ImVec4(0.8f, 0.2f, 0.2f, 1.0f);  // Red
+            status_color = UITheme::errorColor();
             break;
         case DQXClarityStatus::Stopped:
-            status_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);  // Gray
+            status_color = UITheme::disabledColor();
             break;
     }
     
@@ -285,7 +279,7 @@ void SettingsPanel::renderDQXClaritySection()
     if (status == DQXClarityStatus::Disconnected)
     {
         ImGui::Spacing();
-        ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "Warning:");
+        ImGui::TextColored(UITheme::errorColor(), "Warning:");
         ImGui::TextWrapped("dqxclarity is not on the same wineserver as DQXGame.exe. "
                            "Hooks will not work correctly. Try stopping and relaunching.");
     }
@@ -384,7 +378,7 @@ void SettingsPanel::renderStatusSection()
     if (ImGui::CollapsingHeader("Status", ImGuiTreeNodeFlags_DefaultOpen))
     {
         bool dqx_running = ProcessDetector::isProcessRunning("DQXGame.exe");
-        ImVec4 status_color = dqx_running ? ImVec4(0.2f, 0.8f, 0.2f, 1.0f) : ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
+        ImVec4 status_color = UITheme::statusColor(dqx_running, !dqx_running);
         const char* status_symbol = dqx_running ? "●" : "●";
         const char* status_text = dqx_running ? "Running" : "Not Running";
 

@@ -98,6 +98,7 @@ add_executable(dqx_utility
   src/ProcessDetector.cpp
   src/WineDetector.cpp
   src/DQXClarityLauncher.cpp
+  src/UITheme.cpp
   src/ipc/TextSourceClient.cpp
   src/translate/ITranslator.hpp
   src/translate/OpenAITranslator.cpp
@@ -153,6 +154,7 @@ if(BUILD_TESTS AND Catch2_ADDED)
     src/ProcessDetector.cpp
     src/WineDetector.cpp
     src/DQXClarityLauncher.cpp
+    src/UITheme.cpp
     src/ipc/TextSourceClient.cpp
     src/translate/ITranslator.hpp
     src/translate/OpenAITranslator.cpp
