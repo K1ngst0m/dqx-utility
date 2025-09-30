@@ -2,3 +2,12 @@
 /compile_commands.json
 /out/
 /logs/
+**/__pycache__/**
+/.cache/
+*venv*
+*.log
+dqxclarity/defaults.pref
+dqxclarity/misc_files/*.csv
+dqxclarity/misc_files/*.xlsx
+dqxclarity/misc_files/*.db
+dqxclarity/logs
