@@ -197,6 +197,9 @@ if(BUILD_TESTS AND Catch2_ADDED)
     tests/translate/test_translator_factory.cpp
     tests/translate/test_openai_translator.cpp
     tests/translate/test_google_translator.cpp
+    tests/dqxclarity/test_memory.cpp
+    src/dqxclarity/memory/LinuxMemory.cpp
+    src/dqxclarity/memory/MemoryFactory.cpp
   )
   
   target_include_directories(dqx_utility_tests PRIVATE
@@ -215,4 +218,24 @@ if(BUILD_TESTS AND Catch2_ADDED)
     include(Catch)
     catch_discover_tests(dqx_utility_tests)
   endif()
+endif()
+
+# DQXClarity C++ Memory Abstraction
+add_executable(dqxclarity-cpp
+  src/dqxclarity/main.cpp
+  src/dqxclarity/memory/LinuxMemory.cpp
+  src/dqxclarity/memory/MemoryFactory.cpp
+)
+
+target_include_directories(dqxclarity-cpp PRIVATE
+  src/dqxclarity
+)
+
+target_compile_features(dqxclarity-cpp PRIVATE cxx_std_20)
+set_target_properties(dqxclarity-cpp PROPERTIES OUTPUT_NAME "dqxclarity-cpp")
+
+if(MSVC)
+  target_compile_options(dqxclarity-cpp PRIVATE /W4 /permissive-)
+else()
+  target_compile_options(dqxclarity-cpp PRIVATE -Wall -Wextra -Wpedantic)
 endif()
