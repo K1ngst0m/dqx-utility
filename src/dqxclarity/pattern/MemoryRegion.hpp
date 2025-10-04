@@ -1,8 +1,15 @@
 #pragma once
 
-#include <sys/types.h>
+#include <cstdint>
 #include <vector>
 #include <string>
+
+#ifdef _WIN32
+    #include <windows.h>
+    using pid_t = DWORD;
+#else
+    #include <sys/types.h>
+#endif
 #include <cstdint>
 
 namespace dqxclarity {

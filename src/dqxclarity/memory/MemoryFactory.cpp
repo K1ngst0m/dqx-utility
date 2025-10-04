@@ -1,14 +1,18 @@
 #include "MemoryFactory.hpp"
-#include "LinuxMemory.hpp"
+#ifdef _WIN32
+#include "win/ProcessMemory.hpp"
+#else
+#include "linux/ProcessMemory.hpp"
+#endif
+#include <memory>
 
 namespace dqxclarity {
 
 std::unique_ptr<IProcessMemory> MemoryFactory::CreatePlatformMemory() {
 #ifdef _WIN32
-    // TODO: Return Windows implementation when available
-    return nullptr;
+    return std::make_unique<ProcessMemory>();
 #else
-    return std::make_unique<LinuxMemory>();
+    return std::make_unique<ProcessMemory>();
 #endif
 }
 
