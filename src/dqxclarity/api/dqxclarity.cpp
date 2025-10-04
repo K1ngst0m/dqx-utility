@@ -4,9 +4,12 @@
 #include "../memory/IProcessMemory.hpp"
 #include "../process/ProcessFinder.hpp"
 #include "../hooking/DialogHook.hpp"
+#include "dialog_message.hpp"
+#include "../util/spsc_ring.hpp"
 
 #include <chrono>
 #include <thread>
+#include <atomic>
 
 namespace dqxclarity {
 
@@ -15,6 +18,11 @@ struct Engine::Impl {
   Logger log{};
   std::shared_ptr<IProcessMemory> memory;
   std::unique_ptr<DialogHook> hook;
+
+  SpscRing<DialogMessage, 1024> ring;
+  std::atomic<std::uint64_t> seq{0};
+  std::thread poller;
+  std::atomic<bool> poll_stop{false};
 };
 
 Engine::Engine() : impl_(new Impl{}) {}
@@ -60,6 +68,26 @@ bool Engine::start_hook() {
   }
 
   if (impl_->log.info) impl_->log.info("Hook installed");
+
+  // Start poller thread to capture dialog events and publish to ring buffer
+  impl_->poll_stop.store(false);
+  impl_->poller = std::thread([this]{
+    using namespace std::chrono_literals;
+    while (!impl_->poll_stop.load()) {
+      if (impl_->hook && impl_->hook->PollDialogData()) {
+        DialogMessage msg;
+        msg.seq = ++impl_->seq;
+        msg.text = impl_->hook->GetLastDialogText();
+        msg.speaker.clear();
+        msg.lang.clear();
+        if (!msg.text.empty()) {
+          impl_->ring.try_push(std::move(msg));
+        }
+      }
+      std::this_thread::sleep_for(100ms);
+    }
+  });
+
   status_ = Status::Hooked;
   return true;
 }
@@ -67,6 +95,8 @@ bool Engine::start_hook() {
 bool Engine::stop_hook() {
   if (status_ == Status::Stopped || status_ == Status::Stopping) return true;
   status_ = Status::Stopping;
+  impl_->poll_stop.store(true);
+  if (impl_->poller.joinable()) impl_->poller.join();
   if (impl_->hook) {
     impl_->hook->RemoveHook();
     impl_->hook.reset();
@@ -75,6 +105,10 @@ bool Engine::stop_hook() {
   if (impl_->log.info) impl_->log.info("Hook removed");
   status_ = Status::Stopped;
   return true;
+}
+
+bool Engine::drain(std::vector<DialogMessage>& out) {
+  return impl_->ring.pop_all(out) > 0;
 }
 
 } // namespace dqxclarity

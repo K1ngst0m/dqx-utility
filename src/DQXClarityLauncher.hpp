@@ -2,6 +2,9 @@
 
 #include <string>
 #include <memory>
+#include <vector>
+
+namespace dqxclarity { struct DialogMessage; }
 
 enum class DQXClarityStatus
 {
@@ -32,6 +35,9 @@ public:
 
     // Check if DQXGame.exe is running
     bool isDQXGameRunning() const;
+
+    // Copy messages with seq > since_seq into out (non-destructive snapshot)
+    bool copyDialogsSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogMessage>& out) const;
 
 private:
     struct Impl;

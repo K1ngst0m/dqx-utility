@@ -9,11 +9,13 @@
 #include <cstring>
 
 #include "IconUtils.hpp"
-#include "ipc/TextSourceClient.hpp"
 #include "translate/ITranslator.hpp"
 #include "translate/LabelProcessor.hpp"
 #include "config/ConfigManager.hpp"
 #include "UITheme.hpp"
+#include "DQXClarityService.hpp"
+#include "DQXClarityLauncher.hpp"
+#include "dqxclarity/api/dialog_message.hpp"
 
 namespace
 {
@@ -59,8 +61,8 @@ DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_
     state_.content_state().append_buffer.fill('\0');
     state_.content_state().segments.emplace_back();
     safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), reinterpret_cast<const char*>(u8""));
+    // Legacy TCP portfile path no longer used (Phase 3)
     state_.ipc_config().portfile_path.fill('\0');
-    std::snprintf(state_.ipc_config().portfile_path.data(), state_.ipc_config().portfile_path.size(), "%s", "../dqxc/app/ipc.port");
     state_.translation_config().target_lang_enum = TranslationConfig::TargetLang::EN_US;
     state_.translation_config().openai_base_url.fill('\0');
     std::snprintf(state_.translation_config().openai_base_url.data(), state_.translation_config().openai_base_url.size(), "%s", "https://api.openai.com");
@@ -73,8 +75,6 @@ DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_
 DialogWindow::~DialogWindow()
 {
     font_manager_.unregisterDialog(state_.ui_state());
-    if (client_)
-        client_->disconnect();
 }
 
 void DialogWindow::applyPending()
@@ -85,15 +85,16 @@ void DialogWindow::applyPending()
         return true;
     };
 
-    if (client_ && client_->isConnected())
+    // Pull new dialog messages from in-process backlog (Phase 3)
+    if (auto* launcher = DQXClarityService_Get())
     {
-        std::vector<ipc::Incoming> msgs;
-        if (client_->poll(msgs))
+        std::vector<dqxclarity::DialogMessage> msgs;
+        if (launcher->copyDialogsSince(last_applied_seq_, msgs))
         {
             std::lock_guard<std::mutex> lock(pending_mutex_);
             for (auto& m : msgs)
             {
-                if (m.type == "dialog" && !m.text.empty() && !is_blank(m.text))
+                if (!m.text.empty() && !is_blank(m.text))
                 {
                     PendingMsg pm; pm.text = std::move(m.text); pm.lang = std::move(m.lang); pm.seq = m.seq;
                     pending_.push_back(std::move(pm));
@@ -141,8 +142,7 @@ void DialogWindow::applyPending()
         if (m.seq > 0)
         {
             last_applied_seq_ = m.seq;
-            if (client_)
-                client_->sendAck(last_applied_seq_);
+            // No ack needed in in-process mode
         }
     }
 }
@@ -322,27 +322,7 @@ void DialogWindow::initTranslatorIfEnabled()
 
 void DialogWindow::autoConnectIPC()
 {
-    // Only auto-connect if portfile path is configured and not empty
-    if (state_.ipc_config().portfile_path[0] == '\0')
-        return;
-
-    // Only connect if not already connected
-    if (client_ && client_->isConnected())
-        return;
-
-    if (!client_)
-        client_ = std::make_unique<ipc::TextSourceClient>();
-
-    last_error_.fill('\0');
-    if (!client_->connectFromPortfile(state_.ipc_config().portfile_path.data()))
-    {
-        std::snprintf(last_error_.data(), last_error_.size(), "%s", client_->lastError());
-        PLOG_INFO << "Auto-connect IPC failed for " << name_ << ": " << last_error_.data();
-    }
-    else
-    {
-        PLOG_INFO << "Auto-connected IPC for " << name_ << " using " << state_.ipc_config().portfile_path.data();
-    }
+    // Phase 3: no-op (legacy TCP IPC removed)
 }
 
 void DialogWindow::renderSettingsPanel(ImGuiIO& io)
@@ -576,40 +556,9 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         ImGui::Indent();
         ImGui::PushID(settings_id_suffix_.c_str());
         
-        // IPC Section
-        ImGui::TextUnformatted("Text Source (IPC)");
-        ImGui::TextUnformatted("Portfile Path");
-        {
-            const ImGuiStyle& style = ImGui::GetStyle();
-            float avail = ImGui::GetContentRegionAvail().x;
-            float btn_w = ImGui::CalcTextSize("Connect").x + style.FramePadding.x * 2.0f + ImGui::CalcTextSize("Disconnect").x + style.FramePadding.x * 2.0f + style.ItemSpacing.x;
-            ImGui::SetNextItemWidth(std::max(220.0f, avail - btn_w - style.ItemSpacing.x));
-            ImGui::InputText("##portfile_path", state_.ipc_config().portfile_path.data(), state_.ipc_config().portfile_path.size());
-            ImGui::SameLine();
-            bool connected = client_ && client_->isConnected();
-            if (!connected)
-            {
-                if (ImGui::Button("Connect"))
-                {
-                    if (!client_) client_ = std::make_unique<ipc::TextSourceClient>();
-                    last_error_.fill('\0');
-                    if (!client_->connectFromPortfile(state_.ipc_config().portfile_path.data()))
-                    {
-                        std::snprintf(last_error_.data(), last_error_.size(), "%s", client_->lastError());
-                    }
-                }
-            }
-            else
-            {
-                if (ImGui::Button("Disconnect"))
-                {
-                    client_->disconnect();
-                }
-            }
-            ImGui::TextDisabled("Status: %s", (client_ && client_->isConnected()) ? "Connected" : "Disconnected");
-            if (last_error_[0] != '\0')
-                ImGui::TextColored(UITheme::warningColor(), "%s", last_error_.data());
-        }
+        // IPC Section (Phase 3): in-process
+        ImGui::TextUnformatted("Text Source: In-Process Ring Buffer");
+        ImGui::TextDisabled("Delivery: Start/Stop controls, 5s delayed auto-start on DQXGame.exe detection.");
         
         ImGui::Spacing();
         ImGui::Separator();
@@ -849,20 +798,9 @@ void DialogWindow::renderStatusSection()
             ImGui::TextColored(UITheme::errorColor(), "● %s", error_msg);
         }
 
-        ImGui::TextUnformatted("IPC Connection:");
+        ImGui::TextUnformatted("Delivery:");
         ImGui::SameLine();
-        if (client_ && client_->isConnected())
-        {
-            ImGui::TextColored(UITheme::successColor(), "● Connected");
-        }
-        else if (last_error_[0] != '\0')
-        {
-            ImGui::TextColored(UITheme::errorColor(), "● Error");
-        }
-        else
-        {
-            ImGui::TextColored(UITheme::disabledColor(), "● Disconnected");
-        }
+        ImGui::TextColored(UITheme::successColor(), "● In-Process");
 
         ImGui::Unindent();
         ImGui::Spacing();

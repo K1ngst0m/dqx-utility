@@ -5,6 +5,7 @@
 #include "DQXClarityLauncher.hpp"
 #include "config/ConfigManager.hpp"
 #include "UITheme.hpp"
+#include "DQXClarityService.hpp"
 
 #include <algorithm>
 #include <imgui.h>
@@ -31,6 +32,8 @@ SettingsPanel::SettingsPanel(WindowRegistry& registry)
     : registry_(registry)
     , dqxc_launcher_(std::make_unique<DQXClarityLauncher>())
 {
+    // Expose launcher globally for UI windows to fetch dialog messages
+    DQXClarityService_Set(dqxc_launcher_.get());
 }
 
 // Renders the settings window with type/instance selectors.
@@ -206,11 +209,11 @@ void SettingsPanel::renderDQXClaritySection()
     ImVec4 status_color;
     switch (status)
     {
-        case DQXClarityStatus::Connected:
+        case DQXClarityStatus::Running:
             status_color = UITheme::successColor();
             break;
-        case DQXClarityStatus::Running:
-            status_color = UITheme::cautionColor();
+        case DQXClarityStatus::Connected:
+            status_color = UITheme::successColor();
             break;
         case DQXClarityStatus::Disconnected:
             status_color = UITheme::errorColor();
@@ -223,7 +226,7 @@ void SettingsPanel::renderDQXClaritySection()
     // Display status
     ImGui::TextColored(status_color, "●");
     ImGui::SameLine();
-    ImGui::TextUnformatted("DQXClarity:");
+    ImGui::TextUnformatted("Status:");
     ImGui::SameLine();
     ImGui::TextColored(status_color, "%s", status_str.c_str());
     
@@ -232,39 +235,25 @@ void SettingsPanel::renderDQXClaritySection()
     
     bool dqxgame_running = dqxc_launcher_->isDQXGameRunning();
     bool is_stopped = (status == DQXClarityStatus::Stopped);
-    
-    if (is_stopped && !is_launching_)
+
+    if (is_stopped)
     {
         if (!dqxgame_running)
         {
             ImGui::BeginDisabled();
         }
 
-        if (ImGui::Button("Launch##dqxc", ImVec2(120, 0)))
+        if (ImGui::Button("Start##dqxc", ImVec2(120, 0)))
         {
-            is_launching_ = true;
-            if (dqxc_launcher_->launch())
-            {
-                is_launching_ = false;
-            }
-            else
-            {
-                is_launching_ = false;
-            }
+            dqxc_launcher_->launch();
         }
-        
+
         if (!dqxgame_running)
         {
             ImGui::EndDisabled();
             ImGui::SameLine();
             ImGui::TextDisabled("(DQXGame.exe not running)");
         }
-    }
-    else if (is_launching_)
-    {
-        ImGui::BeginDisabled();
-        ImGui::Button("Launching...##dqxc", ImVec2(120, 0));
-        ImGui::EndDisabled();
     }
     else
     {
@@ -288,37 +277,15 @@ void SettingsPanel::renderDQXClaritySection()
 
 void SettingsPanel::renderDebugSection()
 {
-    ImGui::TextUnformatted("DQXClarity Logs");
+    ImGui::TextUnformatted("DQXClarity Debug");
     
     // Refresh log content every 2 seconds
     float current_time = ImGui::GetTime();
     if (current_time - last_log_refresh_time_ > 2.0f)
     {
-        std::string project_root;
-        
-        // Find project root
-        std::filesystem::path current_path = std::filesystem::current_path();
-        for (int i = 0; i < 3; ++i)
-        {
-            auto dqxc_path = current_path / "dqxclarity";
-            if (std::filesystem::exists(dqxc_path))
-            {
-                project_root = current_path.string();
-                break;
-            }
-            current_path = current_path.parent_path();
-        }
-        
-        if (!project_root.empty())
-        {
-            std::string log_path = project_root + "/dqxclarity/logs/console.log";
-            cached_log_content_ = readLogFile(log_path);
-        }
-        else
-        {
-            cached_log_content_ = "[Error: Could not find project root]";
-        }
-        
+        // Read the app's own log from current working directory
+        std::string log_path = "logs/run.log";
+        cached_log_content_ = readLogFile(log_path);
         last_log_refresh_time_ = current_time;
     }
     

@@ -15,6 +15,29 @@
 
 #include <filesystem>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <clocale>
+static void SetupUtf8Console()
+{
+    // Set Windows console to UTF-8 so narrow logs print correctly
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+    // Best-effort: ensure console mode supports processed output
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut && hOut != INVALID_HANDLE_VALUE)
+    {
+        DWORD mode = 0;
+        if (GetConsoleMode(hOut, &mode))
+        {
+            SetConsoleMode(hOut, mode | ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT);
+        }
+    }
+    // Set C locale to UTF-8 for stdio where applicable
+    std::setlocale(LC_ALL, ".UTF-8");
+}
+#endif
+
 static void SDLCALL sdl_log_bridge(void* userdata, int category, SDL_LogPriority priority, const char* message)
 {
     (void)userdata;
@@ -85,6 +108,10 @@ int main(int argc, char** argv)
     plog::init(plog::info, "logs/run.log");
     if (auto logger = plog::get())
         logger->addAppender(&console_appender);
+
+#ifdef _WIN32
+    SetupUtf8Console();
+#endif
 
     AppContext app;
     if (!app.initialize())

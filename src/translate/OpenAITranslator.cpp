@@ -201,7 +201,22 @@ bool OpenAITranslator::doRequest(const std::string& text, const std::string& tar
     body += "\"temperature\":0.3}";
 
     cpr::Header headers{{"Content-Type","application/json"},{"Authorization", std::string("Bearer ")+cfg_.api_key}};
-    auto r = cpr::Post(cpr::Url{url}, headers, cpr::Body{body});
+
+    cpr::Session session;
+    session.SetUrl(cpr::Url{url});
+    session.SetHeader(headers);
+    session.SetBody(cpr::Body{body});
+    // Set bounded timeouts to avoid hanging on exit; keep conservative defaults
+    session.SetConnectTimeout(cpr::ConnectTimeout{5000});   // 5s to connect
+    session.SetTimeout(cpr::Timeout{15000});                 // 15s total
+    // Allow shutdown() to abort in-flight requests quickly
+    session.SetProgressCallback(cpr::ProgressCallback(
+        [](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t userdata) -> bool {
+            auto flag = reinterpret_cast<std::atomic<bool>*>(userdata);
+            return flag && flag->load();
+        }, reinterpret_cast<intptr_t>(&running_)));
+
+    auto r = session.Post();
     if (r.error)
     {
         std::string err_msg = r.error.message;
@@ -250,18 +265,28 @@ std::string OpenAITranslator::testConnection()
     models_url += "/v1/models";
     
     cpr::Header auth_headers{{"Authorization", std::string("Bearer ") + cfg_.api_key}};
-    auto models_response = cpr::Get(cpr::Url{models_url}, auth_headers);
+    {
+        cpr::Session s;
+        s.SetUrl(cpr::Url{models_url});
+        s.SetHeader(auth_headers);
+        s.SetConnectTimeout(cpr::ConnectTimeout{3000});
+        s.SetTimeout(cpr::Timeout{8000});
+        s.SetProgressCallback(cpr::ProgressCallback(
+            [](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t userdata) -> bool {
+                auto flag = reinterpret_cast<std::atomic<bool>*>(userdata);
+                return flag && flag->load();
+            }, reinterpret_cast<intptr_t>(&running_)));
+        auto models_response = s.Get();
+        if (models_response.error)
+            return "Error: Cannot connect to base URL - " + models_response.error.message;
+        if (models_response.status_code < 200 || models_response.status_code >= 300)
+            return "Error: Base URL returned HTTP " + std::to_string(models_response.status_code);
+        // proceed using models_response below
+        bool model_found = models_response.text.find('"' + cfg_.model + '"') != std::string::npos;
+        if (!model_found)
+            return "Warning: Model '" + cfg_.model + "' not found in available models list";
+    }
     
-    if (models_response.error)
-        return "Error: Cannot connect to base URL - " + models_response.error.message;
-    
-    if (models_response.status_code < 200 || models_response.status_code >= 300)
-        return "Error: Base URL returned HTTP " + std::to_string(models_response.status_code);
-    
-    // Step 2: Check if model is available
-    bool model_found = models_response.text.find('"' + cfg_.model + '"') != std::string::npos;
-    if (!model_found)
-        return "Warning: Model '" + cfg_.model + "' not found in available models list";
     
     // Step 3: Simple translation test
     std::string test_text = "Hello";

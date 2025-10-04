@@ -29,6 +29,9 @@ class Engine {
   bool stop_hook();
   Status status() const { return status_; }
 
+  // Drain all available dialog messages into out (single consumer)
+  bool drain(std::vector<struct DialogMessage>& out);
+
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;

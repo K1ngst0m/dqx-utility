@@ -61,18 +61,17 @@ private:
     bool show_settings_window_ = false;
     bool should_be_removed_ = false;
 
-    std::unique_ptr<ipc::TextSourceClient> client_;
+    // In-process messaging (Phase 3): pending messages and last seen seq
     std::mutex pending_mutex_;
     std::vector<PendingMsg> pending_;
     std::uint64_t last_applied_seq_ = 0;
     bool appended_since_last_frame_ = false;
-    std::array<char, 512> last_error_{};
 
     std::unique_ptr<translate::ITranslator> translator_;
     std::uint64_t last_job_id_ = 0;
     std::unique_ptr<LabelProcessor> label_processor_;
     
-    // Test connection state
+    // Test connection state (translator)
     bool testing_connection_ = false;
     std::string test_result_;
 };
