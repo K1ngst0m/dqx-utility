@@ -9,6 +9,7 @@
 #include <ctime>
 #include <chrono>
 #include <thread>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <windows.h>

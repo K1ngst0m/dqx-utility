@@ -2,49 +2,65 @@ name: CI
 
 on:
   push:
+    branches: [ main, dev/* ]
   pull_request:
+    branches: [ main ]
 
 jobs:
-  build:
+  build-linux:
+    runs-on: ubuntu-22.04
     strategy:
-      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        config: [Debug, Release]
-    runs-on: ${{ matrix.os }}
+        build_type: [debug, release]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang
+          sudo apt-get install -y \
+            clang \
+            pkg-config \
+            cmake \
+            ninja-build \
+            libcurl4-openssl-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxfixes-dev \
+            libxi-dev \
+            libxss-dev \
+            libxtst-dev \
+            libxkbcommon-dev \
+            libdrm-dev \
+            libgbm-dev \
+            libgl1-mesa-dev \
+            libgles2-mesa-dev \
+            libegl1-mesa-dev \
+            libdbus-1-dev \
+            libibus-1.0-dev \
+            libudev-dev \
+            libwayland-dev \
+            libdecor-0-dev
 
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          choco install -y ninja llvm
+      - name: Cache CPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            out/linux-clang-${{ matrix.build_type }}/_deps
+            out/linux-clang-${{ matrix.build_type }}/cmake/CPM.cmake
+          key: deps-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            deps-${{ runner.os }}-${{ matrix.build_type }}-
 
       - name: Configure
-        run: |
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            preset="linux-clang-${{ matrix.config == 'Debug' && 'debug' || 'release' }}"
-          else
-            preset="windows-clang-${{ matrix.config == 'Debug' && 'debug' || 'release' }}"
-          fi
-          cmake --preset "$preset"
-        shell: bash
+        run: cmake --preset linux-clang-${{ matrix.build_type }}
 
       - name: Build
-        run: |
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            preset="linux-clang-${{ matrix.config == 'Debug' && 'debug' || 'release' }}"
-          else
-            preset="windows-clang-${{ matrix.config == 'Debug' && 'debug' || 'release' }}"
-          fi
-          cmake --build --preset "$preset" --parallel
-        shell: bash
+        run: cmake --build --preset linux-clang-${{ matrix.build_type }}
 
+      - name: Test
+        run: ./out/linux-clang-${{ matrix.build_type }}/dqx_utility_tests

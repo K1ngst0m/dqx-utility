@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(CheckCXXCompilerFlag)
+
+check_cxx_compiler_flag("-Wno-deprecated-literal-operator" HAS_NO_DEPRECATED_LITERAL_OPERATOR)
 
 set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
 if(NOT EXISTS ${CPM_DOWNLOAD_LOCATION})
@@ -48,7 +51,7 @@ CPMAddPackage(
   OPTIONS
     "CPR_BUILD_TESTS OFF"
     "CPR_BUILD_DOCS OFF"
-    "CPR_USE_SYSTEM_CURL OFF"
+    "CPR_USE_SYSTEM_CURL ON"
 )
 
 CPMAddPackage(
@@ -126,7 +129,7 @@ if(cpr_ADDED)
 endif()
 if(tomlplusplus_SOURCE_DIR)
   target_include_directories(dqx_utility PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
-  if(NOT MSVC)
+  if(NOT MSVC AND HAS_NO_DEPRECATED_LITERAL_OPERATOR)
     target_compile_options(dqx_utility PRIVATE -Wno-deprecated-literal-operator)
   endif()
 endif()
@@ -176,7 +179,7 @@ if(BUILD_TESTS AND Catch2_ADDED)
   endif()
   if(tomlplusplus_SOURCE_DIR)
     target_include_directories(dqx_utility_lib PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
-    if(NOT MSVC)
+    if(NOT MSVC AND HAS_NO_DEPRECATED_LITERAL_OPERATOR)
       target_compile_options(dqx_utility_lib PRIVATE -Wno-deprecated-literal-operator)
     endif()
   endif()
