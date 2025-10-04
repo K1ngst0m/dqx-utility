@@ -14,71 +14,7 @@ check_cxx_compiler_flag("-Wno-deprecated-literal-operator" HAS_NO_DEPRECATED_LIT
 option(BUILD_DQXCLARITY "Build DQXClarity C++ executable" ON)
 
 if(BUILD_DQXCLARITY)
-  set(DQXCLARITY_SOURCES
-    src/dqxclarity/main.cpp
-    src/dqxclarity/memory/MemoryFactory.cpp
-    src/dqxclarity/pattern/Pattern.cpp
-    src/dqxclarity/pattern/PatternScanner.cpp
-    src/dqxclarity/signatures/Signatures.cpp
-    src/dqxclarity/process/ProcessFinder.cpp
-    src/dqxclarity/hooking/DialogHook.cpp
-  )
-
-  if(WIN32)
-    list(APPEND DQXCLARITY_SOURCES
-      src/dqxclarity/memory/win/ProcessMemory.cpp
-      src/dqxclarity/pattern/win/MemoryRegion.cpp
-      src/dqxclarity/process/win/ProcessFinder.cpp
-    )
-  else()
-    list(APPEND DQXCLARITY_SOURCES
-      src/dqxclarity/memory/linux/ProcessMemory.cpp
-      src/dqxclarity/pattern/linux/MemoryRegion.cpp
-      src/dqxclarity/process/linux/ProcessFinder.cpp
-    )
-  endif()
-
-  list(APPEND DQXCLARITY_SOURCES
-    src/dqxclarity/memory/IProcessMemory.hpp
-    src/dqxclarity/memory/win/ProcessMemory.hpp
-    src/dqxclarity/memory/linux/ProcessMemory.hpp
-    src/dqxclarity/console/IConsoleSink.hpp
-    src/dqxclarity/console/ConsoleFactory.hpp
-    src/dqxclarity/console/ConsoleFactory.cpp
-    src/dqxclarity/console/ConsoleNull.hpp
-  )
-  if(WIN32)
-    list(APPEND DQXCLARITY_SOURCES
-      src/dqxclarity/console/win/Console.cpp
-      src/dqxclarity/console/win/Console.hpp
-    )
-  else()
-    list(APPEND DQXCLARITY_SOURCES
-      src/dqxclarity/console/linux/Console.cpp
-      src/dqxclarity/console/linux/Console.hpp
-    )
-  endif()
-
-  add_executable(dqxclarity-cpp ${DQXCLARITY_SOURCES})
-
-  target_include_directories(dqxclarity-cpp PRIVATE
-    src/dqxclarity
-  )
-
-  target_compile_features(dqxclarity-cpp PRIVATE cxx_std_20)
-  set_target_properties(dqxclarity-cpp PROPERTIES OUTPUT_NAME "dqxclarity-cpp")
-
-  if(WIN32)
-    target_link_libraries(dqxclarity-cpp PRIVATE psapi)
-  endif()
-
-  if(MSVC)
-    target_compile_options(dqxclarity-cpp PRIVATE /W4 /permissive-)
-  else()
-    target_compile_options(dqxclarity-cpp PRIVATE -Wall -Wextra -Wpedantic)
-  endif()
-  
-  message(STATUS "DQXClarity C++ executable will be built")
+  add_subdirectory(src/dqxclarity)
 endif()
 
 
@@ -155,32 +91,42 @@ if(WIN32 AND MSVC)
   )
   
   if(SDL3_ADDED)
-    # Create imported targets for SDL3
-    add_library(SDL3::SDL3-static STATIC IMPORTED)
-    add_library(SDL3::SDL3main STATIC IMPORTED)
-    
     # Set library paths based on architecture
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
       set(SDL3_ARCH "x64")
     else()
       set(SDL3_ARCH "x86")
     endif()
-    
-    # Set imported library locations
-    set_target_properties(SDL3::SDL3-static PROPERTIES
-      IMPORTED_LOCATION "${SDL3_SOURCE_DIR}/lib/${SDL3_ARCH}/SDL3.lib"
-      INTERFACE_INCLUDE_DIRECTORIES "${SDL3_SOURCE_DIR}/include"
-      INTERFACE_LINK_LIBRARIES "winmm;version;setupapi;advapi32;shell32;ole32;oleaut32;user32;gdi32;imm32"
-    )
-    
+
+    set(SDL3_LIB_DIR "${SDL3_SOURCE_DIR}/lib/${SDL3_ARCH}")
+    set(SDL3_STATIC_LIB "${SDL3_LIB_DIR}/SDL3-static.lib")
+    set(SDL3_IMPORT_LIB "${SDL3_LIB_DIR}/SDL3.lib")
+    set(SDL3_DLL "${SDL3_LIB_DIR}/SDL3.dll")
+
+    # Prefer static if available; otherwise use the import lib + DLL
+    if(EXISTS "${SDL3_STATIC_LIB}")
+      add_library(SDL3::SDL3 STATIC IMPORTED)
+      set_target_properties(SDL3::SDL3 PROPERTIES
+        IMPORTED_LOCATION "${SDL3_STATIC_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${SDL3_SOURCE_DIR}/include"
+        INTERFACE_LINK_LIBRARIES "winmm;version;setupapi;advapi32;shell32;ole32;oleaut32;user32;gdi32;imm32"
+      )
+    else()
+      add_library(SDL3::SDL3 SHARED IMPORTED)
+      set_target_properties(SDL3::SDL3 PROPERTIES
+        IMPORTED_IMPLIB "${SDL3_IMPORT_LIB}"
+        IMPORTED_LOCATION "${SDL3_DLL}"
+        INTERFACE_INCLUDE_DIRECTORIES "${SDL3_SOURCE_DIR}/include"
+        INTERFACE_LINK_LIBRARIES "winmm;version;setupapi;advapi32;shell32;ole32;oleaut32;user32;gdi32;imm32"
+      )
+    endif()
+
+    add_library(SDL3::SDL3main STATIC IMPORTED)
     set_target_properties(SDL3::SDL3main PROPERTIES
-      IMPORTED_LOCATION "${SDL3_SOURCE_DIR}/lib/${SDL3_ARCH}/SDL3main.lib"
+      IMPORTED_LOCATION "${SDL3_LIB_DIR}/SDL3main.lib"
       INTERFACE_INCLUDE_DIRECTORIES "${SDL3_SOURCE_DIR}/include"
     )
-    
-    # Create an alias for compatibility
-    add_library(SDL3::SDL3 ALIAS SDL3::SDL3-static)
-    
+
     message(STATUS "Using prebuilt SDL3 for Windows MSVC from: ${SDL3_SOURCE_DIR}")
   endif()
 else()
@@ -223,6 +169,8 @@ CPMAddPackage(
     "CPR_ENABLE_CURL_HTTP_ONLY ON"
     "CURL_USE_LIBPSL OFF"
     "CURL_DISABLE_COOKIES ON"
+    "BUILD_SHARED_LIBS OFF"
+    "CURL_STATICLIB ON"
 )
 
 CPMAddPackage(
@@ -258,7 +206,7 @@ if(imgui_ADDED)
     ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
   )
   target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
-  target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
+  target_link_libraries(imgui PUBLIC SDL3::SDL3)
 endif()
 
 
@@ -294,7 +242,7 @@ endif()
 
 set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
 target_compile_features(dqx_utility PRIVATE cxx_std_20)
-target_link_libraries(dqx_utility PRIVATE SDL3::SDL3-static imgui)
+target_link_libraries(dqx_utility PRIVATE SDL3::SDL3 imgui)
 if(cpr_ADDED)
   target_link_libraries(dqx_utility PRIVATE cpr::cpr)
 endif()
@@ -310,6 +258,29 @@ endif()
 
 if(WIN32)
   target_compile_definitions(dqx_utility PRIVATE SDL_MAIN_USE_CONSOLE)
+endif()
+
+# Ensure required runtime DLLs are next to the executable
+if(WIN32 AND MSVC)
+  # Determine arch for the prebuilt SDL3 package
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(_SDL3_ARCH "x64")
+  else()
+    set(_SDL3_ARCH "x86")
+  endif()
+
+  # SDL3 (import library + DLL in lib/<arch>)
+  if(DEFINED SDL3_SOURCE_DIR)
+    set(_SDL3_DLL "${SDL3_SOURCE_DIR}/lib/${_SDL3_ARCH}/SDL3.dll")
+    if(EXISTS "${_SDL3_DLL}")
+      add_custom_command(TARGET dqx_utility POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_SDL3_DLL}" $<TARGET_FILE_DIR:dqx_utility>
+        COMMENT "Copying SDL3.dll to dqx-utility output directory")
+    else()
+      message(WARNING "SDL3.dll not found at ${_SDL3_DLL}; dqx-utility may fail to start without it.")
+    endif()
+  endif()
+
 endif()
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES src/main.cpp)
@@ -344,7 +315,7 @@ if(BUILD_TESTS AND Catch2_ADDED)
   
   # Apply same configuration as main executable
   target_compile_features(dqx_utility_lib PRIVATE cxx_std_20)
-  target_link_libraries(dqx_utility_lib PRIVATE SDL3::SDL3-static imgui)
+  target_link_libraries(dqx_utility_lib PRIVATE SDL3::SDL3 imgui)
   if(cpr_ADDED)
     target_link_libraries(dqx_utility_lib PRIVATE cpr::cpr)
   endif()
