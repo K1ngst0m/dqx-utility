@@ -198,8 +198,13 @@ if(BUILD_TESTS AND Catch2_ADDED)
     tests/translate/test_openai_translator.cpp
     tests/translate/test_google_translator.cpp
     tests/dqxclarity/test_memory.cpp
+    tests/dqxclarity/test_pattern_scanner.cpp
     src/dqxclarity/memory/LinuxMemory.cpp
     src/dqxclarity/memory/MemoryFactory.cpp
+    src/dqxclarity/pattern/Pattern.cpp
+    src/dqxclarity/pattern/MemoryRegion.cpp
+    src/dqxclarity/pattern/PatternScanner.cpp
+    src/dqxclarity/signatures/Signatures.cpp
   )
   
   target_include_directories(dqx_utility_tests PRIVATE
@@ -225,6 +230,10 @@ add_executable(dqxclarity-cpp
   src/dqxclarity/main.cpp
   src/dqxclarity/memory/LinuxMemory.cpp
   src/dqxclarity/memory/MemoryFactory.cpp
+  src/dqxclarity/pattern/Pattern.cpp
+  src/dqxclarity/pattern/MemoryRegion.cpp
+  src/dqxclarity/pattern/PatternScanner.cpp
+  src/dqxclarity/signatures/Signatures.cpp
 )
 
 target_include_directories(dqxclarity-cpp PRIVATE

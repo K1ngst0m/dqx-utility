@@ -1,0 +1,43 @@
+#pragma once
+
+#include <sys/types.h>
+#include <vector>
+#include <string>
+#include <cstdint>
+
+namespace dqxclarity {
+
+enum class MemoryProtection {
+    Read = 1,
+    Write = 2,
+    Execute = 4
+};
+
+struct MemoryRegion {
+    uintptr_t start;
+    uintptr_t end;
+    int protection;
+    std::string pathname;
+
+    size_t Size() const { return end - start; }
+    bool IsReadable() const { return protection & static_cast<int>(MemoryProtection::Read); }
+    bool IsExecutable() const { return protection & static_cast<int>(MemoryProtection::Execute); }
+    bool IsWritable() const { return protection & static_cast<int>(MemoryProtection::Write); }
+};
+
+class MemoryRegionParser {
+public:
+    static std::vector<MemoryRegion> ParseMaps(pid_t pid);
+
+    static std::vector<MemoryRegion> ParseMapsFiltered(
+        pid_t pid,
+        bool require_readable,
+        bool require_executable
+    );
+
+private:
+    static MemoryRegion ParseLine(const std::string& line);
+    static int ParseProtection(const std::string& perm);
+};
+
+} // namespace dqxclarity
