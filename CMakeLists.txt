@@ -146,17 +146,57 @@ if(NOT EXISTS ${CPM_DOWNLOAD_LOCATION})
 endif()
 include(${CPM_DOWNLOAD_LOCATION})
 
-CPMAddPackage(
-  NAME SDL3
-  GITHUB_REPOSITORY libsdl-org/SDL
-  GIT_TAG release-3.2.0
-  OPTIONS
-    "SDL_TEST OFF"
-    "SDL_DISABLE_UNINSTALL ON"
-    "SDL_SHARED OFF"
-    "SDL_STATIC ON"
-    "SDL_AUDIO OFF"
-)
+# Download prebuilt SDL3 for Windows MSVC
+if(WIN32 AND MSVC)
+  CPMAddPackage(
+    NAME SDL3
+    URL https://github.com/libsdl-org/SDL/releases/download/release-3.2.24/SDL3-devel-3.2.24-VC.zip
+    DOWNLOAD_ONLY YES
+  )
+  
+  if(SDL3_ADDED)
+    # Create imported targets for SDL3
+    add_library(SDL3::SDL3-static STATIC IMPORTED)
+    add_library(SDL3::SDL3main STATIC IMPORTED)
+    
+    # Set library paths based on architecture
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+      set(SDL3_ARCH "x64")
+    else()
+      set(SDL3_ARCH "x86")
+    endif()
+    
+    # Set imported library locations
+    set_target_properties(SDL3::SDL3-static PROPERTIES
+      IMPORTED_LOCATION "${SDL3_SOURCE_DIR}/lib/${SDL3_ARCH}/SDL3.lib"
+      INTERFACE_INCLUDE_DIRECTORIES "${SDL3_SOURCE_DIR}/include"
+      INTERFACE_LINK_LIBRARIES "winmm;version;setupapi;advapi32;shell32;ole32;oleaut32;user32;gdi32;imm32"
+    )
+    
+    set_target_properties(SDL3::SDL3main PROPERTIES
+      IMPORTED_LOCATION "${SDL3_SOURCE_DIR}/lib/${SDL3_ARCH}/SDL3main.lib"
+      INTERFACE_INCLUDE_DIRECTORIES "${SDL3_SOURCE_DIR}/include"
+    )
+    
+    # Create an alias for compatibility
+    add_library(SDL3::SDL3 ALIAS SDL3::SDL3-static)
+    
+    message(STATUS "Using prebuilt SDL3 for Windows MSVC from: ${SDL3_SOURCE_DIR}")
+  endif()
+else()
+  # Fallback to building from source on non-Windows or non-MSVC
+  CPMAddPackage(
+    NAME SDL3
+    GITHUB_REPOSITORY libsdl-org/SDL
+    GIT_TAG release-3.2.0
+    OPTIONS
+      "SDL_TEST OFF"
+      "SDL_DISABLE_UNINSTALL ON"
+      "SDL_SHARED OFF"
+      "SDL_STATIC ON"
+      "SDL_AUDIO OFF"
+  )
+endif()
 
 CPMAddPackage(
   NAME plog
@@ -177,8 +217,12 @@ CPMAddPackage(
   GIT_TAG 1.12.0
   OPTIONS
     "CPR_BUILD_TESTS OFF"
-    "CPR_BUILD_DOCS OFF"
-    "CPR_USE_SYSTEM_CURL ON"
+    "CPR_USE_SYSTEM_CURL OFF"
+    "CPR_USE_SYSTEM_LIB_PSL ON"
+    "CPR_FORCE_WINSSL_BACKEND ON"
+    "CPR_ENABLE_CURL_HTTP_ONLY ON"
+    "CURL_USE_LIBPSL OFF"
+    "CURL_DISABLE_COOKIES ON"
 )
 
 CPMAddPackage(
