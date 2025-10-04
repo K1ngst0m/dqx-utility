@@ -242,7 +242,7 @@ endif()
 
 set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
 target_compile_features(dqx_utility PRIVATE cxx_std_20)
-target_link_libraries(dqx_utility PRIVATE SDL3::SDL3 imgui)
+target_link_libraries(dqx_utility PRIVATE SDL3::SDL3 imgui dqxclarity::dqxclarity)
 if(cpr_ADDED)
   target_link_libraries(dqx_utility PRIVATE cpr::cpr)
 endif()
