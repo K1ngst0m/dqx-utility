@@ -70,6 +70,20 @@
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       }
+    },
+    {
+      "name": "windows-msvc-release",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/out/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_MAIN_APP": "OFF"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     }
   ],
   "buildPresets": [
@@ -88,6 +102,11 @@
     {
       "name": "windows-clang-release",
       "configurePreset": "windows-clang-release"
+    },
+    {
+      "name": "windows-msvc-release",
+      "configurePreset": "windows-msvc-release",
+      "configuration": "Release"
     }
   ]
 }

@@ -10,6 +10,133 @@ include(CheckCXXCompilerFlag)
 
 check_cxx_compiler_flag("-Wno-deprecated-literal-operator" HAS_NO_DEPRECATED_LITERAL_OPERATOR)
 
+# Build dqxclarity-cpp early (no external dependencies)
+option(BUILD_DQXCLARITY "Build DQXClarity C++ executable" ON)
+
+if(BUILD_DQXCLARITY)
+  set(DQXCLARITY_SOURCES
+    src/dqxclarity/main.cpp
+    src/dqxclarity/memory/MemoryFactory.cpp
+    src/dqxclarity/pattern/Pattern.cpp
+    src/dqxclarity/pattern/PatternScanner.cpp
+    src/dqxclarity/signatures/Signatures.cpp
+    src/dqxclarity/process/ProcessFinder.cpp
+    src/dqxclarity/hooking/DialogHook.cpp
+  )
+
+  if(WIN32)
+    list(APPEND DQXCLARITY_SOURCES
+      src/dqxclarity/memory/win/ProcessMemory.cpp
+      src/dqxclarity/pattern/win/MemoryRegion.cpp
+      src/dqxclarity/process/win/ProcessFinder.cpp
+    )
+  else()
+    list(APPEND DQXCLARITY_SOURCES
+      src/dqxclarity/memory/linux/ProcessMemory.cpp
+      src/dqxclarity/pattern/linux/MemoryRegion.cpp
+      src/dqxclarity/process/linux/ProcessFinder.cpp
+    )
+  endif()
+
+  list(APPEND DQXCLARITY_SOURCES
+    src/dqxclarity/memory/IProcessMemory.hpp
+    src/dqxclarity/memory/win/ProcessMemory.hpp
+    src/dqxclarity/memory/linux/ProcessMemory.hpp
+    src/dqxclarity/console/IConsoleSink.hpp
+    src/dqxclarity/console/ConsoleFactory.hpp
+    src/dqxclarity/console/ConsoleFactory.cpp
+    src/dqxclarity/console/ConsoleNull.hpp
+  )
+  if(WIN32)
+    list(APPEND DQXCLARITY_SOURCES
+      src/dqxclarity/console/win/Console.cpp
+      src/dqxclarity/console/win/Console.hpp
+    )
+  else()
+    list(APPEND DQXCLARITY_SOURCES
+      src/dqxclarity/console/linux/Console.cpp
+      src/dqxclarity/console/linux/Console.hpp
+    )
+  endif()
+
+  add_executable(dqxclarity-cpp ${DQXCLARITY_SOURCES})
+
+  target_include_directories(dqxclarity-cpp PRIVATE
+    src/dqxclarity
+  )
+
+  target_compile_features(dqxclarity-cpp PRIVATE cxx_std_20)
+  set_target_properties(dqxclarity-cpp PROPERTIES OUTPUT_NAME "dqxclarity-cpp")
+
+  if(WIN32)
+    target_link_libraries(dqxclarity-cpp PRIVATE psapi)
+  endif()
+
+  if(MSVC)
+    target_compile_options(dqxclarity-cpp PRIVATE /W4 /permissive-)
+  else()
+    target_compile_options(dqxclarity-cpp PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+  
+  message(STATUS "DQXClarity C++ executable will be built")
+endif()
+
+
+# Diagnostic tool - read-only examination of hook location
+option(BUILD_DIAGNOSE_HOOK "Build diagnose hook executable" ON)
+
+if(BUILD_DIAGNOSE_HOOK)
+  set(DIAGNOSE_HOOK_SOURCES
+    src/diagnose_hook.cpp
+    src/dqxclarity/memory/MemoryFactory.cpp
+    src/dqxclarity/signatures/Signatures.cpp
+    src/dqxclarity/pattern/Pattern.cpp
+  )
+
+  if(WIN32)
+    list(APPEND DIAGNOSE_HOOK_SOURCES
+      src/dqxclarity/memory/win/ProcessMemory.cpp
+      src/dqxclarity/pattern/win/MemoryRegion.cpp
+      src/dqxclarity/process/win/ProcessFinder.cpp
+    )
+  else()
+    list(APPEND DIAGNOSE_HOOK_SOURCES
+      src/dqxclarity/memory/linux/ProcessMemory.cpp
+      src/dqxclarity/pattern/linux/MemoryRegion.cpp
+      src/dqxclarity/process/linux/ProcessFinder.cpp
+    )
+  endif()
+
+  add_executable(diagnose_hook ${DIAGNOSE_HOOK_SOURCES})
+
+  target_include_directories(diagnose_hook PRIVATE
+    src
+  )
+
+  target_compile_features(diagnose_hook PRIVATE cxx_std_20)
+  set_target_properties(diagnose_hook PROPERTIES OUTPUT_NAME "diagnose_hook")
+
+  if(WIN32)
+    target_link_libraries(diagnose_hook PRIVATE psapi)
+  endif()
+
+  if(MSVC)
+    target_compile_options(diagnose_hook PRIVATE /W4 /permissive-)
+  else()
+    target_compile_options(diagnose_hook PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+  
+  message(STATUS "Diagnose Hook executable will be built")
+endif()
+
+# Main application dependencies (SDL, ImGui, etc.)
+option(BUILD_MAIN_APP "Build main dqx-utility application" ON)
+
+if(NOT BUILD_MAIN_APP)
+  message(STATUS "Skipping main application build")
+  return()
+endif()
+
 set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
 if(NOT EXISTS ${CPM_DOWNLOAD_LOCATION})
   file(DOWNLOAD
@@ -194,6 +321,28 @@ if(BUILD_TESTS AND Catch2_ADDED)
   endif()
   
   # Test executable
+  set(TEST_DQXCLARITY_SOURCES
+    src/dqxclarity/memory/MemoryFactory.cpp
+    src/dqxclarity/pattern/Pattern.cpp
+    src/dqxclarity/pattern/PatternScanner.cpp
+    src/dqxclarity/signatures/Signatures.cpp
+    src/dqxclarity/process/ProcessFinder.cpp
+  )
+  
+  if(WIN32)
+    list(APPEND TEST_DQXCLARITY_SOURCES
+      src/dqxclarity/memory/win/ProcessMemory.cpp
+      src/dqxclarity/pattern/win/MemoryRegion.cpp
+      src/dqxclarity/process/win/ProcessFinder.cpp
+    )
+  else()
+    list(APPEND TEST_DQXCLARITY_SOURCES
+      src/dqxclarity/memory/linux/ProcessMemory.cpp
+      src/dqxclarity/pattern/linux/MemoryRegion.cpp
+      src/dqxclarity/process/linux/ProcessFinder.cpp
+    )
+  endif()
+
   add_executable(dqx_utility_tests
     tests/test_main.cpp
     tests/utils/mock_http.cpp
@@ -202,12 +351,8 @@ if(BUILD_TESTS AND Catch2_ADDED)
     tests/translate/test_google_translator.cpp
     tests/dqxclarity/test_memory.cpp
     tests/dqxclarity/test_pattern_scanner.cpp
-    src/dqxclarity/memory/LinuxMemory.cpp
-    src/dqxclarity/memory/MemoryFactory.cpp
-    src/dqxclarity/pattern/Pattern.cpp
-    src/dqxclarity/pattern/MemoryRegion.cpp
-    src/dqxclarity/pattern/PatternScanner.cpp
-    src/dqxclarity/signatures/Signatures.cpp
+    tests/dqxclarity/test_process_finder.cpp
+    ${TEST_DQXCLARITY_SOURCES}
   )
   
   target_include_directories(dqx_utility_tests PRIVATE
@@ -219,6 +364,10 @@ if(BUILD_TESTS AND Catch2_ADDED)
     Catch2::Catch2WithMain
   )
   
+  if(WIN32)
+    target_link_libraries(dqx_utility_tests PRIVATE psapi)
+  endif()
+  
   # Register tests with CTest
   include(CTest)
   if(Catch2_SOURCE_DIR)
@@ -228,26 +377,4 @@ if(BUILD_TESTS AND Catch2_ADDED)
   endif()
 endif()
 
-# DQXClarity C++ Memory Abstraction
-add_executable(dqxclarity-cpp
-  src/dqxclarity/main.cpp
-  src/dqxclarity/memory/LinuxMemory.cpp
-  src/dqxclarity/memory/MemoryFactory.cpp
-  src/dqxclarity/pattern/Pattern.cpp
-  src/dqxclarity/pattern/MemoryRegion.cpp
-  src/dqxclarity/pattern/PatternScanner.cpp
-  src/dqxclarity/signatures/Signatures.cpp
-)
 
-target_include_directories(dqxclarity-cpp PRIVATE
-  src/dqxclarity
-)
-
-target_compile_features(dqxclarity-cpp PRIVATE cxx_std_20)
-set_target_properties(dqxclarity-cpp PROPERTIES OUTPUT_NAME "dqxclarity-cpp")
-
-if(MSVC)
-  target_compile_options(dqxclarity-cpp PRIVATE /W4 /permissive-)
-else()
-  target_compile_options(dqxclarity-cpp PRIVATE -Wall -Wextra -Wpedantic)
-endif()
