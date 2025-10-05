@@ -5,6 +5,7 @@
 
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "dqxclarity/api/dialog_message.hpp"
+#include "dqxclarity/process/NoticeWaiter.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -20,6 +21,11 @@ struct DQXClarityLauncher::Impl
     bool waiting_delay = false;
     std::chrono::steady_clock::time_point detect_tp{};
     int delay_ms = 5000; // default 5s; make configurable later
+
+    // Notice wait worker
+    std::thread notice_worker;
+    std::atomic<bool> cancel_notice{false};
+    std::atomic<bool> notice_found{false};
 
     // Backlog for UI consumers to read with per-window seq cursors
     mutable std::mutex backlog_mutex;
@@ -46,17 +52,33 @@ DQXClarityLauncher::DQXClarityLauncher()
 
             if (game_running) {
                 if (st == dqxclarity::Status::Stopped || st == dqxclarity::Status::Error) {
-                    if (!pimpl_->waiting_delay) {
-                        PLOG_INFO << "DQXGame.exe detected; delaying hook for 5s";
-                        pimpl_->waiting_delay = true;
-                        pimpl_->detect_tp = steady_clock::now();
-                    } else if (steady_clock::now() - pimpl_->detect_tp >= milliseconds(pimpl_->delay_ms)) {
-                        PLOG_INFO << "Starting hook...";
+                    if (!pimpl_->notice_worker.joinable()) {
+                        PLOG_INFO << "DQXGame.exe detected; waiting for \"Important notice\" screen via pattern scan";
+                        pimpl_->cancel_notice.store(false);
+                        pimpl_->notice_found.store(false);
+                        pimpl_->notice_worker = std::thread([this]{
+                            bool ok = dqxclarity::WaitForNoticeScreen(pimpl_->cancel_notice,
+                                std::chrono::milliseconds(250), std::chrono::minutes(5));
+                            if (ok) {
+                                pimpl_->notice_found.store(true);
+                            }
+                        });
+                    } else if (pimpl_->notice_found.load()) {
+                        PLOG_INFO << "Important notice found; starting hook...";
                         (void)pimpl_->engine.start_hook();
-                        pimpl_->waiting_delay = false;
+                        pimpl_->notice_found.store(false);
+                        if (pimpl_->notice_worker.joinable()) {
+                            pimpl_->notice_worker.join();
+                        }
                     }
                 }
             } else {
+                // Cancel any pending notice wait
+                if (pimpl_->notice_worker.joinable()) {
+                    pimpl_->cancel_notice.store(true);
+                    pimpl_->notice_worker.join();
+                }
+                // Cleanup hooks
                 if (pimpl_->waiting_delay) pimpl_->waiting_delay = false;
                 if (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting || st == dqxclarity::Status::Stopping) {
                     PLOG_INFO << "DQXGame.exe not running; ensuring hook is stopped";
@@ -87,6 +109,10 @@ DQXClarityLauncher::~DQXClarityLauncher()
         pimpl_->stop_flag.store(true);
         if (pimpl_->monitor.joinable()) {
             pimpl_->monitor.join();
+        }
+        if (pimpl_->notice_worker.joinable()) {
+            pimpl_->cancel_notice.store(true);
+            pimpl_->notice_worker.join();
         }
     }
 }
@@ -122,6 +148,10 @@ bool DQXClarityLauncher::stop()
 {
     PLOG_INFO << "Stop requested";
     pimpl_->waiting_delay = false;
+    pimpl_->cancel_notice.store(true);
+    if (pimpl_->notice_worker.joinable()) {
+        pimpl_->notice_worker.join();
+    }
     return pimpl_->engine.stop_hook();
 }
 
