@@ -7,6 +7,7 @@
 #include <cfloat>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 
 #include "translate/ITranslator.hpp"
 #include "translate/LabelProcessor.hpp"
@@ -260,10 +261,48 @@ void DialogWindow::renderDialog(ImGuiIO& io)
             ImGui::PopFont();
         }
 
-        // Auto-scroll to bottom when new content is appended
-        if (state_.ipc_config().auto_scroll_to_new && appended_since_last_frame_)
+        // Smooth, constant-speed auto-scroll to bottom when content grows
+        if (state_.ipc_config().auto_scroll_to_new)
         {
-            ImGui::SetScrollHereY(1.0f);
+            const float curr_scroll = ImGui::GetScrollY();
+            const float curr_max    = ImGui::GetScrollMaxY();
+
+            // Initialize tracking on first layout
+            if (!scroll_initialized_)
+            {
+                last_scroll_max_y_ = curr_max;
+                scroll_initialized_ = true;
+            }
+
+            // If content height increased since last frame and user was at (or near) bottom, start animating
+            const bool content_grew   = (curr_max > last_scroll_max_y_ + 0.5f);
+            const bool was_at_bottom  = (last_scroll_max_y_ <= 0.5f) || ((last_scroll_max_y_ - curr_scroll) <= 2.0f);
+            if (!scroll_animating_ && content_grew && was_at_bottom)
+            {
+                scroll_animating_ = true;
+            }
+
+            // Advance animation at constant speed until we reach the bottom
+            if (scroll_animating_)
+            {
+                const float target = curr_max;
+                const float current = ImGui::GetScrollY();
+                float delta = target - current;
+                const float step = SCROLL_SPEED * io.DeltaTime;
+
+                if (std::fabs(delta) <= step)
+                {
+                    ImGui::SetScrollY(target);
+                    scroll_animating_ = false;
+                }
+                else
+                {
+                    ImGui::SetScrollY(current + (delta > 0.0f ? step : -step));
+                }
+            }
+
+            // Update for next frame comparison
+            last_scroll_max_y_ = curr_max;
         }
 
         const bool was_pending_resize = state_.ui_state().pending_resize;

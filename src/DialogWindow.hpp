@@ -75,4 +75,10 @@ private:
     // Test connection state (translator)
     bool testing_connection_ = false;
     std::string test_result_;
+
+    // Smooth scroll animation
+    bool  scroll_animating_   = false;
+    bool  scroll_initialized_ = false;
+    float last_scroll_max_y_  = 0.0f;
+    static constexpr float SCROLL_SPEED = 800.0f;  // pixels per second (constant speed)
 };
