@@ -2,6 +2,7 @@
 
 #include "DialogWindow.hpp"
 #include "ProcessDetector.hpp"
+#include "ProcessLocaleChecker.hpp"
 #include "DQXClarityLauncher.hpp"
 #include "config/ConfigManager.hpp"
 #include "UITheme.hpp"
@@ -348,15 +349,49 @@ void SettingsPanel::renderStatusSection()
     if (ImGui::CollapsingHeader("Status", ImGuiTreeNodeFlags_DefaultOpen))
     {
         bool dqx_running = ProcessDetector::isProcessRunning("DQXGame.exe");
-        ImVec4 status_color = UITheme::statusColor(dqx_running, !dqx_running);
-        const char* status_symbol = dqx_running ? "●" : "●";
-        const char* status_text = dqx_running ? "Running" : "Not Running";
+        ImVec4 game_status_color = dqx_running ? UITheme::successColor() : UITheme::errorColor();
+        const char* game_status_text = dqx_running ? "Running" : "Not Running";
 
-        ImGui::TextColored(status_color, "%s", status_symbol);
+        // DQX Game Status
+        ImGui::TextColored(game_status_color, "●");
         ImGui::SameLine();
         ImGui::TextUnformatted("DQX Game:");
         ImGui::SameLine();
-        ImGui::TextUnformatted(status_text);
+        ImGui::TextColored(game_status_color, "%s", game_status_text);
+
+#ifdef _WIN32
+        // Locale Status (Windows only) - based on window title
+        if (dqx_running)
+        {
+            ProcessLocale locale = ProcessLocaleChecker::checkProcessLocale("DQXGame.exe");
+            ImVec4 locale_color;
+            const char* locale_text;
+            
+            switch (locale)
+            {
+                case ProcessLocale::Japanese:
+                    locale_color = UITheme::successColor();
+                    locale_text = "Japanese";
+                    break;
+                case ProcessLocale::NonJapanese:
+                    locale_color = UITheme::warningColor();
+                    locale_text = "Non-Japanese";
+                    break;
+                case ProcessLocale::Unknown:
+                default:
+                    locale_color = UITheme::disabledColor();
+                    locale_text = "Unknown";
+                    break;
+            }
+            
+            ImGui::TextColored(locale_color, "●");
+            ImGui::SameLine();
+            ImGui::TextUnformatted("Locale:");
+            ImGui::SameLine();
+            ImGui::TextColored(locale_color, "%s", locale_text);
+        }
+#endif
+
         renderDQXClaritySection();
     }
 }

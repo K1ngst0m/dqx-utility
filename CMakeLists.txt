@@ -228,24 +228,25 @@ set(MAIN_TRANSLATOR_SOURCES
 )
 
 add_executable(dqx_utility
-    src/main.cpp
-    src/AppContext.cpp
-    src/DialogWindow.cpp
-    src/FontManager.cpp
-    src/SettingsPanel.cpp
-    src/WindowRegistry.cpp
-    src/ProcessDetector.cpp
-    src/WineDetector.cpp
-    src/DQXClarityLauncher.cpp
-    src/DQXClarityService.cpp
-    src/UITheme.cpp
-    src/ipc/TextSourceClient.cpp
-    ${MAIN_TRANSLATOR_SOURCES}
-    src/translate/LabelProcessor.cpp
-    src/translate/LabelProcessor.hpp
-    src/config/ConfigManager.cpp
-    src/config/ConfigManager.hpp
-  )
+  src/main.cpp
+  src/AppContext.cpp
+  src/DialogWindow.cpp
+  src/FontManager.cpp
+  src/SettingsPanel.cpp
+  src/WindowRegistry.cpp
+  src/ProcessDetector.cpp
+  src/ProcessLocaleChecker.cpp
+  src/WineDetector.cpp
+  src/DQXClarityLauncher.cpp
+  src/DQXClarityService.cpp
+  src/UITheme.cpp
+  src/ipc/TextSourceClient.cpp
+  ${MAIN_TRANSLATOR_SOURCES}
+  src/translate/LabelProcessor.cpp
+  src/translate/LabelProcessor.hpp
+  src/config/ConfigManager.cpp
+  src/config/ConfigManager.hpp
+)
 
   if(MSVC)
     target_compile_options(dqx_utility PRIVATE /W4 /permissive-)
