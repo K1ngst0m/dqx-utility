@@ -83,14 +83,16 @@ static bool is_mouse_outside_dialogs(ImGuiIO& io, WindowRegistry& registry)
 
 static void handle_transparent_area_click(ImGuiIO& io, WindowRegistry& registry, AppContext& app)
 {
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-    {
-        bool over_any_window = ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
-        if (!over_any_window && is_mouse_outside_dialogs(io, registry))
-        {
-            app.triggerVignette(io.MousePos.x, io.MousePos.y);
-        }
-    }
+    if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        return;
+    
+    if (io.WantCaptureMouse)
+        return;
+    
+    if (!is_mouse_outside_dialogs(io, registry))
+        return;
+    
+    app.triggerVignette(io.MousePos.x, io.MousePos.y);
 }
 
 static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bool& show_manager)

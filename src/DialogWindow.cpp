@@ -41,6 +41,29 @@ namespace
         std::memcpy(dest, src.c_str(), copy_len);
         dest[copy_len] = '\0';
     }
+
+    const char* waiting_text_for_lang(TranslationConfig::TargetLang lang)
+    {
+        switch (lang)
+        {
+        case TranslationConfig::TargetLang::EN_US: return "Waiting";
+        case TranslationConfig::TargetLang::ZH_CN: return "等待中";
+        case TranslationConfig::TargetLang::ZH_TW: return "等待中";
+        }
+        return "Waiting";
+    }
+
+    const char* dots_for_phase(int phase)
+    {
+        switch (phase % 4)
+        {
+        case 0: return ".";
+        case 1: return "..";
+        case 2: return "...";
+        case 3: return "..";
+        }
+        return ".";
+    }
 }
 
 
@@ -113,24 +136,34 @@ void DialogWindow::applyPending()
     {
         if (state_.translation_config().translate_enabled)
         {
+            // Process labels before translation
+            std::string processed_text = label_processor_->processText(m.text);
+
+            std::uint64_t job_id = 0;
+            std::string target_lang_str;
+            switch (state_.translation_config().target_lang_enum)
+            {
+            case TranslationConfig::TargetLang::EN_US: target_lang_str = "en-us"; break;
+            case TranslationConfig::TargetLang::ZH_CN: target_lang_str = "zh-cn"; break;
+            case TranslationConfig::TargetLang::ZH_TW: target_lang_str = "zh-tw"; break;
+            }
+
+            bool queued = false;
             if (translator_ && translator_->isReady())
             {
-                // Process labels before translation
-                std::string processed_text = label_processor_->processText(m.text);
-                
-                // Queue async translation job - original text will be replaced by translation
-                std::uint64_t job_id = 0;
-                std::string target_lang_str;
-                switch (state_.translation_config().target_lang_enum)
-                {
-                case TranslationConfig::TargetLang::EN_US: target_lang_str = "en-us"; break;
-                case TranslationConfig::TargetLang::ZH_CN: target_lang_str = "zh-cn"; break;
-                case TranslationConfig::TargetLang::ZH_TW: target_lang_str = "zh-tw"; break;
-                }
-                translator_->translate(processed_text, "auto", target_lang_str, job_id);
+                queued = translator_->translate(processed_text, "auto", target_lang_str, job_id);
                 last_job_id_ = job_id;
             }
-            // Skip showing original text - only show translation when ready
+
+            // Always show a placeholder while waiting (even if translator not ready)
+            state_.content_state().segments.emplace_back();
+            auto& buf = state_.content_state().segments.back();
+            std::string placeholder = std::string(waiting_text_for_lang(state_.translation_config().target_lang_enum)) + " .";
+            safe_copy_utf8(buf.data(), buf.size(), placeholder);
+            if (queued && job_id != 0)
+            {
+                pending_segment_by_job_[job_id] = static_cast<int>(state_.content_state().segments.size()) - 1;
+            }
         }
         else
         {
@@ -162,8 +195,21 @@ void DialogWindow::render(ImGuiIO& io)
             appended_since_last_frame_ = true;
             for (auto& r : done)
             {
-                state_.content_state().segments.emplace_back();
-                safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), r.text);
+                auto it = pending_segment_by_job_.find(r.id);
+                if (it != pending_segment_by_job_.end())
+                {
+                    int idx = it->second;
+                    if (idx >= 0 && idx < static_cast<int>(state_.content_state().segments.size()))
+                    {
+                        safe_copy_utf8(state_.content_state().segments[idx].data(), state_.content_state().segments[idx].size(), r.text);
+                    }
+                    pending_segment_by_job_.erase(it);
+                }
+                else
+                {
+                    state_.content_state().segments.emplace_back();
+                    safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), r.text);
+                }
             }
         }
     }
@@ -235,6 +281,30 @@ void DialogWindow::renderDialog(ImGuiIO& io)
         }
 
         const float wrap_width = std::max(40.0f, state_.ui_state().width - state_.ui_state().padding.x * 2.0f);
+
+        // Update 'Waiting...' placeholder animation for in-flight translations
+        if (!pending_segment_by_job_.empty())
+        {
+            waiting_anim_accum_ += io.DeltaTime;
+            const float step = 0.35f; // seconds per phase
+            while (waiting_anim_accum_ >= step)
+            {
+                waiting_anim_accum_ -= step;
+                waiting_anim_phase_ = (waiting_anim_phase_ + 1) % 4; // ., .., ..., ..
+            }
+            std::string base = waiting_text_for_lang(state_.translation_config().target_lang_enum);
+            std::string suffix = " "; suffix += dots_for_phase(waiting_anim_phase_);
+            for (const auto& kv : pending_segment_by_job_)
+            {
+                int idx = kv.second;
+                if (idx >= 0 && idx < static_cast<int>(state_.content_state().segments.size()))
+                {
+                    std::string composed = base + suffix;
+                    safe_copy_utf8(state_.content_state().segments[idx].data(), state_.content_state().segments[idx].size(), composed);
+                }
+            }
+        }
+
         for (size_t i = 0; i < state_.content_state().segments.size(); ++i)
         {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap_width);

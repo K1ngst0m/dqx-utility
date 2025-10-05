@@ -10,6 +10,7 @@
 #include <memory>
 #include <cstdint>
 #include <array>
+#include <unordered_map>
 
 struct ImGuiIO;
 
@@ -75,10 +76,15 @@ private:
     // Test connection state (translator)
     bool testing_connection_ = false;
     std::string test_result_;
-
-    // Smooth scroll animation
+    
+    // Smooth scroll animation (content-growth driven)
     bool  scroll_animating_   = false;
     bool  scroll_initialized_ = false;
     float last_scroll_max_y_  = 0.0f;
     static constexpr float SCROLL_SPEED = 800.0f;  // pixels per second (constant speed)
+
+    // Pending translation placeholders and animation
+    std::unordered_map<std::uint64_t, int> pending_segment_by_job_;
+    float waiting_anim_accum_ = 0.0f;
+    int waiting_anim_phase_ = 0; // 0:".", 1:"..", 2:"...", 3:".."
 };
