@@ -23,4 +23,12 @@ struct DialogStateManager
 
     ContentState& content_state() { return content; }
     const ContentState& content_state() const { return content; }
+
+    void applyDefaults()
+    {
+        ui.applyDefaults();
+        ipc.applyDefaults();
+        translation.applyDefaults();
+        content.applyDefaults();
+    }
 };

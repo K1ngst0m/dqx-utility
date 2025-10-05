@@ -214,8 +214,9 @@ bool ConfigManager::loadAndApply()
                 if (!node.is_table()) continue;
                 auto tbl = *node.as_table();
                 DialogStateManager state;
+                state.applyDefaults();  // Start with defaults
                 std::string name;
-                if (tomlToDialogState(tbl, state, name))
+                if (tomlToDialogState(tbl, state, name))  // Overlay config values
                 {
                     dialog_configs.emplace_back(std::move(name), std::move(state));
                 }
@@ -248,7 +249,18 @@ bool ConfigManager::loadAndApply()
                     auto* dw = dynamic_cast<DialogWindow*>(windows[i]);
                     if (!dw) continue;
                     dw->rename(dialog_configs[i].first.c_str());
+                    
+                    // Apply loaded config (which already has defaults applied)
                     dw->state() = dialog_configs[i].second;
+                    
+                    // Restore runtime-only state not persisted in config
+                    dw->state().ui_state().window_size = ImVec2(dw->state().ui_state().width, dw->state().ui_state().height);
+                    dw->state().ui_state().pending_resize = true;
+                    dw->state().ui_state().font = nullptr;
+                    dw->state().ui_state().font_base_size = dw->state().ui_state().font_size;
+                    
+                    // Rebind font pointers after state replacement
+                    dw->refreshFontBinding();
                     dw->initTranslatorIfEnabled();
                     dw->autoConnectIPC();
                 }

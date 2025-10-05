@@ -56,24 +56,22 @@ DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_
     
     label_processor_ = std::make_unique<LabelProcessor>();
 
-    state_.ui_state().font_path.fill('\0');
-    state_.content_state().append_buffer.fill('\0');
-    state_.content_state().segments.emplace_back();
-    safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), reinterpret_cast<const char*>(u8""));
-    // Legacy TCP portfile path no longer used
-    state_.ipc_config().portfile_path.fill('\0');
-    state_.translation_config().target_lang_enum = TranslationConfig::TargetLang::EN_US;
-    state_.translation_config().openai_base_url.fill('\0');
-    std::snprintf(state_.translation_config().openai_base_url.data(), state_.translation_config().openai_base_url.size(), "%s", "https://api.openai.com");
-    state_.translation_config().openai_model.fill('\0');
-    state_.translation_config().openai_api_key.fill('\0');
+    // Initialize all state to defaults
+    state_.applyDefaults();
 
+    // Register with font manager for UI rendering
     font_manager_.registerDialog(state_.ui_state());
 }
 
 DialogWindow::~DialogWindow()
 {
     font_manager_.unregisterDialog(state_.ui_state());
+}
+
+void DialogWindow::refreshFontBinding()
+{
+    // Re-assign active font and base size after external state replacement (e.g., config load)
+    font_manager_.ensureFont(state_.ui_state());
 }
 
 void DialogWindow::applyPending()

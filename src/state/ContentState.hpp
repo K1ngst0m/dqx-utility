@@ -11,6 +11,17 @@ struct ContentState
 
     std::vector<std::array<char, EntryBufferSize>> segments;
     std::array<char, EntryBufferSize> append_buffer{};
-    int editing_index = -1;
+    int editing_index;
     std::array<char, BodyBufferSize> edit_buffer{};
+
+    void applyDefaults()
+    {
+        segments.clear();
+        segments.emplace_back();
+        segments.back().fill('\0');
+        
+        append_buffer.fill('\0');
+        editing_index = -1;
+        edit_buffer.fill('\0');
+    }
 };

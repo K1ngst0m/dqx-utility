@@ -7,21 +7,42 @@ struct UIState
 {
     static constexpr std::size_t FontPathSize = 512;
 
-    float width            = 580.0f;
-    float height           = 220.0f;
-    ImVec2 padding         = ImVec2(24.0f, 18.0f);
-    float rounding         = 16.0f;
-    float border_thickness = 2.0f;
-    float background_alpha = 0.78f;
-    float font_size        = 28.0f;
-    float font_base_size   = 28.0f;
+    float width;
+    float height;
+    ImVec2 padding;
+    float rounding;
+    float border_thickness;
+    float background_alpha;
+    float font_size;
+    float font_base_size;
 
     std::array<char, FontPathSize> font_path{};
-    ImVec2 window_pos      = ImVec2(0.0f, 0.0f);
-    ImVec2 window_size     = ImVec2(width, height);
-    bool pending_reposition = true;
-    bool pending_resize     = true;
-    bool has_custom_font    = false;
+    ImVec2 window_pos;
+    ImVec2 window_size;
+    bool pending_reposition;
+    bool pending_resize;
+    bool has_custom_font;
 
-    ImFont* font = nullptr;
+    ImFont* font;
+
+    void applyDefaults()
+    {
+        width = 580.0f;
+        height = 220.0f;
+        padding = ImVec2(24.0f, 18.0f);
+        rounding = 16.0f;
+        border_thickness = 2.0f;
+        background_alpha = 0.78f;
+        font_size = 28.0f;
+        font_base_size = 28.0f;
+        
+        font_path.fill('\0');
+        window_pos = ImVec2(0.0f, 0.0f);
+        window_size = ImVec2(width, height);
+        pending_reposition = true;
+        pending_resize = true;
+        has_custom_font = false;
+        
+        font = nullptr;
+    }
 };

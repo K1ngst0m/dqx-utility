@@ -36,6 +36,7 @@ public:
     // Exposed for config manager apply
     void initTranslatorIfEnabled();
     void autoConnectIPC();
+    void refreshFontBinding();
     bool shouldBeRemoved() const { return should_be_removed_; }
 private:
     struct PendingMsg { std::string text; std::string lang; std::uint64_t seq = 0; };
