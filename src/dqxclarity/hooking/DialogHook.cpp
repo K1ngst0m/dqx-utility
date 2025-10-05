@@ -6,6 +6,7 @@
 #include <fstream>
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -483,6 +484,24 @@ bool DialogHook::ReapplyPatch() {
         }
     }
 
+    return true;
+}
+
+bool DialogHook::IsPatched() const {
+    if (m_hook_address == 0 || m_detour_address == 0 || m_original_bytes.empty()) return false;
+    const size_t n = m_original_bytes.size();
+    std::vector<uint8_t> cur(n);
+    if (!m_memory->ReadMemory(m_hook_address, cur.data(), cur.size())) return false;
+    if (cur.size() < 5) return false;
+    if (cur[0] != 0xE9) return false;
+    uint32_t expected_rel = Rel32From(m_hook_address, m_detour_address);
+    uint32_t got_rel = 0;
+    std::memcpy(&got_rel, &cur[1], sizeof(uint32_t));
+    if (got_rel != expected_rel) return false;
+    // Ensure remaining bytes are NOPs (best-effort)
+    for (size_t i = 5; i < cur.size(); ++i) {
+        if (cur[i] != 0x90) return false;
+    }
     return true;
 }
 

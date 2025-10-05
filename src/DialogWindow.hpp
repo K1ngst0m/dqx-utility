@@ -61,7 +61,7 @@ private:
     bool show_settings_window_ = false;
     bool should_be_removed_ = false;
 
-    // In-process messaging (Phase 3): pending messages and last seen seq
+    // In-process messaging: pending messages and last seen seq
     std::mutex pending_mutex_;
     std::vector<PendingMsg> pending_;
     std::uint64_t last_applied_seq_ = 0;

@@ -35,6 +35,11 @@ void Signatures::InitializeSignatures() {
         "E5 8B 95 E7 94 BB E9 85 8D E4 BF A1 E3 81 AE E9 9A 9B E3 81 AF E3 82 B5 E3 83 BC E3 83 90 E3 83 BC"
     );
 
+    // Simplified walkthrough pattern (post-login indicator)
+    s_signatures["walkthrough"] = Pattern::FromString(
+        "04 02 ?? ?? 10 00 00 00 80 ?? ?? ?? 00 00 00 00 ??"
+    );
+
     s_initialized = true;
 }
 
@@ -66,6 +71,11 @@ const Pattern& Signatures::GetCornerText() {
 const Pattern& Signatures::GetNoticeString() {
     InitializeSignatures();
     return s_signatures["notice_string"];
+}
+
+const Pattern& Signatures::GetWalkthroughPattern() {
+    InitializeSignatures();
+    return s_signatures["walkthrough"];
 }
 
 const Pattern* Signatures::GetSignature(const std::string& name) {

@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace dqxclarity {
 
@@ -14,6 +15,8 @@ struct Config {
   bool defer_dialog_patch = true; // enable initial patch only after first integrity
   bool instruction_safe_steal = true; // compute stolen bytes safely
   int readback_bytes = 16; // how many bytes to log from patch sites
+  int proactive_verify_after_enable_ms = 200; // recheck patch post-enable
+  bool enable_post_login_heuristics = false; // optional walkthrough heuristic
 };
 
 struct Logger {

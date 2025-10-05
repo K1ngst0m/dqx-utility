@@ -94,6 +94,21 @@ bool Engine::start_hook(StartPolicy policy) {
     return false;
   }
 
+  // Proactive verification after immediate enable
+  if (enable_patch_now && impl_->cfg.proactive_verify_after_enable_ms > 0) {
+    auto delay = std::chrono::milliseconds(impl_->cfg.proactive_verify_after_enable_ms);
+    std::thread([this, delay]{
+      std::this_thread::sleep_for(delay);
+      if (!impl_->hook) return;
+      if (!impl_->hook->IsPatched()) {
+        if (impl_->log.warn) impl_->log.warn("Post-enable verify: hook not present; reapplying once");
+        (void)impl_->hook->ReapplyPatch();
+      } else {
+        if (impl_->log.info) impl_->log.info("Post-enable verify: hook present");
+      }
+    }).detach();
+  }
+
   // Start integrity monitor to enable/reapply dialog hook
   auto state_addr = impl_->integrity ? impl_->integrity->GetStateAddress() : 0;
   if (state_addr == 0) {

@@ -6,6 +6,7 @@
 #include "config/ConfigManager.hpp"
 #include "UITheme.hpp"
 #include "DQXClarityService.hpp"
+#include "dqxclarity/api/dqxclarity.hpp"
 
 #include <algorithm>
 #include <imgui.h>
@@ -223,46 +224,13 @@ void SettingsPanel::renderDQXClaritySection()
             break;
     }
     
-    // Display status
+    // Display concise status only
     ImGui::TextColored(status_color, "●");
     ImGui::SameLine();
     ImGui::TextUnformatted("Status:");
     ImGui::SameLine();
     ImGui::TextColored(status_color, "%s", status_str.c_str());
-    
-    // Launch/Stop button
-    ImGui::Spacing();
-    
-    bool dqxgame_running = dqxc_launcher_->isDQXGameRunning();
-    bool is_stopped = (status == DQXClarityStatus::Stopped);
 
-    if (is_stopped)
-    {
-        if (!dqxgame_running)
-        {
-            ImGui::BeginDisabled();
-        }
-
-        if (ImGui::Button("Start##dqxc", ImVec2(120, 0)))
-        {
-            dqxc_launcher_->launch();
-        }
-
-        if (!dqxgame_running)
-        {
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            ImGui::TextDisabled("(DQXGame.exe not running)");
-        }
-    }
-    else
-    {
-        if (ImGui::Button("Stop##dqxc", ImVec2(120, 0)))
-        {
-            dqxc_launcher_->stop();
-        }
-    }
-    
 #ifndef _WIN32
     // Show wineserver info on Linux
     if (status == DQXClarityStatus::Disconnected)
@@ -278,7 +246,42 @@ void SettingsPanel::renderDQXClaritySection()
 void SettingsPanel::renderDebugSection()
 {
     ImGui::TextUnformatted("DQXClarity Debug");
-    
+
+    if (dqxc_launcher_)
+    {
+        // Launch/Stop moved to Debug; guard against mid-stages
+        auto stage = dqxc_launcher_->getEngineStage();
+        bool is_busy = (stage != dqxclarity::Status::Stopped && stage != dqxclarity::Status::Hooked);
+        bool is_stopped = (stage == dqxclarity::Status::Stopped);
+        bool dqx_running = dqxc_launcher_->isDQXGameRunning();
+
+        if (is_stopped)
+        {
+            bool disable = is_busy || !dqx_running;
+            if (disable) ImGui::BeginDisabled();
+            if (ImGui::Button("Start##dqxc_dbg", ImVec2(120, 0)))
+            {
+                dqxc_launcher_->launch();
+            }
+            if (disable) {
+                ImGui::EndDisabled();
+                if (!dqx_running) { ImGui::SameLine(); ImGui::TextDisabled("(DQXGame.exe not running)"); }
+            }
+        }
+        else
+        {
+            bool disable = is_busy; // disable Stop during Starting/Stopping
+            if (disable) ImGui::BeginDisabled();
+            if (ImGui::Button("Stop##dqxc_dbg", ImVec2(120, 0)))
+            {
+                dqxc_launcher_->stop();
+            }
+            if (disable) ImGui::EndDisabled();
+        }
+    }
+
+    ImGui::SeparatorText("Logs");
+
     // Refresh log content every 2 seconds
     float current_time = ImGui::GetTime();
     if (current_time - last_log_refresh_time_ > 2.0f)

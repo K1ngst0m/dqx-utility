@@ -61,7 +61,7 @@ DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_
     state_.content_state().append_buffer.fill('\0');
     state_.content_state().segments.emplace_back();
     safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), reinterpret_cast<const char*>(u8""));
-    // Legacy TCP portfile path no longer used (Phase 3)
+    // Legacy TCP portfile path no longer used
     state_.ipc_config().portfile_path.fill('\0');
     state_.translation_config().target_lang_enum = TranslationConfig::TargetLang::EN_US;
     state_.translation_config().openai_base_url.fill('\0');
@@ -85,7 +85,7 @@ void DialogWindow::applyPending()
         return true;
     };
 
-    // Pull new dialog messages from in-process backlog (Phase 3)
+    // Pull new dialog messages from in-process backlog
     if (auto* launcher = DQXClarityService_Get())
     {
         std::vector<dqxclarity::DialogMessage> msgs;
@@ -322,7 +322,7 @@ void DialogWindow::initTranslatorIfEnabled()
 
 void DialogWindow::autoConnectIPC()
 {
-    // Phase 3: no-op (legacy TCP IPC removed)
+    // No-op (legacy TCP IPC removed)
 }
 
 void DialogWindow::renderSettingsPanel(ImGuiIO& io)
@@ -556,10 +556,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         ImGui::Indent();
         ImGui::PushID(settings_id_suffix_.c_str());
         
-        // IPC Section (Phase 3): in-process
-        ImGui::TextUnformatted("Text Source: In-Process Ring Buffer");
-        ImGui::TextDisabled("Delivery: Start/Stop controls, 5s delayed auto-start on DQXGame.exe detection.");
-        
+        // IPC Section
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
@@ -798,9 +795,6 @@ void DialogWindow::renderStatusSection()
             ImGui::TextColored(UITheme::errorColor(), "● %s", error_msg);
         }
 
-        ImGui::TextUnformatted("Delivery:");
-        ImGui::SameLine();
-        ImGui::TextColored(UITheme::successColor(), "● In-Process");
 
         ImGui::Unindent();
         ImGui::Spacing();

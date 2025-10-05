@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 
-namespace dqxclarity { struct DialogMessage; }
+namespace dqxclarity { struct DialogMessage; enum class Status; struct Config; }
 
 enum class DQXClarityStatus
 {
@@ -38,6 +38,12 @@ public:
 
     // Copy messages with seq > since_seq into out (non-destructive snapshot)
     bool copyDialogsSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogMessage>& out) const;
+
+    // Expose engine stage to guard UI actions
+    dqxclarity::Status getEngineStage() const;
+
+
+    // (No runtime engine tweak APIs exposed in UI)
 
 private:
     struct Impl;

@@ -14,6 +14,7 @@ public:
     static const Pattern& GetQuestText();
     static const Pattern& GetCornerText();
     static const Pattern& GetNoticeString();
+    static const Pattern& GetWalkthroughPattern();
 
     static const Pattern* GetSignature(const std::string& name);
 

@@ -27,6 +27,9 @@ public:
     // Re-apply the JMP patch at the original hook site (used after integrity runs)
     bool ReapplyPatch();
 
+    // Verify if the hook site currently contains our JMP -> detour bytes
+    bool IsPatched() const;
+
     void SetVerbose(bool enabled) { m_verbose = enabled; }
     void SetConsoleOutput(bool enabled) { m_console_output = enabled; }
     void SetConsole(ConsolePtr console) { m_console = std::move(console); }
