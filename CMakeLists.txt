@@ -17,54 +17,6 @@ if(BUILD_DQXCLARITY)
   add_subdirectory(src/dqxclarity)
 endif()
 
-
-# Diagnostic tool - read-only examination of hook location
-option(BUILD_DIAGNOSE_HOOK "Build diagnose hook executable" ON)
-
-if(BUILD_DIAGNOSE_HOOK)
-  set(DIAGNOSE_HOOK_SOURCES
-    src/diagnose_hook.cpp
-    src/dqxclarity/memory/MemoryFactory.cpp
-    src/dqxclarity/signatures/Signatures.cpp
-    src/dqxclarity/pattern/Pattern.cpp
-  )
-
-  if(WIN32)
-    list(APPEND DIAGNOSE_HOOK_SOURCES
-      src/dqxclarity/memory/win/ProcessMemory.cpp
-      src/dqxclarity/pattern/win/MemoryRegion.cpp
-      src/dqxclarity/process/win/ProcessFinder.cpp
-    )
-  else()
-    list(APPEND DIAGNOSE_HOOK_SOURCES
-      src/dqxclarity/memory/linux/ProcessMemory.cpp
-      src/dqxclarity/pattern/linux/MemoryRegion.cpp
-      src/dqxclarity/process/linux/ProcessFinder.cpp
-    )
-  endif()
-
-  add_executable(diagnose_hook ${DIAGNOSE_HOOK_SOURCES})
-
-  target_include_directories(diagnose_hook PRIVATE
-    src
-  )
-
-  target_compile_features(diagnose_hook PRIVATE cxx_std_20)
-  set_target_properties(diagnose_hook PROPERTIES OUTPUT_NAME "diagnose_hook")
-
-  if(WIN32)
-    target_link_libraries(diagnose_hook PRIVATE psapi)
-  endif()
-
-  if(MSVC)
-    target_compile_options(diagnose_hook PRIVATE /W4 /permissive-)
-  else()
-    target_compile_options(diagnose_hook PRIVATE -Wall -Wextra -Wpedantic)
-  endif()
-  
-  message(STATUS "Diagnose Hook executable will be built")
-endif()
-
 # Main application dependencies (SDL, ImGui, etc.)
 option(BUILD_MAIN_APP "Build main dqx-utility application" ON)
 
