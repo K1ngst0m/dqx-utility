@@ -11,7 +11,7 @@ include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-Wno-deprecated-literal-operator" HAS_NO_DEPRECATED_LITERAL_OPERATOR)
 
 # Build dqxclarity-cpp early (no external dependencies)
-option(BUILD_DQXCLARITY "Build DQXClarity C++ executable" ON)
+option(BUILD_DQXCLARITY "Build DQXClarity C++ executable" OFF)
 
 if(BUILD_DQXCLARITY)
   add_subdirectory(src/dqxclarity)
@@ -331,8 +331,7 @@ add_custom_target(prepare_package ALL
   COMMAND ${CMAKE_COMMAND} -E remove_directory "${_PACK_DIR}"
   COMMAND ${CMAKE_COMMAND} -E make_directory "${_PACK_DIR}"
   COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqx_utility>" "${_PACK_DIR}/"
-  COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqxclarity-cpp>" "${_PACK_DIR}/"
-  DEPENDS dqx_utility dqxclarity-cpp
+  DEPENDS dqx_utility
   COMMENT "Preparing portable package directory"
 )
 
