@@ -3,6 +3,7 @@
 #include "../memory/IProcessMemory.hpp"
 #include "Codegen.hpp"
 #include "../console/IConsoleSink.hpp"
+#include "../api/dqxclarity.hpp"
 #include <memory>
 #include <vector>
 #include <string>
@@ -15,9 +16,15 @@ public:
     DialogHook(std::shared_ptr<IProcessMemory> memory);
     ~DialogHook();
 
-    bool InstallHook();
+    bool InstallHook(bool enable_patch = true);
+    bool EnablePatch();
     bool RemoveHook();
     bool IsHookInstalled() const { return m_is_installed; }
+
+    void SetLogger(const dqxclarity::Logger& log) { m_logger = log; }
+
+    // Re-apply the JMP patch at the original hook site (used after integrity runs)
+    bool ReapplyPatch();
 
     void SetVerbose(bool enabled) { m_verbose = enabled; }
     void SetConsoleOutput(bool enabled) { m_console_output = enabled; }
@@ -44,6 +51,7 @@ private:
     bool m_verbose = false;
     bool m_console_output = false;
     ConsolePtr m_console;
+    dqxclarity::Logger m_logger{};
     
     // Dialog data
     mutable std::string m_last_dialog_text;

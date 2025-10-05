@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <cstdio>
 
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -28,8 +29,8 @@ DialogHook::~DialogHook() {
     }
 }
 
-bool DialogHook::InstallHook() {
-    if (m_is_installed) {
+bool DialogHook::InstallHook(bool enable_patch) {
+    if (m_is_installed && enable_patch) {
         std::cout << "Hook already installed\n";
         return true;
     }
@@ -39,6 +40,7 @@ bool DialogHook::InstallHook() {
     // Step 1: Find the dialog trigger address
     if (!FindDialogTriggerAddress()) {
         std::cout << "Failed to find dialog trigger address\n";
+        if (m_logger.error) m_logger.error("Failed to find dialog trigger address");
         return false;
     }
 
@@ -57,6 +59,7 @@ bool DialogHook::InstallHook() {
     // Step 2: Allocate memory for detour
     if (!AllocateDetourMemory()) {
         std::cout << "Failed to allocate detour memory\n";
+        if (m_logger.error) m_logger.error("Failed to allocate detour memory");
         return false;
     }
     
@@ -65,14 +68,19 @@ bool DialogHook::InstallHook() {
         std::cout << "Backup address: 0x" << std::hex << m_backup_address << std::dec << "\n";
     }
 
+    if (m_logger.info) {
+        m_logger.info("Dialog trigger at 0x" + std::to_string((unsigned long long)m_hook_address));
+        m_logger.info("Detour at 0x" + std::to_string((unsigned long long)m_detour_address));
+        m_logger.info("Backup at 0x" + std::to_string((unsigned long long)m_backup_address));
+    }
+
     // Step 3: Read original bytes FIRST (before writing detour)
     // Use 10 bytes (minimum covering whole instructions: 3 + 7)
-    //   FF 73 08                      (3 bytes) push [ebx+8]
-    //   C7 45 F4 00 00 00 00          (7 bytes) mov [ebp-0Ch], 0
     const size_t stolen_bytes = 10;
     m_original_bytes.resize(stolen_bytes);
     if (!m_memory->ReadMemory(m_hook_address, m_original_bytes.data(), stolen_bytes)) {
         std::cout << "Failed to read original bytes\n";
+        if (m_logger.error) m_logger.error("Failed to read original bytes at dialog site");
         return false;
     }
     
@@ -85,15 +93,25 @@ bool DialogHook::InstallHook() {
     // Step 4: Write detour code (now that we have stolen bytes)
     if (!WriteDetourCode()) {
         std::cout << "Failed to write detour code\n";
+        if (m_logger.error) m_logger.error("Failed to write dialog detour code");
         return false;
     }
 
-    // Step 5: Patch original function
+    if (!enable_patch) {
+        // Defer patching until first integrity run
+        return true;
+    }
+
+    return EnablePatch();
+}
+
+bool DialogHook::EnablePatch() {
     if (!PatchOriginalFunction()) {
         std::cout << "Failed to patch original function\n";
+        if (m_logger.error) m_logger.error("Failed to patch dialog function");
         return false;
     }
-    
+
     // DIAGNOSTIC: Verify the patch was applied
     std::vector<uint8_t> patched_bytes(20);
     if (m_memory->ReadMemory(m_hook_address, patched_bytes.data(), 20)) {
@@ -135,52 +153,83 @@ bool DialogHook::RemoveHook() {
 
 bool DialogHook::FindDialogTriggerAddress() {
     auto pattern = Signatures::GetDialogTrigger();
-    uintptr_t base = m_memory->GetModuleBaseAddress("DQXGame.exe");
-    
-    if (base == 0) {
-        std::cout << "Failed to get DQXGame.exe base address\n";
-        return false;
-    }
-    
+
     if (m_verbose) {
-        std::cout << "DQXGame.exe base: 0x" << std::hex << base << std::dec << "\n";
+        std::cout << "Searching for dialog trigger using PatternScanner...\n";
         std::cout << "Pattern: ";
-    }
-    if (m_verbose) {
         for (size_t i = 0; i < pattern.Size(); ++i) {
             if (pattern.mask[i]) printf("%02X ", pattern.bytes[i]); else printf("?? ");
         }
         std::cout << "\n";
     }
-    
-    const size_t scan_size = 50 * 1024 * 1024;
-    const size_t chunk_size = 64 * 1024;
-    std::vector<uint8_t> buffer(chunk_size);
-    
-    for (uintptr_t addr = base; addr < base + scan_size; addr += chunk_size) {
-        if (!m_memory->ReadMemory(addr, buffer.data(), chunk_size)) {
-            continue;
+
+    PatternScanner scanner(m_memory);
+    bool found = false;
+    // Prefer module-restricted scan
+    if (auto addr = scanner.ScanModule(pattern, "DQXGame.exe")) {
+        m_hook_address = *addr;
+        found = true;
+    } else if (auto addr2 = scanner.ScanProcess(pattern, /*require_executable=*/true)) {
+        m_hook_address = *addr2;
+        found = true;
+    }
+
+    // Fallback: manual chunk scan from module base (avoids VirtualQuery page guard issues)
+    if (!found) {
+        uintptr_t base = m_memory->GetModuleBaseAddress("DQXGame.exe");
+        if (base == 0) {
+            std::cout << "Failed to get DQXGame.exe base address\n";
+            if (m_logger.error) m_logger.error("Failed to get DQXGame.exe base address");
+            return false;
         }
-        
-        for (size_t i = 0; i <= chunk_size - pattern.Size(); ++i) {
-            bool match = true;
-            for (size_t j = 0; j < pattern.Size(); ++j) {
-                if (!pattern.mask[j]) continue;
-                if (buffer[i + j] != pattern.bytes[j]) {
-                    match = false;
-                    break;
+        const size_t scan_size = 80 * 1024 * 1024; // scan first 80MB of image
+        const size_t chunk_size = 64 * 1024;
+        std::vector<uint8_t> buffer(chunk_size);
+        for (uintptr_t addr = base; addr < base + scan_size; addr += chunk_size) {
+            if (!m_memory->ReadMemory(addr, buffer.data(), chunk_size)) continue;
+            for (size_t i = 0; i + pattern.Size() <= buffer.size(); ++i) {
+                bool match = true;
+                for (size_t j = 0; j < pattern.Size(); ++j) {
+                    if (!pattern.mask[j]) continue;
+                    if (buffer[i + j] != pattern.bytes[j]) { match = false; break; }
                 }
+                if (match) { m_hook_address = addr + i; found = true; break; }
             }
-            if (match) {
-                m_hook_address = addr + i;
-                std::cout << "Found at offset: 0x" << std::hex << (m_hook_address - base) << std::dec << "\n";
-                return true;
-            }
+            if (found) break;
         }
     }
-    
-    std::cout << "Pattern not found after scanning " << (scan_size / 1024 / 1024) << " MB\n";
-    return false;
+
+    if (!found) {
+        std::cout << "Dialog trigger pattern not found in executable regions or manual scan\n";
+        if (m_logger.error) m_logger.error("Dialog trigger pattern not found");
+        return false;
+    }
+
+    uintptr_t base = m_memory->GetModuleBaseAddress("DQXGame.exe");
+    if (base != 0 && m_verbose) {
+        std::cout << "Dialog trigger at: 0x" << std::hex << m_hook_address
+                  << " (offset 0x" << (m_hook_address - base) << ")" << std::dec << "\n";
+    }
+
+    // Read first 16 bytes for verification
+    std::vector<uint8_t> head(16);
+    if (m_memory->ReadMemory(m_hook_address, head.data(), head.size())) {
+        if (m_verbose) {
+            std::cout << "Bytes at trigger: ";
+            for (size_t i=0;i<head.size();++i) printf("%02X ", head[i]);
+            std::cout << "\n";
+        }
+        // Light sanity check: FF 73 08, C7 45 F4 00 00 00 00 presence
+        bool ok = head.size() >= 10 && head[0] == 0xFF && head[1] == 0x73 && head[2] == 0x08
+                   && head[3] == 0xC7 && head[4] == 0x45 && head[5] == 0xF4
+                   && head[6] == 0x00 && head[7] == 0x00 && head[8] == 0x00 && head[9] == 0x00;
+        if (!ok) {
+            std::cout << "WARNING: Trigger bytes do not match expected prologue; continuing, but may be unstable\n";
+            if (m_logger.warn) m_logger.warn("Dialog trigger prologue differs from expected; continuing");
+        }
+    }
+
+    return true;
 }
 
 bool DialogHook::AllocateDetourMemory() {
@@ -365,17 +414,102 @@ bool DialogHook::PatchOriginalFunction() {
         std::cout << "Patching hook location with JMP to detour...\n";
         std::cout << "Jump offset: 0x" << std::hex << jump_offset << std::dec << "\n";
     }
+    if (m_logger.info) m_logger.info("Patching dialog hook with JMP");
     
+    // Temporarily set RWX, write, then restore RX
+    (void)m_memory->SetMemoryProtection(m_hook_address, patch_bytes.size(), MemoryProtectionFlags::ReadWriteExecute);
+    // Ensure stolen bytes still match before patch
+    {
+        std::vector<uint8_t> cur(stolen_bytes);
+        if (!m_memory->ReadMemory(m_hook_address, cur.data(), cur.size())) {
+            std::cout << "Failed to read current bytes before patch\n";
+            return false;
+        }
+        if (cur != m_original_bytes) {
+            std::cout << "WARNING: Hook site bytes changed before patch; continuing cautiously\n";
+            if (m_logger.warn) m_logger.warn("Hook site bytes changed before patch; continuing cautiously");
+        }
+    }
+
     // Write the patch
     if (!m_memory->WriteMemory(m_hook_address, patch_bytes.data(), patch_bytes.size())) {
         std::cout << "Failed to write patch bytes\n";
         return false;
     }
+    (void)m_memory->SetMemoryProtection(m_hook_address, patch_bytes.size(), MemoryProtectionFlags::ReadExecute);
     
     // Flush instruction cache to ensure CPU sees the new code
     m_memory->FlushInstructionCache(m_hook_address, stolen_bytes);
     if (m_verbose) std::cout << "Instruction cache flushed\n";
     
+    // DIAGNOSTIC: read-back
+    {
+        std::vector<uint8_t> rb(20);
+        if (m_memory->ReadMemory(m_hook_address, rb.data(), rb.size())) {
+            if (m_verbose) {
+                std::cout << "Hook bytes after patch: ";
+                for (auto b : rb) printf("%02X ", b);
+                std::cout << "\n";
+            }
+            if (m_logger.info) {
+                char buf[64]; int n = 0;
+                for (size_t i=0;i<rb.size() && i<16;i++) n += std::snprintf(buf+n, sizeof(buf)-n, "%02X ", rb[i]);
+                m_logger.info(std::string("Hook bytes[0..15] ") + buf);
+            }
+        }
+    }
+
+    return true;
+}
+
+bool DialogHook::ReapplyPatch() {
+    if (!m_is_installed) {
+        // Detour memory still present; just re-patch original site
+        // We consider it okay to reapply regardless
+    }
+    
+    const size_t stolen_bytes = m_original_bytes.size();
+    if (stolen_bytes == 0) return false;
+
+    std::vector<uint8_t> patch_bytes;
+    patch_bytes.push_back(0xE9);
+    uint32_t jump_offset = Rel32From(m_hook_address, m_detour_address);
+    patch_bytes.insert(patch_bytes.end(), reinterpret_cast<uint8_t*>(&jump_offset),
+                       reinterpret_cast<uint8_t*>(&jump_offset) + 4);
+    while (patch_bytes.size() < stolen_bytes) patch_bytes.push_back(0x90);
+
+    if (m_verbose) {
+        std::cout << "Reapplying hook JMP at 0x" << std::hex << m_hook_address << std::dec
+                  << " -> detour 0x" << std::hex << m_detour_address << std::dec
+                  << " (rel=0x" << std::hex << jump_offset << std::dec << ")\n";
+    }
+
+    if (m_logger.info) m_logger.info("Reapplying dialog hook JMP");
+
+    (void)m_memory->SetMemoryProtection(m_hook_address, patch_bytes.size(), MemoryProtectionFlags::ReadWriteExecute);
+    if (!m_memory->WriteMemory(m_hook_address, patch_bytes.data(), patch_bytes.size())) {
+        if (m_logger.error) m_logger.error("Failed to reapply dialog JMP");
+        return false;
+    }
+    (void)m_memory->SetMemoryProtection(m_hook_address, patch_bytes.size(), MemoryProtectionFlags::ReadExecute);
+    m_memory->FlushInstructionCache(m_hook_address, stolen_bytes);
+
+    {
+        std::vector<uint8_t> rb(20);
+        if (m_memory->ReadMemory(m_hook_address, rb.data(), rb.size())) {
+            if (m_verbose) {
+                std::cout << "Hook bytes after reapply: ";
+                for (auto b : rb) printf("%02X ", b);
+                std::cout << "\n";
+            }
+            if (m_logger.info) {
+                char buf[64]; int n = 0;
+                for (size_t i=0;i<rb.size() && i<16;i++) n += std::snprintf(buf+n, sizeof(buf)-n, "%02X ", rb[i]);
+                m_logger.info(std::string("Reapplied bytes[0..15] ") + buf);
+            }
+        }
+    }
+
     return true;
 }
 

@@ -16,6 +16,7 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/process/ProcessFinder.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/process/NoticeWaiter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/DialogHook.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityDetour.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/api/dqxclarity.cpp
 )
 
