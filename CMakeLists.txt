@@ -17,11 +17,9 @@ if(BUILD_DQXCLARITY)
   add_subdirectory(src/dqxclarity)
 endif()
 
-# Main application dependencies (SDL, ImGui, etc.)
-option(BUILD_MAIN_APP "Build main dqx-utility application" ON)
-
-
-# If main app is disabled, we still configure dependencies and tests; the app target is skipped later.
+# Configure CPM cache to reuse downloaded dependencies across builds
+set(CPM_SOURCE_CACHE "${CMAKE_SOURCE_DIR}/.cpm-cache" CACHE PATH "CPM source cache directory")
+set(CPM_USE_LOCAL_PACKAGES ON CACHE BOOL "Use local packages if available")
 
 set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
 if(NOT EXISTS ${CPM_DOWNLOAD_LOCATION})
@@ -114,7 +112,6 @@ CPMAddPackage(
   URL_HASH SHA256=9212ee7c4718b1466a5d99e64bce3ef1965704afea4ba651f8d978d0791b7c7c
 )
 
-if(BUILD_MAIN_APP)
 CPMAddPackage(
   NAME cpr
   GITHUB_REPOSITORY libcpr/cpr
@@ -132,7 +129,6 @@ CPMAddPackage(
     "BUILD_CURL_EXE OFF"
     "BUILD_LIBCURL_DOCS OFF"
 )
-endif()
 
 CPMAddPackage(
   NAME tomlplusplus
@@ -231,8 +227,7 @@ set(MAIN_TRANSLATOR_SOURCES
   src/translate/TranslatorFactory.cpp
 )
 
-if(BUILD_MAIN_APP)
-  add_executable(dqx_utility
+add_executable(dqx_utility
     src/main.cpp
     src/AppContext.cpp
     src/DialogWindow.cpp
@@ -258,51 +253,49 @@ if(BUILD_MAIN_APP)
     target_compile_options(dqx_utility PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 
-  set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
-  target_compile_features(dqx_utility PRIVATE cxx_std_20)
-  target_link_libraries(dqx_utility PRIVATE SDL3::SDL3 imgui dqxclarity::dqxclarity)
-  if(cpr_ADDED)
-    target_link_libraries(dqx_utility PRIVATE cpr::cpr)
+set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
+target_compile_features(dqx_utility PRIVATE cxx_std_20)
+target_link_libraries(dqx_utility PRIVATE SDL3::SDL3 imgui dqxclarity::dqxclarity)
+if(cpr_ADDED)
+  target_link_libraries(dqx_utility PRIVATE cpr::cpr)
+endif()
+if(tomlplusplus_SOURCE_DIR)
+  target_include_directories(dqx_utility PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
+  if(NOT MSVC AND HAS_NO_DEPRECATED_LITERAL_OPERATOR)
+    target_compile_options(dqx_utility PRIVATE -Wno-deprecated-literal-operator)
   endif()
-  if(tomlplusplus_SOURCE_DIR)
-    target_include_directories(dqx_utility PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
-    if(NOT MSVC AND HAS_NO_DEPRECATED_LITERAL_OPERATOR)
-      target_compile_options(dqx_utility PRIVATE -Wno-deprecated-literal-operator)
-    endif()
-  endif()
-  if(plog_SOURCE_DIR)
-    target_include_directories(dqx_utility PRIVATE ${plog_SOURCE_DIR}/include)
-    # Force UTF-8 narrow strings in plog on Windows
-    if(WIN32)
-      target_compile_definitions(dqx_utility PRIVATE PLOG_CHAR_IS_UTF8=1)
-    endif()
-  endif()
-
+endif()
+if(plog_SOURCE_DIR)
+  target_include_directories(dqx_utility PRIVATE ${plog_SOURCE_DIR}/include)
+  # Force UTF-8 narrow strings in plog on Windows
   if(WIN32)
-    target_compile_definitions(dqx_utility PRIVATE SDL_MAIN_USE_CONSOLE)
+    target_compile_definitions(dqx_utility PRIVATE PLOG_CHAR_IS_UTF8=1)
+  endif()
+endif()
+
+if(WIN32)
+  target_compile_definitions(dqx_utility PRIVATE SDL_MAIN_USE_CONSOLE)
+endif()
+
+# Ensure required runtime DLLs are next to the executable
+if(WIN32 AND MSVC)
+  # Determine arch for the prebuilt SDL3 package
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(_SDL3_ARCH "x64")
+  else()
+    set(_SDL3_ARCH "x86")
   endif()
 
-  # Ensure required runtime DLLs are next to the executable
-  if(WIN32 AND MSVC)
-    # Determine arch for the prebuilt SDL3 package
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-      set(_SDL3_ARCH "x64")
+  # SDL3 (import library + DLL in lib/<arch>)
+  if(DEFINED SDL3_SOURCE_DIR)
+    set(_SDL3_DLL "${SDL3_SOURCE_DIR}/lib/${_SDL3_ARCH}/SDL3.dll")
+    if(EXISTS "${_SDL3_DLL}")
+      add_custom_command(TARGET dqx_utility POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_SDL3_DLL}" $<TARGET_FILE_DIR:dqx_utility>
+        COMMENT "Copying SDL3.dll to dqx-utility output directory")
     else()
-      set(_SDL3_ARCH "x86")
+      message(WARNING "SDL3.dll not found at ${_SDL3_DLL}; dqx-utility may fail to start without it.")
     endif()
-
-    # SDL3 (import library + DLL in lib/<arch>)
-    if(DEFINED SDL3_SOURCE_DIR)
-      set(_SDL3_DLL "${SDL3_SOURCE_DIR}/lib/${_SDL3_ARCH}/SDL3.dll")
-      if(EXISTS "${_SDL3_DLL}")
-        add_custom_command(TARGET dqx_utility POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_SDL3_DLL}" $<TARGET_FILE_DIR:dqx_utility>
-          COMMENT "Copying SDL3.dll to dqx-utility output directory")
-      else()
-        message(WARNING "SDL3.dll not found at ${_SDL3_DLL}; dqx-utility may fail to start without it.")
-      endif()
-    endif()
-
   endif()
 endif()
 
