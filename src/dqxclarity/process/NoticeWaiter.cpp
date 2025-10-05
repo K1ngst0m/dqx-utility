@@ -13,7 +13,7 @@ namespace dqxclarity {
 bool WaitForNoticeScreen(
     std::atomic<bool>& cancel,
     std::chrono::milliseconds poll_interval,
-    std::chrono::minutes timeout)
+    std::chrono::milliseconds timeout)
 {
     auto pids = ProcessFinder::FindByName("DQXGame.exe", false);
     if (pids.empty()) {

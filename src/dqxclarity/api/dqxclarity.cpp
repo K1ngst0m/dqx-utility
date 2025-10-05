@@ -40,6 +40,11 @@ bool Engine::initialize(const Config& cfg, Logger loggers) {
 }
 
 bool Engine::start_hook() {
+  return start_hook(StartPolicy{ impl_->cfg.defer_dialog_patch ? StartPolicy::DeferUntilIntegrity
+                                                               : StartPolicy::EnableImmediately });
+}
+
+bool Engine::start_hook(StartPolicy policy) {
   if (status_ == Status::Hooked || status_ == Status::Starting) return true;
   status_ = Status::Starting;
 
@@ -78,7 +83,8 @@ bool Engine::start_hook() {
   impl_->hook->SetLogger(impl_->log);
   impl_->hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
   impl_->hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-  if (!impl_->hook->InstallHook(/*enable_patch=*/!impl_->cfg.defer_dialog_patch)) {
+  const bool enable_patch_now = (policy == StartPolicy::EnableImmediately);
+  if (!impl_->hook->InstallHook(/*enable_patch=*/enable_patch_now)) {
     if (impl_->log.error) impl_->log.error("Failed to install dialog hook");
     impl_->hook.reset();
     impl_->integrity->Remove();

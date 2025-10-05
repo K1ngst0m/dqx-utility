@@ -11,7 +11,7 @@ namespace dqxclarity {
 bool WaitForNoticeScreen(
     std::atomic<bool>& cancel,
     std::chrono::milliseconds poll_interval = std::chrono::milliseconds(250),
-    std::chrono::minutes timeout = std::chrono::minutes(5)
+    std::chrono::milliseconds timeout = std::chrono::minutes(5)
 );
 
 } // namespace dqxclarity

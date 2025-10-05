@@ -27,8 +27,11 @@ class Engine {
   Engine();
   ~Engine();
 
+  enum class StartPolicy { DeferUntilIntegrity, EnableImmediately };
+
   bool initialize(const Config& cfg, Logger loggers = {});
   bool start_hook();
+  bool start_hook(StartPolicy policy);
   bool stop_hook();
   Status status() const { return status_; }
 
