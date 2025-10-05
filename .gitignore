@@ -4,6 +4,7 @@
 /logs/
 **/__pycache__/**
 /.cache/
+/.cpm-cache/
 *venv*
 *.log
 dqxclarity/defaults.pref
