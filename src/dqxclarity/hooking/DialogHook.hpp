@@ -4,6 +4,7 @@
 #include "Codegen.hpp"
 #include "../console/IConsoleSink.hpp"
 #include "../api/dqxclarity.hpp"
+#include "../memory/MemoryPatch.hpp"
 #include <memory>
 #include <vector>
 #include <string>

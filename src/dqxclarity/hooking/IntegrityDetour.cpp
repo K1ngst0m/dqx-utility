@@ -2,6 +2,7 @@
 #include "../pattern/PatternScanner.hpp"
 #include "../signatures/Signatures.hpp"
 #include "Codegen.hpp"
+#include "../memory/MemoryPatch.hpp"
 
 #include <iostream>
 #include <cstdio>
@@ -102,10 +103,7 @@ bool IntegrityDetour::PatchIntegrityFunction() {
     if (m_log.info) m_log.info("Patching integrity with JMP");
 
     // Set RWX for patch region, write, restore RX
-    (void)m_memory->SetMemoryProtection(m_integrity_addr, patch.size(), MemoryProtectionFlags::ReadWriteExecute);
-    if (!m_memory->WriteMemory(m_integrity_addr, patch.data(), patch.size())) return false;
-    (void)m_memory->SetMemoryProtection(m_integrity_addr, patch.size(), MemoryProtectionFlags::ReadExecute);
-    m_memory->FlushInstructionCache(m_integrity_addr, patch.size());
+    if (!MemoryPatch::WriteWithProtect(*m_memory, m_integrity_addr, patch)) return false;
 
     if (m_verbose) {
         LogBytes("Integrity patch bytes", m_integrity_addr, (std::max<size_t>)(m_original_bytes.size(), (size_t)8));

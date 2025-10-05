@@ -1,6 +1,6 @@
 #include "DialogHook.hpp"
 #include "../signatures/Signatures.hpp"
-#include "../pattern/PatternScanner.hpp"
+#include "../pattern/PatternFinder.hpp"
 #include "Codegen.hpp"
 #include <iostream>
 #include <fstream>
@@ -163,13 +163,13 @@ bool DialogHook::FindDialogTriggerAddress() {
         std::cout << "\n";
     }
 
-    PatternScanner scanner(m_memory);
+PatternFinder finder(m_memory);
     bool found = false;
     // Prefer module-restricted scan
-    if (auto addr = scanner.ScanModule(pattern, "DQXGame.exe")) {
+if (auto addr = finder.FindInModule(pattern, "DQXGame.exe")) {
         m_hook_address = *addr;
         found = true;
-    } else if (auto addr2 = scanner.ScanProcess(pattern, /*require_executable=*/true)) {
+} else if (auto addr2 = finder.FindInProcessExec(pattern)) {
         m_hook_address = *addr2;
         found = true;
     }
@@ -182,20 +182,9 @@ bool DialogHook::FindDialogTriggerAddress() {
             if (m_logger.error) m_logger.error("Failed to get DQXGame.exe base address");
             return false;
         }
-        const size_t scan_size = 80 * 1024 * 1024; // scan first 80MB of image
-        const size_t chunk_size = 64 * 1024;
-        std::vector<uint8_t> buffer(chunk_size);
-        for (uintptr_t addr = base; addr < base + scan_size; addr += chunk_size) {
-            if (!m_memory->ReadMemory(addr, buffer.data(), chunk_size)) continue;
-            for (size_t i = 0; i + pattern.Size() <= buffer.size(); ++i) {
-                bool match = true;
-                for (size_t j = 0; j < pattern.Size(); ++j) {
-                    if (!pattern.mask[j]) continue;
-                    if (buffer[i + j] != pattern.bytes[j]) { match = false; break; }
-                }
-                if (match) { m_hook_address = addr + i; found = true; break; }
-            }
-            if (found) break;
+        if (auto fb = finder.FindWithFallback(pattern, "DQXGame.exe", 80u * 1024u * 1024u)) {
+            m_hook_address = *fb;
+            found = true;
         }
     }
 
@@ -416,8 +405,6 @@ bool DialogHook::PatchOriginalFunction() {
     }
     if (m_logger.info) m_logger.info("Patching dialog hook with JMP");
     
-    // Temporarily set RWX, write, then restore RX
-    (void)m_memory->SetMemoryProtection(m_hook_address, patch_bytes.size(), MemoryProtectionFlags::ReadWriteExecute);
     // Ensure stolen bytes still match before patch
     {
         std::vector<uint8_t> cur(stolen_bytes);
@@ -431,31 +418,24 @@ bool DialogHook::PatchOriginalFunction() {
         }
     }
 
-    // Write the patch
-    if (!m_memory->WriteMemory(m_hook_address, patch_bytes.data(), patch_bytes.size())) {
+    // Write the patch with protection management
+    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes)) {
         std::cout << "Failed to write patch bytes\n";
+        if (m_logger.error) m_logger.error("Failed to write dialog JMP bytes");
         return false;
     }
-    (void)m_memory->SetMemoryProtection(m_hook_address, patch_bytes.size(), MemoryProtectionFlags::ReadExecute);
-    
-    // Flush instruction cache to ensure CPU sees the new code
-    m_memory->FlushInstructionCache(m_hook_address, stolen_bytes);
     if (m_verbose) std::cout << "Instruction cache flushed\n";
     
     // DIAGNOSTIC: read-back
     {
-        std::vector<uint8_t> rb(20);
-        if (m_memory->ReadMemory(m_hook_address, rb.data(), rb.size())) {
+        auto rb = MemoryPatch::ReadBack(*m_memory, m_hook_address, 20);
+        if (!rb.empty()) {
             if (m_verbose) {
                 std::cout << "Hook bytes after patch: ";
                 for (auto b : rb) printf("%02X ", b);
                 std::cout << "\n";
             }
-            if (m_logger.info) {
-                char buf[64]; int n = 0;
-                for (size_t i=0;i<rb.size() && i<16;i++) n += std::snprintf(buf+n, sizeof(buf)-n, "%02X ", rb[i]);
-                m_logger.info(std::string("Hook bytes[0..15] ") + buf);
-            }
+            if (m_logger.info) m_logger.info(std::string("Hook bytes[0..15] ") + MemoryPatch::HexFirstN(rb));
         }
     }
 
@@ -486,27 +466,20 @@ bool DialogHook::ReapplyPatch() {
 
     if (m_logger.info) m_logger.info("Reapplying dialog hook JMP");
 
-    (void)m_memory->SetMemoryProtection(m_hook_address, patch_bytes.size(), MemoryProtectionFlags::ReadWriteExecute);
-    if (!m_memory->WriteMemory(m_hook_address, patch_bytes.data(), patch_bytes.size())) {
+    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes)) {
         if (m_logger.error) m_logger.error("Failed to reapply dialog JMP");
         return false;
     }
-    (void)m_memory->SetMemoryProtection(m_hook_address, patch_bytes.size(), MemoryProtectionFlags::ReadExecute);
-    m_memory->FlushInstructionCache(m_hook_address, stolen_bytes);
 
     {
-        std::vector<uint8_t> rb(20);
-        if (m_memory->ReadMemory(m_hook_address, rb.data(), rb.size())) {
+        auto rb = MemoryPatch::ReadBack(*m_memory, m_hook_address, 20);
+        if (!rb.empty()) {
             if (m_verbose) {
                 std::cout << "Hook bytes after reapply: ";
                 for (auto b : rb) printf("%02X ", b);
                 std::cout << "\n";
             }
-            if (m_logger.info) {
-                char buf[64]; int n = 0;
-                for (size_t i=0;i<rb.size() && i<16;i++) n += std::snprintf(buf+n, sizeof(buf)-n, "%02X ", rb[i]);
-                m_logger.info(std::string("Reapplied bytes[0..15] ") + buf);
-            }
+            if (m_logger.info) m_logger.info(std::string("Reapplied bytes[0..15] ") + MemoryPatch::HexFirstN(rb));
         }
     }
 

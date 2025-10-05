@@ -12,11 +12,14 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/MemoryFactory.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/Pattern.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/PatternScanner.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/pattern/PatternFinder.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/signatures/Signatures.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/process/ProcessFinder.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/process/NoticeWaiter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/DialogHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityDetour.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityMonitor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/memory/MemoryPatch.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/api/dqxclarity.cpp
 )
 
