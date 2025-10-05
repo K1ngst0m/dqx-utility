@@ -30,6 +30,9 @@ public:
     void SetVerbose(bool enabled) { m_verbose = enabled; }
     void SetConsoleOutput(bool enabled) { m_console_output = enabled; }
     void SetConsole(ConsolePtr console) { m_console = std::move(console); }
+
+    void SetInstructionSafeSteal(bool enabled) { m_instr_safe = enabled; }
+    void SetReadbackBytes(size_t n) { m_readback_n = n; }
     
     // Poll for new dialog data (call this periodically in a loop)
     bool PollDialogData();
@@ -53,6 +56,8 @@ private:
     bool m_console_output = false;
     ConsolePtr m_console;
     dqxclarity::Logger m_logger{};
+    bool m_instr_safe = true;
+    size_t m_readback_n = 16;
     
     // Dialog data
     mutable std::string m_last_dialog_text;
@@ -68,6 +73,8 @@ private:
     
     std::vector<uint8_t> CreateDetourBytecode();
     uintptr_t CalculateRelativeAddress(uintptr_t from, uintptr_t to);
+
+    size_t ComputeStolenLength();
 };
 
 } // namespace dqxclarity

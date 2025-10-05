@@ -75,8 +75,8 @@ bool DialogHook::InstallHook(bool enable_patch) {
     }
 
     // Step 3: Read original bytes FIRST (before writing detour)
-    // Use 10 bytes (minimum covering whole instructions: 3 + 7)
-    const size_t stolen_bytes = 10;
+    size_t stolen_bytes = m_instr_safe ? ComputeStolenLength() : static_cast<size_t>(10);
+    if (stolen_bytes < 5) stolen_bytes = 10; // safety
     m_original_bytes.resize(stolen_bytes);
     if (!m_memory->ReadMemory(m_hook_address, m_original_bytes.data(), stolen_bytes)) {
         std::cout << "Failed to read original bytes\n";
@@ -85,7 +85,7 @@ bool DialogHook::InstallHook(bool enable_patch) {
     }
     
     if (m_verbose) {
-        std::cout << "Original bytes: ";
+        std::cout << "Original bytes (stolen=" << stolen_bytes << "): ";
         for (size_t i = 0; i < stolen_bytes; ++i) printf("%02X ", m_original_bytes[i]);
         std::cout << "\n";
     }
@@ -113,10 +113,10 @@ bool DialogHook::EnablePatch() {
     }
 
     // DIAGNOSTIC: Verify the patch was applied
-    std::vector<uint8_t> patched_bytes(20);
-    if (m_memory->ReadMemory(m_hook_address, patched_bytes.data(), 20)) {
+    std::vector<uint8_t> patched_bytes(static_cast<size_t>(m_readback_n));
+    if (m_memory->ReadMemory(m_hook_address, patched_bytes.data(), patched_bytes.size())) {
         std::cout << "Bytes after patching: ";
-        for (size_t i = 0; i < 20; ++i) {
+        for (size_t i = 0; i < patched_bytes.size(); ++i) {
             printf("%02X ", patched_bytes[i]);
         }
         std::cout << "\n";
@@ -428,14 +428,14 @@ bool DialogHook::PatchOriginalFunction() {
     
     // DIAGNOSTIC: read-back
     {
-        auto rb = MemoryPatch::ReadBack(*m_memory, m_hook_address, 20);
+        auto rb = MemoryPatch::ReadBack(*m_memory, m_hook_address, static_cast<size_t>(m_readback_n));
         if (!rb.empty()) {
             if (m_verbose) {
                 std::cout << "Hook bytes after patch: ";
                 for (auto b : rb) printf("%02X ", b);
                 std::cout << "\n";
             }
-            if (m_logger.info) m_logger.info(std::string("Hook bytes[0..15] ") + MemoryPatch::HexFirstN(rb));
+            if (m_logger.info) m_logger.info(std::string("Hook bytes[0..") + std::to_string(m_readback_n) + "] " + MemoryPatch::HexFirstN(rb, static_cast<size_t>(m_readback_n)));
         }
     }
 
@@ -472,14 +472,14 @@ bool DialogHook::ReapplyPatch() {
     }
 
     {
-        auto rb = MemoryPatch::ReadBack(*m_memory, m_hook_address, 20);
+        auto rb = MemoryPatch::ReadBack(*m_memory, m_hook_address, static_cast<size_t>(m_readback_n));
         if (!rb.empty()) {
             if (m_verbose) {
                 std::cout << "Hook bytes after reapply: ";
                 for (auto b : rb) printf("%02X ", b);
                 std::cout << "\n";
             }
-            if (m_logger.info) m_logger.info(std::string("Reapplied bytes[0..15] ") + MemoryPatch::HexFirstN(rb));
+            if (m_logger.info) m_logger.info(std::string("Reapplied bytes[0..") + std::to_string(m_readback_n) + "] " + MemoryPatch::HexFirstN(rb, static_cast<size_t>(m_readback_n)));
         }
     }
 
@@ -494,6 +494,22 @@ void DialogHook::RestoreOriginalFunction() {
 
 uintptr_t DialogHook::CalculateRelativeAddress(uintptr_t from, uintptr_t to) {
     return Rel32From(from, to);
+}
+
+size_t DialogHook::ComputeStolenLength() {
+    // Try to read a small window and recognize the expected prologue
+    std::vector<uint8_t> head(16);
+    if (!m_memory->ReadMemory(m_hook_address, head.data(), head.size())) {
+        return 10; // fallback
+    }
+    // Expected pattern: FF 73 08 C7 45 F4 00 00 00 00
+    if (head.size() >= 10 && head[0] == 0xFF && head[1] == 0x73 && head[2] == 0x08 &&
+        head[3] == 0xC7 && head[4] == 0x45 && head[5] == 0xF4 && head[6] == 0x00 && head[7] == 0x00 && head[8] == 0x00 && head[9] == 0x00) {
+        return 10;
+    }
+    // Fallback minimal safe length for a JMP rel32 overwrite
+    if (m_logger.warn) m_logger.warn("Instruction-safe steal: unknown prologue; using minimal 5 bytes");
+    return 5;
 }
 
 bool DialogHook::PollDialogData() {

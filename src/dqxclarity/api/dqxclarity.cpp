@@ -5,6 +5,7 @@
 #include "../process/ProcessFinder.hpp"
 #include "../hooking/DialogHook.hpp"
 #include "../hooking/IntegrityDetour.hpp"
+#include "../hooking/IntegrityMonitor.hpp"
 #include "dialog_message.hpp"
 #include "../util/spsc_ring.hpp"
 
@@ -25,8 +26,7 @@ struct Engine::Impl {
   std::atomic<std::uint64_t> seq{0};
   std::thread poller;
   std::atomic<bool> poll_stop{false};
-  std::thread hider;
-  std::atomic<bool> hide_stop{false};
+  std::unique_ptr<class IntegrityMonitor> monitor;
 };
 
 Engine::Engine() : impl_(new Impl{}) {}
@@ -76,7 +76,9 @@ bool Engine::start_hook() {
   impl_->hook = std::make_unique<dqxclarity::DialogHook>(impl_->memory);
   impl_->hook->SetVerbose(impl_->cfg.verbose);
   impl_->hook->SetLogger(impl_->log);
-  if (!impl_->hook->InstallHook(/*enable_patch=*/false)) {
+  impl_->hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
+  impl_->hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+  if (!impl_->hook->InstallHook(/*enable_patch=*/!impl_->cfg.defer_dialog_patch)) {
     if (impl_->log.error) impl_->log.error("Failed to install dialog hook");
     impl_->hook.reset();
     impl_->integrity->Remove();
@@ -86,35 +88,25 @@ bool Engine::start_hook() {
     return false;
   }
 
-  // Start hook hide/reapply thread (monitor integrity state byte)
-  impl_->hide_stop.store(false);
-  impl_->hider = std::thread([this]{
-    using namespace std::chrono_literals;
-    auto state_addr = impl_->integrity ? impl_->integrity->GetStateAddress() : 0;
-    if (state_addr == 0) return; // nothing to do
-    bool first_enabled = false;
-    while (!impl_->hide_stop.load()) {
-      uint8_t flag = 0;
-      if (impl_->memory && impl_->memory->ReadMemory(state_addr, &flag, 1) && flag == 1) {
-        if (impl_->log.info) impl_->log.info("Integrity signal observed; scheduling reapply/enable");
-        // Give the game a moment, then enable or reapply our JMP
-        std::this_thread::sleep_for(1s);
-        if (impl_->hook) {
-          if (!first_enabled) {
-            (void)impl_->hook->EnablePatch();
-            first_enabled = true;
-            if (impl_->log.info) impl_->log.info("Dialog hook enabled after first integrity run");
-          } else {
-            (void)impl_->hook->ReapplyPatch();
-            if (impl_->log.info) impl_->log.info("Dialog hook re-applied after integrity");
-          }
+  // Start integrity monitor to enable/reapply dialog hook
+  auto state_addr = impl_->integrity ? impl_->integrity->GetStateAddress() : 0;
+  if (state_addr == 0) {
+    if (impl_->log.warn) impl_->log.warn("No integrity state address; skipping monitor");
+  } else {
+    impl_->monitor = std::make_unique<dqxclarity::IntegrityMonitor>(impl_->memory, impl_->log, state_addr,
+      [this](bool first){
+        if (!impl_->hook) return;
+        if (first) {
+          (void)impl_->hook->EnablePatch();
+          if (impl_->log.info) impl_->log.info("Dialog hook enabled after first integrity run");
+        } else {
+          (void)impl_->hook->ReapplyPatch();
+          if (impl_->log.info) impl_->log.info("Dialog hook re-applied after integrity");
         }
-        uint8_t zero = 0;
-        (void)impl_->memory->WriteMemory(state_addr, &zero, 1);
       }
-      std::this_thread::sleep_for(250ms);
-    }
-  });
+    );
+    (void)impl_->monitor->start();
+  }
 
   if (impl_->log.info) impl_->log.info("Hook installed");
 
@@ -147,9 +139,11 @@ bool Engine::stop_hook() {
   impl_->poll_stop.store(true);
   if (impl_->poller.joinable()) impl_->poller.join();
 
-  impl_->hide_stop.store(true);
-  if (impl_->hider.joinable()) impl_->hider.join();
 
+  if (impl_->monitor) {
+    impl_->monitor->stop();
+    impl_->monitor.reset();
+  }
   if (impl_->hook) {
     impl_->hook->RemoveHook();
     impl_->hook.reset();

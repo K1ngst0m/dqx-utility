@@ -11,6 +11,9 @@ enum class Status { Stopped, Starting, Hooked, Stopping, Error };
 struct Config {
   bool verbose = false;
   bool console_output = false; // kept for parity; not used by the library
+  bool defer_dialog_patch = true; // enable initial patch only after first integrity
+  bool instruction_safe_steal = true; // compute stolen bytes safely
+  int readback_bytes = 16; // how many bytes to log from patch sites
 };
 
 struct Logger {
