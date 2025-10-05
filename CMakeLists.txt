@@ -128,6 +128,8 @@ CPMAddPackage(
     "CURL_STATICLIB ON"
     "BUILD_CURL_EXE OFF"
     "BUILD_LIBCURL_DOCS OFF"
+    "CMAKE_SKIP_INSTALL_RULES ON"
+    "CURL_DISABLE_INSTALL ON"
 )
 
 CPMAddPackage(
@@ -275,7 +277,7 @@ if(plog_SOURCE_DIR)
 endif()
 
 if(WIN32)
-  target_compile_definitions(dqx_utility PRIVATE SDL_MAIN_USE_CONSOLE)
+  target_link_options(dqx_utility PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
 endif()
 
 # Ensure required runtime DLLs are next to the executable
@@ -302,5 +304,58 @@ endif()
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES src/main.cpp)
 
+# ============================================================================
+# Installation and Packaging
+# ============================================================================
 
+if(NOT WIN32)
+  message(FATAL_ERROR "Packaging is only supported on Windows. Current platform: ${CMAKE_SYSTEM_NAME}")
+endif()
 
+set(CPACK_PACKAGE_NAME "dqx-utility")
+set(CPACK_PACKAGE_VENDOR "DQX Utility")
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Dragon Quest X Utility - Portable Windows Application")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-win64-portable")
+
+set(CPACK_GENERATOR "ZIP")
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+set(CPACK_INSTALL_CMAKE_PROJECTS "")
+
+set(_PACK_DIR "${CMAKE_BINARY_DIR}/_portable_pack")
+
+add_custom_target(prepare_package ALL
+  COMMAND ${CMAKE_COMMAND} -E remove_directory "${_PACK_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_PACK_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqx_utility>" "${_PACK_DIR}/"
+  COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqxclarity-cpp>" "${_PACK_DIR}/"
+  DEPENDS dqx_utility dqxclarity-cpp
+  COMMENT "Preparing portable package directory"
+)
+
+if(EXISTS "${CMAKE_SOURCE_DIR}/assets")
+  add_custom_command(TARGET prepare_package POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "${_PACK_DIR}/assets"
+  )
+endif()
+
+if(DEFINED SDL3_SOURCE_DIR)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(_SDL3_ARCH "x64")
+  else()
+    set(_SDL3_ARCH "x86")
+  endif()
+  set(_SDL3_DLL_SRC "${SDL3_SOURCE_DIR}/lib/${_SDL3_ARCH}/SDL3.dll")
+  if(EXISTS "${_SDL3_DLL_SRC}")
+    add_custom_command(TARGET prepare_package POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy "${_SDL3_DLL_SRC}" "${_PACK_DIR}/"
+    )
+  endif()
+endif()
+
+set(CPACK_INSTALLED_DIRECTORIES "${_PACK_DIR};.")
+
+include(CPack)

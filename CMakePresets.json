@@ -93,6 +93,19 @@
       "configurePreset": "windows-msvc-app-release",
       "configuration": "Release"
     }
+  ],
+  "packagePresets": [
+    {
+      "name": "windows-portable",
+      "configurePreset": "windows-msvc-app-release",
+      "generators": ["ZIP"],
+      "configurations": ["Release"],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    }
   ]
 }
 
