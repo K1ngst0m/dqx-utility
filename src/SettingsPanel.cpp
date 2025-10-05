@@ -422,5 +422,13 @@ void SettingsPanel::renderAppearanceSection()
         {
             if (auto* cm = ConfigManager_Get()) cm->setUIScale(ui_scale);
         }
+
+        // Borderless windows toggle
+        bool borderless = false;
+        if (auto* cm = ConfigManager_Get()) borderless = cm->getBorderlessWindows();
+        if (ImGui::Checkbox("Borderless windows", &borderless))
+        {
+            if (auto* cm = ConfigManager_Get()) cm->setBorderlessWindows(borderless);
+        }
     }
 }

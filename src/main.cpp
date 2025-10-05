@@ -17,6 +17,9 @@
 #include <toml++/toml.h>
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <clocale>
 #include <fcntl.h>
@@ -114,6 +117,7 @@ static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bo
     }
 }
 
+
 int main(int argc, char** argv)
 {
     std::filesystem::create_directories("logs");
@@ -175,6 +179,9 @@ int main(int argc, char** argv)
 
     // Load config at startup; if no dialogs loaded, create a default one
     cfg_mgr.loadAtStartup();
+    // Always start with bordered window regardless of config, and sync the flag for UI
+    cfg_mgr.setBorderlessWindows(false);
+    app.setWindowBorderless(false);
     if (registry.windowsByType(UIWindowType::Dialog).empty())
         registry.createDialogWindow();
 
@@ -184,6 +191,9 @@ int main(int argc, char** argv)
 
     Uint64 last_time = SDL_GetTicks();
     bool running = true;
+    // Track last-applied borderless state to detect changes
+    bool last_borderless = cfg_mgr.getBorderlessWindows();
+
     while (running)
     {
         Uint64 current_time = SDL_GetTicks();
@@ -204,6 +214,15 @@ int main(int argc, char** argv)
             break;
 
         app.updateVignette(delta_time);
+
+        // Apply borderless changes live if toggled in settings
+        bool current_borderless = cfg_mgr.getBorderlessWindows();
+        if (current_borderless != last_borderless)
+        {
+            app.setWindowBorderless(current_borderless);
+            last_borderless = current_borderless;
+        }
+
         app.beginFrame();
 
         for (auto& window : registry.windows())

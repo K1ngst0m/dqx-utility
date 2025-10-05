@@ -25,6 +25,9 @@ public:
     void updateVignette(float delta_time);
     void renderVignette();
 
+    // Toggle OS-level window decorations (title bar, borders)
+    void setWindowBorderless(bool borderless);
+
 private:
     void updateRendererScale();
 

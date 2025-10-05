@@ -21,6 +21,10 @@ public:
     // Append logs option
     bool getAppendLogs() const { return append_logs_; }
 
+    // Borderless windows (hide title bar on dialog windows)
+    bool getBorderlessWindows() const { return borderless_windows_; }
+    void setBorderlessWindows(bool v) { borderless_windows_ = v; }
+
     // Assign registry pointer (used for save/apply)
     void setRegistry(WindowRegistry* reg);
 
@@ -45,6 +49,7 @@ private:
     // global
     float ui_scale_ = 1.0f;
     bool append_logs_ = false;
+    bool borderless_windows_ = false; // default to bordered (title bar visible)
     struct ImGuiStyleBackup { bool valid=false; ImGuiStyle style; };
     ImGuiStyleBackup base_;
 };

@@ -278,3 +278,10 @@ void AppContext::renderVignette()
         transparent, mask, mask, transparent
     );
 }
+
+void AppContext::setWindowBorderless(bool borderless)
+{
+    if (!window_) return;
+    // SDL_SetWindowBordered(window, bordered) where bordered=false -> borderless
+    SDL_SetWindowBordered(window_, !borderless);
+}

@@ -149,6 +149,7 @@ bool ConfigManager::saveAll()
     toml::table global;
     global.insert("ui_scale", ui_scale_);
     global.insert("append_logs", append_logs_);
+    global.insert("borderless_windows", borderless_windows_);
     root.insert("global", std::move(global));
 
     auto windows = registry_->windowsByType(UIWindowType::Dialog);
@@ -204,6 +205,8 @@ bool ConfigManager::loadAndApply()
                 setUIScale(*v);
             if (auto v = (*g)["append_logs"].value<bool>())
                 append_logs_ = *v;
+            if (auto v = (*g)["borderless_windows"].value<bool>())
+                borderless_windows_ = *v;
         }
 
         if (auto* arr = root["dialogs"].as_array())
