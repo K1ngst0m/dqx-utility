@@ -26,7 +26,10 @@ struct DQXClarityLauncher::Impl
     std::thread notice_worker;
     std::atomic<bool> cancel_notice{false};
     std::atomic<bool> notice_found{false};
-    std::atomic<bool> notice_done{false};
+
+    // Process state for start policy
+    bool process_running_at_start = false;
+    bool attempted_auto_start = false;
 
     // Backlog for UI consumers to read with per-window seq cursors
     mutable std::mutex backlog_mutex;
@@ -47,25 +50,38 @@ DQXClarityLauncher::DQXClarityLauncher()
     // Start controller monitor thread
     pimpl_->monitor = std::thread([this]{
         using namespace std::chrono;
+        bool initialized = false;
         while (!pimpl_->stop_flag.load()) {
+            if (!initialized) {
+                pimpl_->process_running_at_start = isDQXGameRunning();
+                initialized = true;
+            }
             const bool game_running = isDQXGameRunning();
             auto st = pimpl_->engine.status();
 
             if (game_running) {
                 if (st == dqxclarity::Status::Stopped || st == dqxclarity::Status::Error) {
-                    if (!pimpl_->notice_worker.joinable()) {
+                    // If process was already running when tool started, enable immediately once.
+                    if (pimpl_->process_running_at_start && !pimpl_->attempted_auto_start) {
+                        PLOG_INFO << "Process already running at tool start; enabling immediately";
+                        (void)pimpl_->engine.start_hook(dqxclarity::Engine::StartPolicy::EnableImmediately);
+                        pimpl_->attempted_auto_start = true;
+                        // Stop any lingering notice worker
+                        if (pimpl_->notice_worker.joinable()) {
+                            pimpl_->cancel_notice.store(true);
+                            pimpl_->notice_worker.join();
+                        }
+                    } else if (!pimpl_->notice_worker.joinable()) {
                         PLOG_INFO << "DQXGame.exe detected; waiting for \"Important notice\" screen via pattern scan";
                         pimpl_->cancel_notice.store(false);
                         pimpl_->notice_found.store(false);
-                        pimpl_->notice_done.store(false);
                         pimpl_->notice_worker = std::thread([this]{
-                            // Short timeout to classify post-Notice state
+                            // Infinite wait for notice by default (0 = infinite)
                             bool ok = dqxclarity::WaitForNoticeScreen(pimpl_->cancel_notice,
-                                std::chrono::milliseconds(250), std::chrono::minutes(0) + std::chrono::seconds(10));
+                                std::chrono::milliseconds(250), std::chrono::milliseconds(0));
                             if (ok) {
                                 pimpl_->notice_found.store(true);
                             }
-                            pimpl_->notice_done.store(true);
                         });
                     } else if (pimpl_->notice_found.load()) {
                         PLOG_INFO << "Important notice found; starting hook...";
@@ -74,23 +90,16 @@ DQXClarityLauncher::DQXClarityLauncher()
                         if (pimpl_->notice_worker.joinable()) {
                             pimpl_->notice_worker.join();
                         }
-                    } else if (pimpl_->notice_done.load()) {
-                        // Notice not found within timeout: treat as post-Notice
-                        PLOG_INFO << "Notice not found within timeout; enabling immediately";
-                        (void)pimpl_->engine.start_hook(dqxclarity::Engine::StartPolicy::EnableImmediately);
-                        pimpl_->notice_done.store(false);
-                        if (pimpl_->notice_worker.joinable()) {
-                            pimpl_->notice_worker.join();
-                        }
                     }
                 }
             } else {
-                // Cancel any pending notice wait
+                // Process not running: reset state and cancel any pending notice wait
+                pimpl_->process_running_at_start = false;
+                pimpl_->attempted_auto_start = false;
                 if (pimpl_->notice_worker.joinable()) {
                     pimpl_->cancel_notice.store(true);
                     pimpl_->notice_worker.join();
                 }
-                // Cleanup hooks
                 if (pimpl_->waiting_delay) pimpl_->waiting_delay = false;
                 if (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting || st == dqxclarity::Status::Stopping) {
                     PLOG_INFO << "DQXGame.exe not running; ensuring hook is stopped";
@@ -153,6 +162,11 @@ bool DQXClarityLauncher::launch()
     }
     PLOG_INFO << "Start requested";
     pimpl_->waiting_delay = false; // cancel any pending delay and start now
+    // Cancel any notice wait worker
+    if (pimpl_->notice_worker.joinable()) {
+        pimpl_->cancel_notice.store(true);
+        pimpl_->notice_worker.join();
+    }
     return pimpl_->engine.start_hook(dqxclarity::Engine::StartPolicy::EnableImmediately);
 }
 
