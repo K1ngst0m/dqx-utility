@@ -96,6 +96,7 @@ bool ProcessDetector::isProcessRunningUnix(const std::string& processName)
 std::optional<WineEnvironment> ProcessDetector::detectWineEnvironment(const std::string& processName)
 {
 #ifdef _WIN32
+    (void)processName;
     // Wine detection not applicable on Windows
     return std::nullopt;
 #else

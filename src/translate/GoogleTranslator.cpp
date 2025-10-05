@@ -1,9 +1,7 @@
 #include "GoogleTranslator.hpp"
 
 #include <cpr/cpr.h>
-#include <cstring>
 #include <plog/Log.h>
-#include <regex>
 
 using namespace translate;
 

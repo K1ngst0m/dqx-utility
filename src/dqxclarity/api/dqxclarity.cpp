@@ -65,33 +65,48 @@ bool Engine::start_hook(StartPolicy policy) {
     return false;
   }
 
-  // Install integrity detour BEFORE enabling dialog hook
-  impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
-  impl_->integrity->SetVerbose(impl_->cfg.verbose);
-  impl_->integrity->SetLogger(impl_->log);
-  if (!impl_->integrity->Install()) {
-    if (impl_->log.error) impl_->log.error("Failed to install integrity detour");
-    impl_->integrity.reset();
-    impl_->memory.reset();
-    status_ = Status::Error;
-    return false;
-  }
-
-  // Prepare the dialog hook but DEFER patching until first integrity signal
+  // Prepare the dialog hook FIRST but do not enable patch yet (we need its original bytes)
   impl_->hook = std::make_unique<dqxclarity::DialogHook>(impl_->memory);
   impl_->hook->SetVerbose(impl_->cfg.verbose);
   impl_->hook->SetLogger(impl_->log);
   impl_->hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
   impl_->hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-  const bool enable_patch_now = (policy == StartPolicy::EnableImmediately);
-  if (!impl_->hook->InstallHook(/*enable_patch=*/enable_patch_now)) {
-    if (impl_->log.error) impl_->log.error("Failed to install dialog hook");
+  if (!impl_->hook->InstallHook(/*enable_patch=*/false)) {
+    if (impl_->log.error) impl_->log.error("Failed to prepare dialog hook");
     impl_->hook.reset();
-    impl_->integrity->Remove();
+    status_ = Status::Error;
+    return false;
+  }
+
+  // Ensure the hook site allows in-process byte stores during integrity restore
+  if (impl_->hook && impl_->hook->GetHookAddress() != 0) {
+    auto& orig = impl_->hook->GetOriginalBytes();
+    if (!orig.empty()) {
+      (void)impl_->memory->SetMemoryProtection(impl_->hook->GetHookAddress(), orig.size(), dqxclarity::MemoryProtectionFlags::ReadWriteExecute);
+    }
+  }
+
+  // Install integrity detour and configure it to restore dialog hook bytes during checks
+  impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
+  impl_->integrity->SetVerbose(impl_->cfg.verbose);
+  impl_->integrity->SetLogger(impl_->log);
+  // Provide restoration info so integrity trampoline can unhook temporarily
+  if (impl_->hook && impl_->hook->GetHookAddress() != 0) {
+    impl_->integrity->AddRestoreTarget(impl_->hook->GetHookAddress(), impl_->hook->GetOriginalBytes());
+  }
+  if (!impl_->integrity->Install()) {
+    if (impl_->log.error) impl_->log.error("Failed to install integrity detour");
     impl_->integrity.reset();
+    impl_->hook.reset();
     impl_->memory.reset();
     status_ = Status::Error;
     return false;
+  }
+
+  // Optionally enable the dialog hook immediately (will be restored during integrity)
+  const bool enable_patch_now = (policy == StartPolicy::EnableImmediately);
+  if (enable_patch_now) {
+    (void)impl_->hook->EnablePatch();
   }
 
   // Proactive verification after immediate enable

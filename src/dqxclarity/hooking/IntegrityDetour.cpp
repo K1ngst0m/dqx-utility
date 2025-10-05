@@ -44,30 +44,46 @@ void IntegrityDetour::LogBytes(const char* label, uintptr_t addr, size_t count) 
 }
 
 bool IntegrityDetour::BuildAndWriteTrampoline() {
-    // Allocate state (1 byte) and trampoline code (64 bytes should be enough)
+    // Allocate state (1 byte) and trampoline code
     m_state_addr = m_memory->AllocateMemory(8, /*executable=*/false);
     if (m_state_addr == 0) return false;
     if (m_log.info) m_log.info("Allocated integrity state at 0x" + std::to_string((unsigned long long)m_state_addr));
     // Initialize state to 0
     uint8_t zero = 0; m_memory->WriteMemory(m_state_addr, &zero, 1);
 
-    m_trampoline_addr = m_memory->AllocateMemory(128, /*executable=*/true);
+    // Trampoline needs enough space to optionally restore several hook sites
+    // Each restored byte uses 6 bytes (C6 05 <imm32> <imm8>), so allocate generously
+    m_trampoline_addr = m_memory->AllocateMemory(1024, /*executable=*/true);
     if (m_trampoline_addr == 0) return false;
     if (m_log.info) m_log.info("Allocated integrity trampoline at 0x" + std::to_string((unsigned long long)m_trampoline_addr));
 
-    // Build code: mov byte ptr [state], 1 ; <stolen bytes> ; jmp back
+    // Build code: [restore hooks] ; mov byte ptr [state], 1 ; <stolen bytes> ; jmp back
     std::vector<uint8_t> code;
-    // C6 05 <imm32 addr> 01
+
+    // 1) Restore hook sites to original bytes so integrity sees clean code
+    for (const auto& site : m_restore_sites) {
+        uintptr_t addr = site.address;
+        for (size_t i = 0; i < site.bytes.size(); ++i) {
+            // C6 05 <imm32> <imm8>
+            code.push_back(0xC6); code.push_back(0x05);
+            uint32_t imm = ToImm32(addr + i);
+            auto* ip = reinterpret_cast<uint8_t*>(&imm);
+            code.insert(code.end(), ip, ip + 4);
+            code.push_back(site.bytes[i]);
+        }
+    }
+
+    // 2) Signal that integrity ran: C6 05 <state_addr> 01
     code.push_back(0xC6); code.push_back(0x05);
     uint32_t state_imm = ToImm32(m_state_addr);
     auto* p = reinterpret_cast<uint8_t*>(&state_imm);
     code.insert(code.end(), p, p + 4);
     code.push_back(0x01);
 
-    // Append stolen bytes
+    // 3) Append stolen bytes to preserve original integrity function behavior
     code.insert(code.end(), m_original_bytes.begin(), m_original_bytes.end());
 
-    // Jump back to integrity_addr + stolen_len
+    // 4) Jump back to integrity_addr + stolen_len
     code.push_back(0xE9);
     uint32_t rel = Rel32From(m_trampoline_addr + code.size() - 1, m_integrity_addr + m_original_bytes.size());
     auto* r = reinterpret_cast<uint8_t*>(&rel);

@@ -22,6 +22,7 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityMonitor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/MemoryPatch.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/api/dqxclarity.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/console/ConsoleFactory.cpp
 )
 
 # Platform-specific library sources
@@ -30,12 +31,14 @@ if(WIN32)
     ${CMAKE_CURRENT_SOURCE_DIR}/memory/win/ProcessMemory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/pattern/win/MemoryRegion.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/process/win/ProcessFinder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/console/win/Console.cpp
   )
 else()
   list(APPEND DQXCLARITY_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/memory/linux/ProcessMemory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/pattern/linux/MemoryRegion.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/process/linux/ProcessFinder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/console/linux/Console.cpp
   )
 endif()
 

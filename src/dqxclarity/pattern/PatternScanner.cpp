@@ -1,6 +1,4 @@
 #include "PatternScanner.hpp"
-#include <algorithm>
-#include <cstring>
 
 namespace dqxclarity {
 

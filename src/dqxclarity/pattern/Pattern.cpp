@@ -1,7 +1,5 @@
 #include "Pattern.hpp"
 #include <sstream>
-#include <algorithm>
-#include <cctype>
 
 namespace dqxclarity {
 

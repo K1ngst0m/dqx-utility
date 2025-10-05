@@ -17,6 +17,9 @@ public:
     // Global UI scale get/set
     float getUIScale() const { return ui_scale_; }
     void setUIScale(float scale);
+    
+    // Append logs option
+    bool getAppendLogs() const { return append_logs_; }
 
     // Assign registry pointer (used for save/apply)
     void setRegistry(WindowRegistry* reg);
@@ -41,6 +44,7 @@ private:
 
     // global
     float ui_scale_ = 1.0f;
+    bool append_logs_ = false;
     struct ImGuiStyleBackup { bool valid=false; ImGuiStyle style; };
     ImGuiStyleBackup base_;
 };

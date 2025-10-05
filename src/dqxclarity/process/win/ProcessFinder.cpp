@@ -10,20 +10,23 @@ namespace dqxclarity {
 std::vector<pid_t> ProcessFinder::EnumerateProcesses() {
     std::vector<pid_t> pids;
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snapshot == INVALID_HANDLE_VALUE) {
-        return pids;
+    if (snapshot != INVALID_HANDLE_VALUE) {
+        PROCESSENTRY32 pe{};
+        pe.dwSize = sizeof(PROCESSENTRY32);
+        if (Process32First(snapshot, &pe)) {
+            do {
+                if (pe.th32ProcessID > 0) {
+                    pids.push_back(pe.th32ProcessID);
+                }
+            } while (Process32Next(snapshot, &pe));
+        }
+        CloseHandle(snapshot);
     }
-
-    PROCESSENTRY32 pe{};
-    pe.dwSize = sizeof(PROCESSENTRY32);
-
-    if (Process32First(snapshot, &pe)) {
-        do {
-            pids.push_back(pe.th32ProcessID);
-        } while (Process32Next(snapshot, &pe));
+    // Ensure current process is included
+    DWORD self = GetCurrentProcessId();
+    if (std::find(pids.begin(), pids.end(), static_cast<pid_t>(self)) == pids.end()) {
+        pids.push_back(static_cast<pid_t>(self));
     }
-
-    CloseHandle(snapshot);
     return pids;
 }
 

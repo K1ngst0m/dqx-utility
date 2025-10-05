@@ -3,7 +3,6 @@
 #include "SettingsPanel.hpp"
 #include "WindowRegistry.hpp"
 #include "DialogWindow.hpp"
-#include "IconUtils.hpp"
 #include "config/ConfigManager.hpp"
 
 #include <SDL3/SDL.h>
@@ -14,16 +13,21 @@
 #include <plog/Initializers/RollingFileInitializer.h>
 
 #include <filesystem>
+#include <fstream>
+#include <toml++/toml.h>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <clocale>
+#include <fcntl.h>
+#include <io.h>
 static void SetupUtf8Console()
 {
-    // Set Windows console to UTF-8 so narrow logs print correctly
+    // Set Windows console to UTF-8 so Japanese text displays correctly
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
-    // Best-effort: ensure console mode supports processed output
+    
+    // Enable UTF-8 mode for console output
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hOut && hOut != INVALID_HANDLE_VALUE)
     {
@@ -33,7 +37,8 @@ static void SetupUtf8Console()
             SetConsoleMode(hOut, mode | ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT);
         }
     }
-    // Set C locale to UTF-8 for stdio where applicable
+    
+    // Set C locale to UTF-8
     std::setlocale(LC_ALL, ".UTF-8");
 }
 #endif
@@ -100,10 +105,37 @@ static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bo
 
 int main(int argc, char** argv)
 {
-    (void)argc;
-    (void)argv;
-
     std::filesystem::create_directories("logs");
+    
+    // Check config file for append_logs setting (parse without ImGui)
+    bool append_logs = false;
+    try {
+        std::ifstream ifs("config.toml");
+        if (ifs) {
+            toml::table cfg = toml::parse(ifs);
+            if (auto* g = cfg["global"].as_table()) {
+                if (auto v = (*g)["append_logs"].value<bool>()) {
+                    append_logs = *v;
+                }
+            }
+        }
+    } catch (...) {
+        // Ignore parse errors during early init
+    }
+    
+    // Check command-line override for append_logs
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--append-logs") == 0) {
+            append_logs = true;
+        }
+    }
+    
+    // Clear existing log file unless append_logs is enabled
+    if (!append_logs && std::filesystem::exists("logs/run.log")) {
+        std::filesystem::remove("logs/run.log");
+    }
+    
+    // Initialize logging with console and file output
     static plog::ConsoleAppender<plog::TxtFormatter> console_appender;
     plog::init(plog::info, "logs/run.log");
     if (auto logger = plog::get())

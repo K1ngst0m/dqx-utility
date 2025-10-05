@@ -1,7 +1,6 @@
 #include "OpenAITranslator.hpp"
 
 #include <cpr/cpr.h>
-#include <cstring>
 #include <plog/Log.h>
 
 using namespace translate;

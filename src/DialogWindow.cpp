@@ -8,7 +8,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "IconUtils.hpp"
 #include "translate/ITranslator.hpp"
 #include "translate/LabelProcessor.hpp"
 #include "config/ConfigManager.hpp"

@@ -44,40 +44,28 @@
       }
     },
     {
-      "name": "windows-clang-debug",
-      "inherits": ["base"],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_COMPILER": "clang-cl",
-        "CMAKE_CXX_COMPILER": "clang-cl"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    },
-    {
-      "name": "windows-clang-release",
-      "inherits": ["base"],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_C_COMPILER": "clang-cl",
-        "CMAKE_CXX_COMPILER": "clang-cl"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    },
-    {
       "name": "windows-msvc-release",
       "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/out/${presetName}",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "BUILD_MAIN_APP": "OFF"
+        "BUILD_MAIN_APP": "OFF",
+        "BUILD_TESTS": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-msvc-app-release",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/out/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_MAIN_APP": "ON",
+        "BUILD_TESTS": "OFF"
       },
       "condition": {
         "type": "equals",
@@ -96,16 +84,13 @@
       "configurePreset": "linux-clang-release"
     },
     {
-      "name": "windows-clang-debug",
-      "configurePreset": "windows-clang-debug"
-    },
-    {
-      "name": "windows-clang-release",
-      "configurePreset": "windows-clang-release"
-    },
-    {
       "name": "windows-msvc-release",
       "configurePreset": "windows-msvc-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-msvc-app-release",
+      "configurePreset": "windows-msvc-app-release",
       "configuration": "Release"
     }
   ]

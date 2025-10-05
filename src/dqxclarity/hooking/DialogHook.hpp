@@ -44,6 +44,10 @@ public:
     std::string GetLastDialogText() const { return m_last_dialog_text; }
     std::string GetLastNpcName() const { return m_last_npc_name; }
 
+    // Expose hook site and original bytes for integrity restoration
+    uintptr_t GetHookAddress() const { return m_hook_address; }
+    const std::vector<uint8_t>& GetOriginalBytes() const { return m_original_bytes; }
+
 private:
     std::shared_ptr<IProcessMemory> m_memory;
     bool m_is_installed;

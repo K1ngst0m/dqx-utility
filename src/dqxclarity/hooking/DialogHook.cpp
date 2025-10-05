@@ -3,10 +3,7 @@
 #include "../pattern/PatternFinder.hpp"
 #include "Codegen.hpp"
 #include <iostream>
-#include <fstream>
-#include <algorithm>
 #include <cstdio>
-#include <cstring>
 
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -526,9 +523,9 @@ size_t DialogHook::ComputeStolenLength() {
         head[3] == 0xC7 && head[4] == 0x45 && head[5] == 0xF4 && head[6] == 0x00 && head[7] == 0x00 && head[8] == 0x00 && head[9] == 0x00) {
         return 10;
     }
-    // Fallback minimal safe length for a JMP rel32 overwrite
-    if (m_logger.warn) m_logger.warn("Instruction-safe steal: unknown prologue; using minimal 5 bytes");
-    return 5;
+    // Fallback: use 10 bytes like Python implementation to avoid splitting instructions
+    if (m_logger.warn) m_logger.warn("Instruction-safe steal: unknown prologue; using 10 bytes fallback");
+    return 10;
 }
 
 bool DialogHook::PollDialogData() {

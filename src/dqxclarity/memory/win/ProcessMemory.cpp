@@ -19,9 +19,8 @@ bool ProcessMemory::AttachProcess(pid_t pid) {
     if (m_is_attached) DetachProcess();
     HANDLE process_handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, static_cast<DWORD>(pid));
     if (!process_handle || process_handle == INVALID_HANDLE_VALUE) return false;
-    DWORD_PTR handle_value = reinterpret_cast<DWORD_PTR>(process_handle);
-    handle_value &= 0xFFFFFFFF;
-    m_process_handle = reinterpret_cast<HANDLE>(handle_value);
+    // Store the full 64-bit handle; do not truncate
+    m_process_handle = process_handle;
     m_process_id = static_cast<DWORD>(pid);
     m_is_attached = true;
     return true;
@@ -29,7 +28,7 @@ bool ProcessMemory::AttachProcess(pid_t pid) {
 
 bool ProcessMemory::ReadMemory(uintptr_t address, void* buffer, size_t size) {
     if (!m_is_attached) return false;
-    if (address == 0 || address > 0x7FFFFFFF) return false;
+    if (address == 0 || buffer == nullptr || size == 0) return false;
     SIZE_T bytes_read = 0;
     BOOL ok = ReadProcessMemory(m_process_handle, reinterpret_cast<LPCVOID>(address), buffer, size, &bytes_read);
     return ok && bytes_read == size;
@@ -53,7 +52,7 @@ void ProcessMemory::DetachProcess() {
 
 bool ProcessMemory::IsProcessAttached() const { return m_is_attached; }
 
-pid_t ProcessMemory::GetAttachedPid() const { return static_cast<pid_t>(m_process_id); }
+pid_t ProcessMemory::GetAttachedPid() const { return m_is_attached ? static_cast<pid_t>(m_process_id) : static_cast<pid_t>(-1); }
 
 uintptr_t ProcessMemory::AllocateMemory(size_t size, bool executable) {
     if (!m_is_attached) return 0;
@@ -77,6 +76,7 @@ bool ProcessMemory::SetMemoryProtection(uintptr_t address, size_t size, MemoryPr
 bool ProcessMemory::ReadString(uintptr_t address, std::string& output, size_t max_length) {
     if (!m_is_attached) return false;
     output.clear();
+    // Game already sends UTF-8, read as-is
     for (size_t i = 0; i < max_length; ++i) {
         char ch = 0;
         if (!ReadMemory(address + i, &ch, 1)) return false;

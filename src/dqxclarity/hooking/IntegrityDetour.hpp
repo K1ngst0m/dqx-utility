@@ -31,7 +31,18 @@ public:
 
     void SetLogger(const dqxclarity::Logger& log) { m_log = log; }
 
+    // Provide a list of hook sites to temporarily restore during integrity.
+    // Each call adds one site with its original bytes.
+    void AddRestoreTarget(uintptr_t address, const std::vector<uint8_t>& original_bytes) {
+        m_restore_sites.push_back({address, original_bytes});
+    }
+
 private:
+    struct RestoreSite {
+        uintptr_t address;                 // original hook site address
+        std::vector<uint8_t> bytes;        // original bytes to restore
+    };
+
     std::shared_ptr<IProcessMemory> m_memory;
     bool m_verbose = false;
     bool m_installed = false;
@@ -42,6 +53,7 @@ private:
     uintptr_t m_state_addr = 0;       // allocated byte for state flag
 
     std::vector<uint8_t> m_original_bytes; // stolen original bytes (8)
+    std::vector<RestoreSite> m_restore_sites; // hook sites to temporarily restore
 
     bool FindIntegrityAddress(uintptr_t& out_addr);
     bool BuildAndWriteTrampoline();

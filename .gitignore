@@ -11,3 +11,8 @@ dqxclarity/misc_files/*.csv
 dqxclarity/misc_files/*.xlsx
 dqxclarity/misc_files/*.db
 dqxclarity/logs
+
+# CI/CD artifacts and configuration
+config.toml
+imgui.ini
+unknown_labels.txt

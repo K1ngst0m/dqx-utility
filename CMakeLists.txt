@@ -68,10 +68,8 @@ endif()
 # Main application dependencies (SDL, ImGui, etc.)
 option(BUILD_MAIN_APP "Build main dqx-utility application" ON)
 
-if(NOT BUILD_MAIN_APP)
-  message(STATUS "Skipping main application build")
-  return()
-endif()
+
+# If main app is disabled, we still configure dependencies and tests; the app target is skipped later.
 
 set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
 if(NOT EXISTS ${CPM_DOWNLOAD_LOCATION})
@@ -81,6 +79,13 @@ if(NOT EXISTS ${CPM_DOWNLOAD_LOCATION})
     TLS_VERIFY ON)
 endif()
 include(${CPM_DOWNLOAD_LOCATION})
+
+# Tests option defined early so tests can be configured before any early returns
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  option(BUILD_TESTS "Build tests" ON)
+else()
+  option(BUILD_TESTS "Build tests" OFF)
+endif()
 
 # Download prebuilt SDL3 for Windows MSVC
 if(WIN32 AND MSVC)
@@ -157,6 +162,7 @@ CPMAddPackage(
   URL_HASH SHA256=9212ee7c4718b1466a5d99e64bce3ef1965704afea4ba651f8d978d0791b7c7c
 )
 
+if(BUILD_MAIN_APP)
 CPMAddPackage(
   NAME cpr
   GITHUB_REPOSITORY libcpr/cpr
@@ -171,7 +177,10 @@ CPMAddPackage(
     "CURL_DISABLE_COOKIES ON"
     "BUILD_SHARED_LIBS OFF"
     "CURL_STATICLIB ON"
+    "BUILD_CURL_EXE OFF"
+    "BUILD_LIBCURL_DOCS OFF"
 )
+endif()
 
 CPMAddPackage(
   NAME tomlplusplus
@@ -180,13 +189,7 @@ CPMAddPackage(
   DOWNLOAD_ONLY YES
 )
 
-# Testing framework - only add if testing is enabled
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-  option(BUILD_TESTS "Build tests" ON)
-else()
-  option(BUILD_TESTS "Build tests" OFF)
-endif()
-
+# Add Catch2 early so tests can be configured before optional early returns
 if(BUILD_TESTS)
   CPMAddPackage(
     NAME Catch2
@@ -210,134 +213,11 @@ if(imgui_ADDED)
 endif()
 
 
-add_executable(dqx_utility
-  src/main.cpp
-  src/AppContext.cpp
-  src/DialogWindow.cpp
-  src/FontManager.cpp
-  src/SettingsPanel.cpp
-  src/WindowRegistry.cpp
-  src/ProcessDetector.cpp
-  src/WineDetector.cpp
-  src/DQXClarityLauncher.cpp
-  src/DQXClarityService.cpp
-  src/UITheme.cpp
-  src/ipc/TextSourceClient.cpp
-  src/translate/ITranslator.hpp
-  src/translate/OpenAITranslator.cpp
-  src/translate/OpenAITranslator.hpp
-  src/translate/GoogleTranslator.cpp
-  src/translate/GoogleTranslator.hpp
-  src/translate/TranslatorFactory.cpp
-  src/translate/LabelProcessor.cpp
-  src/translate/LabelProcessor.hpp
-  src/config/ConfigManager.cpp
-  src/config/ConfigManager.hpp
-)
-
-if(MSVC)
-  target_compile_options(dqx_utility PRIVATE /W4 /permissive-)
-else()
-  target_compile_options(dqx_utility PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
-target_compile_features(dqx_utility PRIVATE cxx_std_20)
-target_link_libraries(dqx_utility PRIVATE SDL3::SDL3 imgui dqxclarity::dqxclarity)
-if(cpr_ADDED)
-  target_link_libraries(dqx_utility PRIVATE cpr::cpr)
-endif()
-if(tomlplusplus_SOURCE_DIR)
-  target_include_directories(dqx_utility PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
-  if(NOT MSVC AND HAS_NO_DEPRECATED_LITERAL_OPERATOR)
-    target_compile_options(dqx_utility PRIVATE -Wno-deprecated-literal-operator)
-  endif()
-endif()
-if(plog_SOURCE_DIR)
-  target_include_directories(dqx_utility PRIVATE ${plog_SOURCE_DIR}/include)
-endif()
-
-if(WIN32)
-  target_compile_definitions(dqx_utility PRIVATE SDL_MAIN_USE_CONSOLE)
-endif()
-
-# Ensure required runtime DLLs are next to the executable
-if(WIN32 AND MSVC)
-  # Determine arch for the prebuilt SDL3 package
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(_SDL3_ARCH "x64")
-  else()
-    set(_SDL3_ARCH "x86")
-  endif()
-
-  # SDL3 (import library + DLL in lib/<arch>)
-  if(DEFINED SDL3_SOURCE_DIR)
-    set(_SDL3_DLL "${SDL3_SOURCE_DIR}/lib/${_SDL3_ARCH}/SDL3.dll")
-    if(EXISTS "${_SDL3_DLL}")
-      add_custom_command(TARGET dqx_utility POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_SDL3_DLL}" $<TARGET_FILE_DIR:dqx_utility>
-        COMMENT "Copying SDL3.dll to dqx-utility output directory")
-    else()
-      message(WARNING "SDL3.dll not found at ${_SDL3_DLL}; dqx-utility may fail to start without it.")
-    endif()
-  endif()
-
-endif()
-
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES src/main.cpp)
-
-# Tests configuration
-if(BUILD_TESTS AND Catch2_ADDED)
+# Tests configuration is placed before optional early return so tests can build even when app is skipped
+if(BUILD_TESTS)
   enable_testing()
   
-  # Create a library with the source code (excluding main.cpp) for testing
-  add_library(dqx_utility_lib STATIC
-    src/AppContext.cpp
-    src/DialogWindow.cpp
-    src/FontManager.cpp
-    src/SettingsPanel.cpp
-    src/WindowRegistry.cpp
-    src/ProcessDetector.cpp
-    src/WineDetector.cpp
-    src/DQXClarityLauncher.cpp
-    src/DQXClarityService.cpp
-    src/UITheme.cpp
-    src/ipc/TextSourceClient.cpp
-    src/translate/ITranslator.hpp
-    src/translate/OpenAITranslator.cpp
-    src/translate/OpenAITranslator.hpp
-    src/translate/GoogleTranslator.cpp
-    src/translate/GoogleTranslator.hpp
-    src/translate/TranslatorFactory.cpp
-    src/translate/LabelProcessor.cpp
-    src/translate/LabelProcessor.hpp
-    src/config/ConfigManager.cpp
-    src/config/ConfigManager.hpp
-  )
-  
-  # Apply same configuration as main executable
-  target_compile_features(dqx_utility_lib PRIVATE cxx_std_20)
-  target_link_libraries(dqx_utility_lib PRIVATE SDL3::SDL3 imgui)
-  if(cpr_ADDED)
-    target_link_libraries(dqx_utility_lib PRIVATE cpr::cpr)
-  endif()
-  if(tomlplusplus_SOURCE_DIR)
-    target_include_directories(dqx_utility_lib PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
-    if(NOT MSVC AND HAS_NO_DEPRECATED_LITERAL_OPERATOR)
-      target_compile_options(dqx_utility_lib PRIVATE -Wno-deprecated-literal-operator)
-    endif()
-  endif()
-  if(plog_SOURCE_DIR)
-    target_include_directories(dqx_utility_lib PRIVATE ${plog_SOURCE_DIR}/include)
-  endif()
-  
-  if(MSVC)
-    target_compile_options(dqx_utility_lib PRIVATE /W4 /permissive-)
-  else()
-    target_compile_options(dqx_utility_lib PRIVATE -Wall -Wextra -Wpedantic)
-  endif()
-  
-  # Test executable
+  # Test executable sources (exclude translator tests to avoid network deps)
   set(TEST_DQXCLARITY_SOURCES
     src/dqxclarity/memory/MemoryFactory.cpp
     src/dqxclarity/pattern/Pattern.cpp
@@ -362,10 +242,6 @@ if(BUILD_TESTS AND Catch2_ADDED)
 
   add_executable(dqx_utility_tests
     tests/test_main.cpp
-    tests/utils/mock_http.cpp
-    tests/translate/test_translator_factory.cpp
-    tests/translate/test_openai_translator.cpp
-    tests/translate/test_google_translator.cpp
     tests/dqxclarity/test_memory.cpp
     tests/dqxclarity/test_pattern_scanner.cpp
     tests/dqxclarity/test_process_finder.cpp
@@ -377,7 +253,6 @@ if(BUILD_TESTS AND Catch2_ADDED)
   )
   
   target_link_libraries(dqx_utility_tests PRIVATE
-    dqx_utility_lib
     Catch2::Catch2WithMain
   )
   
@@ -393,5 +268,93 @@ if(BUILD_TESTS AND Catch2_ADDED)
     catch_discover_tests(dqx_utility_tests)
   endif()
 endif()
+
+# Translator sources - always include network translators
+set(MAIN_TRANSLATOR_SOURCES
+  src/translate/ITranslator.hpp
+  src/translate/OpenAITranslator.cpp
+  src/translate/OpenAITranslator.hpp
+  src/translate/GoogleTranslator.cpp
+  src/translate/GoogleTranslator.hpp
+  src/translate/TranslatorFactory.cpp
+)
+
+if(BUILD_MAIN_APP)
+  add_executable(dqx_utility
+    src/main.cpp
+    src/AppContext.cpp
+    src/DialogWindow.cpp
+    src/FontManager.cpp
+    src/SettingsPanel.cpp
+    src/WindowRegistry.cpp
+    src/ProcessDetector.cpp
+    src/WineDetector.cpp
+    src/DQXClarityLauncher.cpp
+    src/DQXClarityService.cpp
+    src/UITheme.cpp
+    src/ipc/TextSourceClient.cpp
+    ${MAIN_TRANSLATOR_SOURCES}
+    src/translate/LabelProcessor.cpp
+    src/translate/LabelProcessor.hpp
+    src/config/ConfigManager.cpp
+    src/config/ConfigManager.hpp
+  )
+
+  if(MSVC)
+    target_compile_options(dqx_utility PRIVATE /W4 /permissive-)
+  else()
+    target_compile_options(dqx_utility PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+
+  set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
+  target_compile_features(dqx_utility PRIVATE cxx_std_20)
+  target_link_libraries(dqx_utility PRIVATE SDL3::SDL3 imgui dqxclarity::dqxclarity)
+  if(cpr_ADDED)
+    target_link_libraries(dqx_utility PRIVATE cpr::cpr)
+  endif()
+  if(tomlplusplus_SOURCE_DIR)
+    target_include_directories(dqx_utility PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
+    if(NOT MSVC AND HAS_NO_DEPRECATED_LITERAL_OPERATOR)
+      target_compile_options(dqx_utility PRIVATE -Wno-deprecated-literal-operator)
+    endif()
+  endif()
+  if(plog_SOURCE_DIR)
+    target_include_directories(dqx_utility PRIVATE ${plog_SOURCE_DIR}/include)
+    # Force UTF-8 narrow strings in plog on Windows
+    if(WIN32)
+      target_compile_definitions(dqx_utility PRIVATE PLOG_CHAR_IS_UTF8=1)
+    endif()
+  endif()
+
+  if(WIN32)
+    target_compile_definitions(dqx_utility PRIVATE SDL_MAIN_USE_CONSOLE)
+  endif()
+
+  # Ensure required runtime DLLs are next to the executable
+  if(WIN32 AND MSVC)
+    # Determine arch for the prebuilt SDL3 package
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+      set(_SDL3_ARCH "x64")
+    else()
+      set(_SDL3_ARCH "x86")
+    endif()
+
+    # SDL3 (import library + DLL in lib/<arch>)
+    if(DEFINED SDL3_SOURCE_DIR)
+      set(_SDL3_DLL "${SDL3_SOURCE_DIR}/lib/${_SDL3_ARCH}/SDL3.dll")
+      if(EXISTS "${_SDL3_DLL}")
+        add_custom_command(TARGET dqx_utility POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_SDL3_DLL}" $<TARGET_FILE_DIR:dqx_utility>
+          COMMENT "Copying SDL3.dll to dqx-utility output directory")
+      else()
+        message(WARNING "SDL3.dll not found at ${_SDL3_DLL}; dqx-utility may fail to start without it.")
+      endif()
+    endif()
+
+  endif()
+endif()
+
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES src/main.cpp)
+
 
 
