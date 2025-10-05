@@ -92,6 +92,14 @@ DialogWindow::~DialogWindow()
     font_manager_.unregisterDialog(state_.ui_state());
 }
 
+void DialogWindow::clearCaches()
+{
+    for (auto& kv : caches_) kv.second.clear();
+    inflight_.clear();
+    jobs_.clear();
+    cache_hits_ = cache_misses_ = 0;
+}
+
 void DialogWindow::refreshFontBinding()
 {
     // Re-assign active font and base size after external state replacement (e.g., config load)
