@@ -6,6 +6,7 @@
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <plog/Log.h>
 #include <cmath>
+#include <algorithm>
 
 // Constructs an empty context waiting for initialization.
 AppContext::AppContext() = default;
@@ -199,4 +200,81 @@ void AppContext::updateRendererScale()
                          << " curx=" << curx << " cury=" << cury;
         }
     }
+}
+
+void AppContext::triggerVignette(float x, float y)
+{
+    vignette_active_ = true;
+    vignette_time_ = 0.0f;
+    vignette_center_x_ = x;
+    vignette_center_y_ = y;
+}
+
+void AppContext::updateVignette(float delta_time)
+{
+    if (!vignette_active_)
+        return;
+
+    vignette_time_ += delta_time;
+    if (vignette_time_ >= vignette_duration_)
+    {
+        vignette_active_ = false;
+        vignette_time_ = 0.0f;
+    }
+}
+
+void AppContext::renderVignette()
+{
+    if (!vignette_active_)
+        return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
+    
+    const float half_duration = vignette_duration_ * 0.5f;
+    const float max_alpha = 0.5f;
+    
+    float alpha = 0.0f;
+    if (vignette_time_ < half_duration)
+    {
+        float normalized = vignette_time_ / half_duration;
+        float eased = normalized * normalized * (3.0f - 2.0f * normalized);
+        alpha = eased * max_alpha;
+    }
+    else
+    {
+        float normalized = (vignette_time_ - half_duration) / half_duration;
+        float eased = normalized * normalized * (3.0f - 2.0f * normalized);
+        alpha = (1.0f - eased) * max_alpha;
+    }
+
+    const float border_width = io.DisplaySize.x * 0.10f;
+    const float border_height = io.DisplaySize.y * 0.10f;
+    
+    ImU32 transparent = IM_COL32(0, 0, 0, 0);
+    ImU32 mask = IM_COL32(255, 222, 33, static_cast<int>(alpha * 255.0f));
+    
+    draw_list->AddRectFilledMultiColor(
+        ImVec2(0, 0),
+        ImVec2(io.DisplaySize.x, border_height),
+        mask, mask, transparent, transparent
+    );
+    
+    draw_list->AddRectFilledMultiColor(
+        ImVec2(0, io.DisplaySize.y - border_height),
+        ImVec2(io.DisplaySize.x, io.DisplaySize.y),
+        transparent, transparent, mask, mask
+    );
+    
+    draw_list->AddRectFilledMultiColor(
+        ImVec2(0, 0),
+        ImVec2(border_width, io.DisplaySize.y),
+        mask, transparent, transparent, mask
+    );
+    
+    draw_list->AddRectFilledMultiColor(
+        ImVec2(io.DisplaySize.x - border_width, 0),
+        ImVec2(io.DisplaySize.x, io.DisplaySize.y),
+        transparent, mask, mask, transparent
+    );
 }

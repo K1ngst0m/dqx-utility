@@ -81,21 +81,30 @@ static bool is_mouse_outside_dialogs(ImGuiIO& io, WindowRegistry& registry)
     return true;
 }
 
-// Handle global right-click context menu
+static void handle_transparent_area_click(ImGuiIO& io, WindowRegistry& registry, AppContext& app)
+{
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    {
+        bool over_any_window = ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
+        if (!over_any_window && is_mouse_outside_dialogs(io, registry))
+        {
+            app.triggerVignette(io.MousePos.x, io.MousePos.y);
+        }
+    }
+}
+
 static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bool& show_manager)
 {
-    // Open global context menu on right-click outside all dialog windows
     if (is_mouse_outside_dialogs(io, registry) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
     {
         ImGui::OpenPopup("GlobalContextMenu");
     }
 
-    // Render the global context menu
     if (ImGui::BeginPopup("GlobalContextMenu"))
     {
         if (ImGui::MenuItem("Global Settings"))
         {
-            if (!show_manager)  // Only open if not already open
+            if (!show_manager)
                 show_manager = true;
         }
         
@@ -171,9 +180,14 @@ int main(int argc, char** argv)
 
     bool show_manager = true;
 
+    Uint64 last_time = SDL_GetTicks();
     bool running = true;
     while (running)
     {
+        Uint64 current_time = SDL_GetTicks();
+        float delta_time = (current_time - last_time) / 1000.0f;
+        last_time = current_time;
+
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
@@ -187,6 +201,7 @@ int main(int argc, char** argv)
         if (!running)
             break;
 
+        app.updateVignette(delta_time);
         app.beginFrame();
 
         for (auto& window : registry.windows())
@@ -198,10 +213,12 @@ int main(int argc, char** argv)
         // Process any dialog windows marked for removal
         registry.processRemovals();
 
+        handle_transparent_area_click(io, registry, app);
         render_global_context_menu(io, registry, show_manager);
         if (show_manager)
             settings_panel.render(show_manager);
 
+        app.renderVignette();
         app.endFrame();
         SDL_Delay(16);
     }
