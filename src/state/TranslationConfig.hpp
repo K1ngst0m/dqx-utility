@@ -25,6 +25,7 @@ struct TranslationConfig
     };
 
     bool translate_enabled;
+    bool auto_apply_changes;
     TranslationBackend translation_backend;
     TargetLang target_lang_enum;
     std::array<char, URLSize>   openai_base_url{};
@@ -35,6 +36,7 @@ struct TranslationConfig
     void applyDefaults()
     {
         translate_enabled = false;
+        auto_apply_changes = false;
         translation_backend = TranslationBackend::OpenAI;
         target_lang_enum = TargetLang::EN_US;
         

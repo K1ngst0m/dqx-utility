@@ -82,6 +82,11 @@ private:
     // Test connection state (translator)
     bool testing_connection_ = false;
     std::string test_result_;
+    std::string test_timestamp_;
+    
+    // Apply success hint (auto-clears after 5 seconds)
+    std::string apply_hint_;
+    float apply_hint_timer_ = 0.0f;
 
     // Smooth scroll animation (content-growth driven)
     bool  scroll_animating_   = false;

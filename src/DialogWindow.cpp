@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cmath>
+#include <ctime>
 
 #include "translate/ITranslator.hpp"
 #include "translate/LabelProcessor.hpp"
@@ -530,13 +531,16 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
     {
         ImGui::Indent();
         
-        ImGui::Checkbox("Enable Translation", &state_.translation_config().translate_enabled);
+        bool enable_changed = ImGui::Checkbox("Enable Translation", &state_.translation_config().translate_enabled);
+        bool auto_apply_changed = ImGui::Checkbox("Auto-apply changes", &state_.translation_config().auto_apply_changes);
+        ImGui::Spacing();
         
         ImGui::TextUnformatted("Backend");
         const char* backend_items[] = { "OpenAI-compatible", "Google Translate" };
         int current_backend = static_cast<int>(state_.translation_config().translation_backend);
         ImGui::SetNextItemWidth(220.0f);
-        if (ImGui::Combo("##translation_backend", &current_backend, backend_items, IM_ARRAYSIZE(backend_items)))
+        bool backend_changed = ImGui::Combo("##translation_backend", &current_backend, backend_items, IM_ARRAYSIZE(backend_items));
+        if (backend_changed)
         {
             state_.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(current_backend);
         }
@@ -545,100 +549,146 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         const char* lang_items[] = { "English (US)", "Chinese (Simplified)", "Chinese (Traditional)" };
         int current_lang = static_cast<int>(state_.translation_config().target_lang_enum);
         ImGui::SetNextItemWidth(220.0f);
-        if (ImGui::Combo("##target_lang", &current_lang, lang_items, IM_ARRAYSIZE(lang_items)))
+        bool lang_changed = ImGui::Combo("##target_lang", &current_lang, lang_items, IM_ARRAYSIZE(lang_items));
+        if (lang_changed)
         {
             state_.translation_config().target_lang_enum = static_cast<TranslationConfig::TargetLang>(current_lang);
         }
 
         // Show backend-specific configuration
+        bool base_url_changed = false;
+        bool model_changed = false;
+        bool openai_key_changed = false;
+        bool google_key_changed = false;
+        
         if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
         {
             ImGui::TextUnformatted("Base URL");
             ImGui::SetNextItemWidth(300.0f);
-            ImGui::InputText("##openai_base", state_.translation_config().openai_base_url.data(), state_.translation_config().openai_base_url.size());
-            ImGui::TextDisabled("Examples: https://api.openai.com, http://localhost:8000, http://127.0.0.1:11434/v1");
+            base_url_changed = ImGui::InputText("##openai_base", state_.translation_config().openai_base_url.data(), state_.translation_config().openai_base_url.size());
 
             ImGui::TextUnformatted("Model");
             ImGui::SetNextItemWidth(300.0f);
-            ImGui::InputText("##openai_model", state_.translation_config().openai_model.data(), state_.translation_config().openai_model.size());
+            model_changed = ImGui::InputText("##openai_model", state_.translation_config().openai_model.data(), state_.translation_config().openai_model.size());
 
             ImGui::TextUnformatted("API Key");
             ImGui::SetNextItemWidth(300.0f);
-            ImGui::InputText("##openai_key", state_.translation_config().openai_api_key.data(), state_.translation_config().openai_api_key.size(), ImGuiInputTextFlags_Password);
+            openai_key_changed = ImGui::InputText("##openai_key", state_.translation_config().openai_api_key.data(), state_.translation_config().openai_api_key.size(), ImGuiInputTextFlags_Password);
         }
         else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Google)
         {
             ImGui::TextUnformatted("API Key (Optional)");
             ImGui::SetNextItemWidth(300.0f);
-            ImGui::InputText("##google_key", state_.translation_config().google_api_key.data(), state_.translation_config().google_api_key.size(), ImGuiInputTextFlags_Password);
+            google_key_changed = ImGui::InputText("##google_key", state_.translation_config().google_api_key.data(), state_.translation_config().google_api_key.size(), ImGuiInputTextFlags_Password);
             ImGui::TextDisabled("Leave empty to use free tier. Paid API requires Google Cloud credentials.");
         }
 
-        bool ready = translator_ && translator_->isReady();
-        if (!ready)
+        // Check if any config field changed
+        bool any_field_changed = enable_changed || auto_apply_changed || backend_changed || lang_changed || 
+                                 base_url_changed || model_changed || openai_key_changed || google_key_changed;
+        
+        // Auto-clear test result when config changes
+        if (any_field_changed && !test_result_.empty())
+        {
+            test_result_.clear();
+            test_timestamp_.clear();
+        }
+        
+        // Auto-apply changes if enabled
+        if (state_.translation_config().auto_apply_changes && any_field_changed)
+        {
+            initTranslatorIfEnabled();
+            apply_hint_ = "Settings applied";
+            apply_hint_timer_ = 5.0f;
+        }
+        
+        ImGui::Spacing();
+        
+        // Manual Apply button (only shown if auto-apply is off)
+        if (!state_.translation_config().auto_apply_changes)
         {
             if (ImGui::Button("Apply"))
             {
                 initTranslatorIfEnabled();
+                apply_hint_ = "Settings applied";
+                apply_hint_timer_ = 5.0f;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Test") && !testing_connection_)
-            {
-                testing_connection_ = true;
-                test_result_ = "Testing connection...";
-                // Create temporary translator for testing
-                translate::TranslatorConfig test_cfg;
-                test_cfg.backend = static_cast<translate::Backend>(state_.translation_config().translation_backend);
-                switch (state_.translation_config().target_lang_enum)
-                {
-                case TranslationConfig::TargetLang::EN_US: test_cfg.target_lang = "en-us"; break;
-                case TranslationConfig::TargetLang::ZH_CN: test_cfg.target_lang = "zh-cn"; break;
-                case TranslationConfig::TargetLang::ZH_TW: test_cfg.target_lang = "zh-tw"; break;
-                }
-                test_cfg.base_url = state_.translation_config().openai_base_url.data();
-                test_cfg.model = state_.translation_config().openai_model.data();
-                if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
-                {
-                    test_cfg.api_key = state_.translation_config().openai_api_key.data();
-                }
-                else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Google)
-                {
-                    test_cfg.api_key = state_.translation_config().google_api_key.data();
-                }
-                
-                auto temp_translator = translate::createTranslator(test_cfg.backend);
-                if (temp_translator && temp_translator->init(test_cfg))
-                {
-                    test_result_ = temp_translator->testConnection();
-                }
-                else
-                {
-                    test_result_ = "Error: Failed to initialize translator for testing";
-                }
-                if (temp_translator) temp_translator->shutdown();
-                testing_connection_ = false;
-            }
         }
-        else
+        
+        // Test button
+        if (ImGui::Button("Test") && !testing_connection_)
         {
-            if (ImGui::Button("Stop"))
+            testing_connection_ = true;
+            test_result_ = "Testing connection...";
+            
+            // Create temporary translator for testing
+            translate::TranslatorConfig test_cfg;
+            test_cfg.backend = static_cast<translate::Backend>(state_.translation_config().translation_backend);
+            switch (state_.translation_config().target_lang_enum)
             {
-                translator_->shutdown();
-                translator_.reset();
+            case TranslationConfig::TargetLang::EN_US: test_cfg.target_lang = "en-us"; break;
+            case TranslationConfig::TargetLang::ZH_CN: test_cfg.target_lang = "zh-cn"; break;
+            case TranslationConfig::TargetLang::ZH_TW: test_cfg.target_lang = "zh-tw"; break;
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Test") && !testing_connection_)
+            test_cfg.base_url = state_.translation_config().openai_base_url.data();
+            test_cfg.model = state_.translation_config().openai_model.data();
+            if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
             {
-                testing_connection_ = true;
-                test_result_ = "Testing connection...";
-                test_result_ = translator_->testConnection();
-                testing_connection_ = false;
+                test_cfg.api_key = state_.translation_config().openai_api_key.data();
+            }
+            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Google)
+            {
+                test_cfg.api_key = state_.translation_config().google_api_key.data();
+            }
+            
+            auto temp_translator = translate::createTranslator(test_cfg.backend);
+            if (temp_translator && temp_translator->init(test_cfg))
+            {
+                test_result_ = temp_translator->testConnection();
+            }
+            else
+            {
+                test_result_ = "Error: Failed to initialize translator for testing";
+            }
+            if (temp_translator) temp_translator->shutdown();
+            
+            // Capture timestamp
+            std::time_t now = std::time(nullptr);
+            std::tm tm_buf;
+#ifdef _WIN32
+            localtime_s(&tm_buf, &now);
+#else
+            localtime_r(&now, &tm_buf);
+#endif
+            char time_str[16];
+            std::strftime(time_str, sizeof(time_str), "%H:%M:%S", &tm_buf);
+            test_timestamp_ = time_str;
+            
+            testing_connection_ = false;
+        }
+        
+        // Status indicator
+        const char* status = (translator_ && translator_->isReady()) ? "Ready" : "Not Ready";
+        ImGui::SameLine();
+        ImGui::TextDisabled("Status: %s", status);
+        
+        // Apply success hint (auto-clears after 5 seconds)
+        if (apply_hint_timer_ > 0.0f)
+        {
+            apply_hint_timer_ -= io.DeltaTime;
+            if (apply_hint_timer_ <= 0.0f)
+            {
+                apply_hint_.clear();
+                apply_hint_timer_ = 0.0f;
             }
         }
-
-        const char* status = (translator_ && translator_->isReady()) ? "Ready" : "Not Ready";
-        ImGui::SameLine(); ImGui::TextDisabled("Status: %s", status);
-        ImGui::SameLine(); if (ImGui::SmallButton("Refresh")) initTranslatorIfEnabled();
+        if (!apply_hint_.empty())
+        {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%s", apply_hint_.c_str());
+        }
+        
         if (translator_)
         {
             const char* err = translator_->lastError();
@@ -658,11 +708,11 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             else
                 color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);  // Grey for other
             
-            ImGui::TextColored(color, "%s", test_result_.c_str());
-            if (ImGui::SmallButton("Clear Test Result"))
-            {
-                test_result_.clear();
-            }
+            // Display with inline timestamp if available
+            if (!test_timestamp_.empty())
+                ImGui::TextColored(color, "Test result (%s): %s", test_timestamp_.c_str(), test_result_.c_str());
+            else
+                ImGui::TextColored(color, "%s", test_result_.c_str());
         }
         
         ImGui::Unindent();

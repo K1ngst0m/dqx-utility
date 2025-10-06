@@ -162,18 +162,39 @@ std::string OpenAITranslator::normalizeURL(const std::string& base_url)
     std::string url = base_url;
     
     // Remove trailing slash
-    if (!url.empty() && url.back() == '/') 
+    while (!url.empty() && url.back() == '/') 
         url.pop_back();
     
-    // If it already ends with the full path, use as-is
-    if (url.find("/v1/chat/completions") != std::string::npos)
+    if (url.empty())
         return url;
     
-    // If it ends with /v1, append /chat/completions
-    if (url.size() >= 3 && url.substr(url.size() - 3) == "/v1")
-        return url + "/chat/completions";
+    // Check if URL already contains a path beyond the domain
+    // If it has more than just domain (e.g., contains /v1beta, /api, etc.), use it exactly
+    size_t scheme_end = url.find("://");
+    size_t path_start = (scheme_end != std::string::npos) 
+        ? url.find('/', scheme_end + 3) 
+        : url.find('/');
     
-    // Otherwise, append the full path
+    // If there's a path component
+    if (path_start != std::string::npos)
+    {
+        std::string path = url.substr(path_start);
+        
+        // Only handle these 3 patterns:
+        // 1. Exact match: xxx/v1/chat/completions - use as-is
+        if (path.find("/v1/chat/completions") != std::string::npos)
+            return url;
+        
+        // 2. Ends with /v1 - append /chat/completions
+        if (path == "/v1")
+            return url + "/chat/completions";
+        
+        // 3. Any other path - use exactly as provided (e.g., /v1beta, /api/v2, etc.)
+        return url;
+    }
+    
+    // No path component (just domain like "https://api.openai.com")
+    // Append the standard OpenAI path
     return url + "/v1/chat/completions";
 }
 
