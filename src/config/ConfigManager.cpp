@@ -20,8 +20,7 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
 {
     toml::table t;
     t.insert("name", name);
-    t.insert("auto_scroll_to_new", state.ipc_config().auto_scroll_to_new);
-    t.insert("portfile_path", std::string(state.ipc_config().portfile_path.data()));
+    t.insert("auto_scroll_to_new", state.ui_state().auto_scroll_to_new);
     t.insert("translate_enabled", state.translation_config().translate_enabled);
     t.insert("auto_apply_changes", state.translation_config().auto_apply_changes);
     t.insert("translation_backend", static_cast<int>(state.translation_config().translation_backend));
@@ -62,9 +61,7 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
     if (!name_val) return false;
     name = *name_val;
 
-    if (auto v = t["auto_scroll_to_new"].value<bool>()) state.ipc_config().auto_scroll_to_new = *v;
-    if (auto v = t["portfile_path"].value<std::string>())
-        std::snprintf(state.ipc_config().portfile_path.data(), state.ipc_config().portfile_path.size(), "%s", v->c_str());
+    if (auto v = t["auto_scroll_to_new"].value<bool>()) state.ui_state().auto_scroll_to_new = *v;
     if (auto v = t["translate_enabled"].value<bool>()) state.translation_config().translate_enabled = *v;
     if (auto v = t["auto_apply_changes"].value<bool>()) state.translation_config().auto_apply_changes = *v;
     if (auto v = t["translation_backend"].value<int>())
@@ -279,7 +276,6 @@ bool ConfigManager::loadAndApply()
                     // Rebind font pointers after state replacement
                     dw->refreshFontBinding();
                     dw->initTranslatorIfEnabled();
-                    dw->autoConnectIPC();
                 }
             }
         }

@@ -23,6 +23,9 @@ struct UIState
     bool pending_resize;
     bool has_custom_font;
 
+    // UI behavior flags
+    bool auto_scroll_to_new;
+
     ImFont* font;
 
     void applyDefaults()
@@ -42,6 +45,8 @@ struct UIState
         pending_reposition = true;
         pending_resize = true;
         has_custom_font = false;
+
+        auto_scroll_to_new = true;
         
         font = nullptr;
     }

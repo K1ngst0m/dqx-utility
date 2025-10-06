@@ -348,7 +348,7 @@ void DialogWindow::renderDialog(ImGuiIO& io)
         }
 
         // Smooth, constant-speed auto-scroll to bottom when content grows
-        if (state_.ipc_config().auto_scroll_to_new)
+        if (state_.ui_state().auto_scroll_to_new)
         {
             const float curr_scroll = ImGui::GetScrollY();
             const float curr_max    = ImGui::GetScrollMaxY();
@@ -442,10 +442,6 @@ void DialogWindow::initTranslatorIfEnabled()
     }
 }
 
-void DialogWindow::autoConnectIPC()
-{
-    // No-op (legacy TCP IPC removed)
-}
 
 void DialogWindow::renderSettingsPanel(ImGuiIO& io)
 {
@@ -483,7 +479,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
     {
         ImGui::Indent();
         
-        ImGui::Checkbox("Auto-scroll to new", &state_.ipc_config().auto_scroll_to_new);
+        ImGui::Checkbox("Auto-scroll to new", &state_.ui_state().auto_scroll_to_new);
         ImGui::Spacing();
 
         ImGui::TextUnformatted("Dialog Width");

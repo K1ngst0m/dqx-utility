@@ -17,7 +17,6 @@
 
 struct ImGuiIO;
 
-namespace ipc { class TextSourceClient; }
 namespace translate { class ITranslator; }
 class LabelProcessor;
 
@@ -39,7 +38,6 @@ public:
 
     // Exposed for config manager apply
     void initTranslatorIfEnabled();
-    void autoConnectIPC();
     void refreshFontBinding();
     bool shouldBeRemoved() const { return should_be_removed_; }
 private:

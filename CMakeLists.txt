@@ -242,7 +242,6 @@ add_executable(dqx_utility
   src/services/DQXClarityLauncher.cpp
   src/services/DQXClarityService.cpp
   src/ui/UITheme.cpp
-  src/ipc/TextSourceClient.cpp
   ${MAIN_TRANSLATOR_SOURCES}
   src/translate/LabelProcessor.cpp
   src/translate/LabelProcessor.hpp
