@@ -248,6 +248,7 @@ add_executable(dqx_utility
   src/services/DQXClarityLauncher.cpp
   src/services/DQXClarityService.cpp
   src/ui/UITheme.cpp
+  src/ui/Localization.cpp
   ${MAIN_TRANSLATOR_SOURCES}
   src/translate/LabelProcessor.cpp
   src/translate/LabelProcessor.hpp
@@ -262,6 +263,13 @@ add_executable(dqx_utility
   src/ui/ErrorDialog.cpp
   src/ui/ErrorDialog.hpp
 )
+
+# Copy assets directory next to the executable after build for dev runs
+if(EXISTS "${CMAKE_SOURCE_DIR}/assets")
+  add_custom_command(TARGET dqx_utility POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:dqx_utility>/assets"
+  )
+endif()
 
 if(MSVC)
     target_compile_options(dqx_utility PRIVATE /W4 /permissive-)

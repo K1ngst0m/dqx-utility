@@ -7,6 +7,7 @@
 #include "utils/ErrorReporter.hpp"
 #include "utils/CrashHandler.hpp"
 #include "ErrorDialog.hpp"
+#include "ui/Localization.hpp"
 
 #include <SDL3/SDL.h>
 #include <plog/Appenders/ConsoleAppender.h>
@@ -110,7 +111,7 @@ static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bo
 
     if (ImGui::BeginPopup("GlobalContextMenu"))
     {
-        if (ImGui::MenuItem("Global Settings"))
+        if (ImGui::MenuItem(i18n::get("menu.global_settings")))
         {
             if (!show_manager)
                 show_manager = true;
@@ -184,6 +185,9 @@ int main(int argc, char** argv)
 
     // Load config at startup; if no dialogs loaded, create a default one
     cfg_mgr.loadAtStartup();
+
+    // Initialize GUI localization with global setting (default "en")
+    i18n::init(cfg_mgr.getUILanguageCode());
     // Always start with bordered window regardless of config, and sync the flag for UI
     cfg_mgr.setBorderlessWindows(false);
     app.setWindowBorderless(false);

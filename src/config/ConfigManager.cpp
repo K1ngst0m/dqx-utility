@@ -174,6 +174,7 @@ bool ConfigManager::saveAll()
     global.insert("ui_scale", ui_scale_);
     global.insert("append_logs", append_logs_);
     global.insert("borderless_windows", borderless_windows_);
+    global.insert("ui_language", ui_language_);
     root.insert("global", std::move(global));
 
     auto windows = registry_->windowsByType(UIWindowType::Dialog);
@@ -237,6 +238,8 @@ bool ConfigManager::loadAndApply()
                 append_logs_ = *v;
             if (auto v = (*g)["borderless_windows"].value<bool>())
                 borderless_windows_ = *v;
+            if (auto v = (*g)["ui_language"].value<std::string>())
+                ui_language_ = *v;
         }
 
         if (auto* arr = root["dialogs"].as_array())

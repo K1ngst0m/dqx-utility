@@ -1,0 +1,189 @@
+[settings]
+title = "全局设置"
+add_dialog = "添加对话框"
+no_instances = "暂无实例"
+rename_instance = "重命名实例"
+window_type = "窗口类型"
+ui_scale = "界面缩放"
+borderless = "无边框窗口"
+logs = "日志"
+refresh_logs = "刷新"
+[settings.log_viewer]
+not_found = "[未找到日志文件：{path}]"
+
+[settings.sections]
+status = "状态"
+window_management = "窗口管理"
+appearance = "外观"
+debug = "调试"
+
+[common]
+start = "启动"
+stop = "停止"
+warning = "警告："
+save = "保存"
+cancel = "取消"
+settings = "设置"
+remove = "移除"
+
+[settings.dqxc]
+debug_title = "DQXClarity 调试"
+status_label = "状态："
+not_running_hint = "（DQXGame.exe 未运行）"
+wineserver_mismatch = "dqxclarity 与 DQXGame.exe 不在同一 wineserver 中。Hook 将无法正常工作。请尝试停止并重新启动。"
+
+[settings.status]
+game_label = "DQX 游戏："
+locale_label = "区域："
+running = "运行中"
+not_running = "未运行"
+japanese = "日文"
+non_japanese = "非日文"
+unknown = "未知"
+
+[settings.table]
+name = "名称"
+type = "类型"
+actions = "操作"
+
+[window_type]
+dialog = "对话框"
+
+[window]
+default_name_prefix = "对话框"
+
+[settings.ui_language]
+label = "界面语言"
+option_en = "英语"
+option_zh_cn = "简体中文"
+
+[menu]
+global_settings = "全局设置"
+
+total = "总计：{count}"
+apply = "应用"
+
+[dialog.settings]
+target_language = "目标语言"
+base_url = "基础地址"
+model = "模型"
+api_key = "API 密钥"
+api_key_optional = "API 密钥（可选）"
+google_note = "留空以使用免费额度。付费 API 需要 Google Cloud 凭据。"
+apply_hint = "设置已应用"
+test = "测试"
+testing = "正在测试连接……"
+status_label = "状态："
+ready = "就绪"
+not_ready = "未就绪"
+translation_cache = "翻译缓存"
+enable_cache = "启用缓存"
+clear_cache = "清空缓存"
+font_path = "字体路径"
+reload_font = "重新加载字体"
+font_active_label = "当前字体："
+font_active_custom = "自定义"
+font_active_default = "默认（仅 ASCII）"
+font_warning_no_cjk = "未加载 CJK 字体；日文可能显示为 '?' 字符。"
+appended_texts = "追加文本"
+cache_entries = "条目：{cur} / {cap}"
+cache_hits = "命中：{n}"
+cache_misses = "未命中：{n}"
+save_config = "保存配置"
+save_config_failed = "保存配置失败，请查看日志。"
+window_suffix = "设置"
+test_result = "测试结果（{time}）：{text}"
+test_result_no_time = "测试结果：{text}"
+
+[dialog.settings.target_lang]
+en_us = "英语（美国）"
+zh_cn = "中文（简体）"
+zh_tw = "中文（繁体）"
+
+[error]
+title = "错误报告"
+technical_details = "技术细节"
+time = "时间："
+copy_to_clipboard = "复制到剪贴板"
+open_logs_folder = "打开日志文件夹"
+exit_application = "退出程序"
+continue = "继续"
+prev = "< 上一条"
+next = "下一条 >"
+counter = "错误 {index} / {total}"
+
+[error.severity]
+info = "信息"
+warning = "警告"
+error = "错误"
+fatal = "致命"
+unknown = "未知"
+
+# ----------------------------------------
+# 额外的对话框/通用本地化键
+# ----------------------------------------
+
+[dialog.appearance]
+title = "外观"
+auto_scroll = "自动滚动至新内容"
+width = "对话框宽度"
+height = "对话框高度"
+padding_xy = "内边距 XY"
+corner_rounding = "圆角"
+border_thickness = "边框粗细"
+dark_border_size = "暗边大小"
+background_opacity = "背景不透明度"
+font_size = "字体大小"
+
+[dialog.translate]
+title = "翻译"
+enable = "启用翻译"
+auto_apply = "自动应用更改"
+
+[dialog.translate.backend]
+label = "后端"
+
+[dialog.translate.backend.items]
+openai_compat = "OpenAI 兼容"
+google = "谷歌翻译"
+glm4_zhipu = "GLM-4 Flash（智谱）"
+qwen_mt = "Qwen-MT（阿里云）"
+niutrans = "小牛"
+
+[dialog.debug]
+title = "调试"
+
+[dialog.append]
+edit = "编辑"
+delete = "删除"
+editing_entry = "正在编辑条目 #{index}"
+new_text = "追加新文本"
+append_button = "追加"
+
+
+[error.category]
+initialization = "初始化"
+memory_hook = "内存/Hook"
+process_detection = "进程检测"
+configuration = "配置"
+ipc = "IPC"
+translation = "翻译"
+unknown = "未知"
+
+[error.native]
+fatal_title = "DQX 工具 - 致命错误"
+technical_details = "技术细节："
+exit_line = "程序即将退出。"
+check_logs = "请查看 logs/run.log 获取更多信息。"
+
+[app.init]
+graphics_failed = "无法初始化图形系统"
+graphics_failed_long = "无法初始化图形系统。请尝试更新显卡驱动或重新安装应用程序。"
+window_failed = "无法创建应用程序窗口"
+window_failed_long = "无法创建应用程序窗口。您的系统可能不支持所需的图形功能。"
+renderer_failed = "无法创建图形渲染器"
+renderer_failed_long = "无法初始化图形渲染器。请更新您的显卡驱动。"
+ui_backend_failed = "无法初始化 UI 系统（SDL3 后端）"
+ui_failed_long = "无法初始化用户界面系统。"
+ui_renderer_failed = "无法初始化 UI 渲染器"
+ui_renderer_failed_long = "无法初始化用户界面渲染器。"

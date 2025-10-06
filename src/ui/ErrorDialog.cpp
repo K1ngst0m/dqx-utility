@@ -1,6 +1,36 @@
 #include "ErrorDialog.hpp"
 #include <SDL3/SDL.h>
 #include <sstream>
+#include "ui/Localization.hpp"
+
+static const char* LocalizeSeverity(utils::ErrorSeverity sev)
+{
+    using utils::ErrorSeverity;
+    switch (sev)
+    {
+    case ErrorSeverity::Info:    return i18n::get("error.severity.info");
+    case ErrorSeverity::Warning: return i18n::get("error.severity.warning");
+    case ErrorSeverity::Error:   return i18n::get("error.severity.error");
+    case ErrorSeverity::Fatal:   return i18n::get("error.severity.fatal");
+    default:                     return i18n::get("error.severity.unknown");
+    }
+}
+
+static const char* LocalizeCategory(utils::ErrorCategory cat)
+{
+    using utils::ErrorCategory;
+    switch (cat)
+    {
+    case ErrorCategory::Initialization:   return i18n::get("error.category.initialization");
+    case ErrorCategory::MemoryHook:       return i18n::get("error.category.memory_hook");
+    case ErrorCategory::ProcessDetection: return i18n::get("error.category.process_detection");
+    case ErrorCategory::Configuration:    return i18n::get("error.category.configuration");
+    case ErrorCategory::IPC:              return i18n::get("error.category.ipc");
+    case ErrorCategory::Translation:      return i18n::get("error.category.translation");
+    case ErrorCategory::Unknown:          return i18n::get("error.category.unknown");
+    default:                              return i18n::get("error.category.unknown");
+    }
+}
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -27,8 +57,9 @@ void ErrorDialog::Show(const std::vector<utils::ErrorReport>& errors)
     show_technical_details_ = false;
     is_open_ = true;
 
-    // Open the modal
-    ImGui::OpenPopup("Error Report");
+    // Open the modal with a stable ID while showing localized title
+    std::string popup_title = std::string(i18n::get("error.title")) + "###error_report_modal";
+    ImGui::OpenPopup(popup_title.c_str());
 }
 
 bool ErrorDialog::Render()
@@ -43,7 +74,8 @@ bool ErrorDialog::Render()
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
 
-    if (ImGui::BeginPopupModal("Error Report", &is_open_, ImGuiWindowFlags_NoCollapse))
+    std::string popup_title = std::string(i18n::get("error.title")) + "###error_report_modal";
+    if (ImGui::BeginPopupModal(popup_title.c_str(), &is_open_, ImGuiWindowFlags_NoCollapse))
     {
         if (current_errors_.empty())
         {
@@ -57,15 +89,13 @@ bool ErrorDialog::Render()
         ImGui::PushStyleColor(ImGuiCol_Text, GetSeverityColor(error.severity));
         ImGui::TextUnformatted(GetSeverityIcon(error.severity));
         ImGui::SameLine();
-        ImGui::Text("%s - %s", 
-                    utils::ErrorReporter::SeverityToString(error.severity).c_str(),
-                    utils::ErrorReporter::CategoryToString(error.category).c_str());
+        ImGui::Text("%s - %s", LocalizeSeverity(error.severity), LocalizeCategory(error.category));
         ImGui::PopStyleColor();
 
         ImGui::Separator();
 
         // Timestamp
-        ImGui::TextDisabled("Time: %s", error.timestamp.c_str());
+        ImGui::TextDisabled("%s %s", i18n::get("error.time"), error.timestamp.c_str());
         ImGui::Spacing();
 
         // User message (wrapped)
@@ -75,7 +105,7 @@ bool ErrorDialog::Render()
         // Technical details (collapsible)
         if (!error.technical_details.empty())
         {
-            if (ImGui::CollapsingHeader("Technical Details", show_technical_details_ ? ImGuiTreeNodeFlags_DefaultOpen : 0))
+            if (ImGui::CollapsingHeader(i18n::get("error.technical_details"), show_technical_details_ ? ImGuiTreeNodeFlags_DefaultOpen : 0))
             {
                 show_technical_details_ = true;
                 ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
@@ -96,17 +126,20 @@ bool ErrorDialog::Render()
         if (current_errors_.size() > 1)
         {
             ImGui::Separator();
-            ImGui::Text("Error %d of %zu", selected_error_ + 1, current_errors_.size());
+            {
+                std::string counter = i18n::format("error.counter", {{"index", std::to_string(selected_error_ + 1)}, {"total", std::to_string(current_errors_.size())}});
+                ImGui::TextUnformatted(counter.c_str());
+            }
             ImGui::SameLine();
             
-            if (ImGui::Button("< Previous") && selected_error_ > 0)
+            if (ImGui::Button(i18n::get("error.prev")) && selected_error_ > 0)
             {
                 selected_error_--;
                 show_technical_details_ = false;
             }
             ImGui::SameLine();
             
-            if (ImGui::Button("Next >") && selected_error_ < static_cast<int>(current_errors_.size()) - 1)
+            if (ImGui::Button(i18n::get("error.next")) && selected_error_ < static_cast<int>(current_errors_.size()) - 1)
             {
                 selected_error_++;
                 show_technical_details_ = false;
@@ -116,13 +149,13 @@ bool ErrorDialog::Render()
         ImGui::Separator();
 
         // Action buttons
-        if (ImGui::Button("Copy to Clipboard"))
+        if (ImGui::Button(i18n::get("error.copy_to_clipboard")))
         {
             CopyToClipboard(error);
         }
         ImGui::SameLine();
 
-        if (ImGui::Button("Open Logs Folder"))
+        if (ImGui::Button(i18n::get("error.open_logs_folder")))
         {
             OpenLogsFolder();
         }
@@ -131,7 +164,7 @@ bool ErrorDialog::Render()
         // Exit or Continue button
         if (error.is_fatal)
         {
-            if (ImGui::Button("Exit Application"))
+            if (ImGui::Button(i18n::get("error.exit_application")))
             {
                 should_exit = true;
                 Close();
@@ -139,7 +172,7 @@ bool ErrorDialog::Render()
         }
         else
         {
-            if (ImGui::Button("Continue"))
+            if (ImGui::Button(i18n::get("error.continue")))
             {
                 Close();
             }

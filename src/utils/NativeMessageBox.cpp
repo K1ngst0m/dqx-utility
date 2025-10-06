@@ -1,6 +1,7 @@
 #include "NativeMessageBox.hpp"
 #include <sstream>
 #include <iostream>
+#include "ui/Localization.hpp"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -85,13 +86,13 @@ void NativeMessageBox::ShowFatalError(const std::string& message, const std::str
     
     if (!details.empty())
     {
-        ss << "Technical Details:\n" << details << "\n\n";
+        ss << i18n::get("error.native.technical_details") << "\n" << details << "\n\n";
     }
     
-    ss << "The application will now exit.\n";
-    ss << "Please check logs/run.log for more information.";
+    ss << i18n::get("error.native.exit_line") << "\n";
+    ss << i18n::get("error.native.check_logs");
     
-    Show("DQX Utility - Fatal Error", ss.str(), Type::Error);
+    Show(i18n::get("error.native.fatal_title"), ss.str(), Type::Error);
 }
 
 } // namespace utils

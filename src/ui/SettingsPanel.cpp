@@ -8,6 +8,7 @@
 #include "UITheme.hpp"
 #include "DQXClarityService.hpp"
 #include "dqxclarity/api/dqxclarity.hpp"
+#include "ui/Localization.hpp"
 
 #include <algorithm>
 #include <imgui.h>
@@ -49,7 +50,7 @@ void SettingsPanel::render(bool& open)
     UITheme::pushSettingsWindowStyle();
 
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-    if (ImGui::Begin("Global Settings", &open, flags))
+    if (ImGui::Begin((std::string(i18n::get("settings.title")) + "###global_settings").c_str(), &open, flags))
     {
         renderStatusSection();
 
@@ -57,7 +58,7 @@ void SettingsPanel::render(bool& open)
 
         renderWindowManagementSection();
         
-        if (ImGui::CollapsingHeader("Debug"))
+        if (ImGui::CollapsingHeader(i18n::get("settings.sections.debug")))
         {
             renderDebugSection();
         }
@@ -80,13 +81,14 @@ void SettingsPanel::renderTypeSelector()
         }
     }
 
-    const char* preview = kWindowTypes[current_index].label;
+    const char* preview = i18n::get("window_type.dialog");
     if (ImGui::BeginCombo("##window_type_combo", preview))
     {
         for (int i = 0; i < static_cast<int>(std::size(kWindowTypes)); ++i)
         {
             const bool selected = (i == current_index);
-            if (ImGui::Selectable(kWindowTypes[i].label, selected))
+            const char* label = i18n::get("window_type.dialog");
+            if (ImGui::Selectable(label, selected))
             {
                 selected_type_ = kWindowTypes[i].type;
                 selected_index_ = 0;
@@ -103,7 +105,7 @@ void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows
 {
     if (selected_type_ == UIWindowType::Dialog)
     {
-        if (ImGui::Button("Add Dialog"))
+        if (ImGui::Button(i18n::get("settings.add_dialog")))
         {
             registry_.createDialogWindow();
             auto filtered = registry_.windowsByType(UIWindowType::Dialog);
@@ -111,13 +113,16 @@ void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows
             previous_selected_index_ = -1;
         }
         ImGui::SameLine();
-        ImGui::TextDisabled("Total: %zu", windows.size());
+        {
+            std::string total = i18n::format("total", {{"count", std::to_string(windows.size())}});
+            ImGui::TextDisabled("%s", total.c_str());
+        }
     }
 
     if (windows.empty())
     {
         ImGui::Spacing();
-        ImGui::TextDisabled("No instances available.");
+        ImGui::TextDisabled("%s", i18n::get("settings.no_instances"));
         return;
     }
 
@@ -126,9 +131,9 @@ void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows
 
     if (ImGui::BeginTable("InstanceTable", 3, ImGuiTableFlags_BordersInner | ImGuiTableFlags_RowBg))
     {
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-        ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+        ImGui::TableSetupColumn(i18n::get("settings.table.name"), ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(i18n::get("settings.table.type"), ImGuiTableColumnFlags_WidthFixed, 80.0f);
+        ImGui::TableSetupColumn(i18n::get("settings.table.actions"), ImGuiTableColumnFlags_WidthFixed, 80.0f);
         ImGui::TableHeadersRow();
 
         for (int i = 0; i < static_cast<int>(windows.size()); ++i)
@@ -143,11 +148,11 @@ void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows
                 selected_index_ = i;
             }
 
-            ImGui::TableSetColumnIndex(1);
-            ImGui::TextUnformatted(kWindowTypes[static_cast<int>(selected_type_)].label);
+    ImGui::TableSetColumnIndex(1);
+    ImGui::TextUnformatted(i18n::get("window_type.dialog"));
 
             ImGui::TableSetColumnIndex(2);
-            std::string remove_id = std::string("Remove##") + win->windowLabel();
+            std::string remove_id = std::string(i18n::get("common.remove")) + "##" + win->windowLabel();
             if (ImGui::SmallButton(remove_id.c_str()))
             {
                 registry_.removeWindow(win);
@@ -186,10 +191,10 @@ void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows
     }
 
     ImGui::Spacing();
-    ImGui::TextUnformatted("Rename Instance");
+    ImGui::TextUnformatted(i18n::get("settings.rename_instance"));
     ImGui::InputText("##instance_rename", rename_buffer_.data(), rename_buffer_.size());
     ImGui::SameLine();
-    if (ImGui::Button("Apply"))
+    if (ImGui::Button(i18n::get("apply")))
     {
         UIWindow* current = windows[selected_index_];
         current->rename(rename_buffer_.data());
@@ -227,7 +232,7 @@ void SettingsPanel::renderDQXClaritySection()
     // Display concise status only
     ImGui::TextColored(status_color, "●");
     ImGui::SameLine();
-    ImGui::TextUnformatted("Status:");
+    ImGui::TextUnformatted(i18n::get("settings.dqxc.status_label"));
     ImGui::SameLine();
     ImGui::TextColored(status_color, "%s", status_str.c_str());
 
@@ -236,16 +241,15 @@ void SettingsPanel::renderDQXClaritySection()
     if (status == DQXClarityStatus::Disconnected)
     {
         ImGui::Spacing();
-        ImGui::TextColored(UITheme::errorColor(), "Warning:");
-        ImGui::TextWrapped("dqxclarity is not on the same wineserver as DQXGame.exe. "
-                           "Hooks will not work correctly. Try stopping and relaunching.");
+        ImGui::TextColored(UITheme::errorColor(), "%s", i18n::get("common.warning"));
+        ImGui::TextWrapped("%s", i18n::get("settings.dqxc.wineserver_mismatch"));
     }
 #endif
 }
 
 void SettingsPanel::renderDebugSection()
 {
-    ImGui::TextUnformatted("DQXClarity Debug");
+    ImGui::TextUnformatted(i18n::get("settings.dqxc.debug_title"));
 
     if (dqxc_launcher_)
     {
@@ -259,20 +263,22 @@ void SettingsPanel::renderDebugSection()
         {
             bool disable = is_busy || !dqx_running;
             if (disable) ImGui::BeginDisabled();
-            if (ImGui::Button("Start##dqxc_dbg", ImVec2(120, 0)))
+            std::string label = std::string(i18n::get("common.start")) + "##dqxc_dbg";
+            if (ImGui::Button(label.c_str(), ImVec2(120, 0)))
             {
                 dqxc_launcher_->launch();
             }
             if (disable) {
                 ImGui::EndDisabled();
-                if (!dqx_running) { ImGui::SameLine(); ImGui::TextDisabled("(DQXGame.exe not running)"); }
+                if (!dqx_running) { ImGui::SameLine(); ImGui::TextDisabled("%s", i18n::get("settings.dqxc.not_running_hint")); }
             }
         }
         else
         {
             bool disable = is_busy; // disable Stop during Starting/Stopping
             if (disable) ImGui::BeginDisabled();
-            if (ImGui::Button("Stop##dqxc_dbg", ImVec2(120, 0)))
+            std::string label = std::string(i18n::get("common.stop")) + "##dqxc_dbg";
+            if (ImGui::Button(label.c_str(), ImVec2(120, 0)))
             {
                 dqxc_launcher_->stop();
             }
@@ -280,7 +286,7 @@ void SettingsPanel::renderDebugSection()
         }
     }
 
-    ImGui::SeparatorText("Logs");
+    ImGui::SeparatorText(i18n::get("settings.logs"));
 
     // Refresh log content every 2 seconds
     float current_time = ImGui::GetTime();
@@ -301,10 +307,6 @@ void SettingsPanel::renderDebugSection()
         ImGuiInputTextFlags_ReadOnly
     );
     
-    if (ImGui::Button("Refresh##logs"))
-    {
-        last_log_refresh_time_ = 0.0f;  // Force refresh
-    }
 }
 
 std::string SettingsPanel::readLogFile(const std::string& path, size_t max_lines)
@@ -312,7 +314,7 @@ std::string SettingsPanel::readLogFile(const std::string& path, size_t max_lines
     std::ifstream file(path);
     if (!file.is_open())
     {
-        return "[Log file not found: " + path + "]";
+return i18n::format("settings.log_viewer.not_found", {{"path", path}});
     }
     
     std::vector<std::string> lines;
@@ -345,16 +347,16 @@ std::string SettingsPanel::readLogFile(const std::string& path, size_t max_lines
 
 void SettingsPanel::renderStatusSection()
 {
-    if (ImGui::CollapsingHeader("Status", ImGuiTreeNodeFlags_DefaultOpen))
+    if (ImGui::CollapsingHeader(i18n::get("settings.sections.status"), ImGuiTreeNodeFlags_DefaultOpen))
     {
         bool dqx_running = ProcessDetector::isProcessRunning("DQXGame.exe");
         ImVec4 game_status_color = dqx_running ? UITheme::successColor() : UITheme::errorColor();
-        const char* game_status_text = dqx_running ? "Running" : "Not Running";
+        const char* game_status_text = dqx_running ? i18n::get("settings.status.running") : i18n::get("settings.status.not_running");
 
         // DQX Game Status
         ImGui::TextColored(game_status_color, "●");
         ImGui::SameLine();
-        ImGui::TextUnformatted("DQX Game:");
+        ImGui::TextUnformatted(i18n::get("settings.status.game_label"));
         ImGui::SameLine();
         ImGui::TextColored(game_status_color, "%s", game_status_text);
 
@@ -370,22 +372,22 @@ void SettingsPanel::renderStatusSection()
             {
                 case ProcessLocale::Japanese:
                     locale_color = UITheme::successColor();
-                    locale_text = "Japanese";
+                    locale_text = i18n::get("settings.status.japanese");
                     break;
                 case ProcessLocale::NonJapanese:
                     locale_color = UITheme::warningColor();
-                    locale_text = "Non-Japanese";
+                    locale_text = i18n::get("settings.status.non_japanese");
                     break;
                 case ProcessLocale::Unknown:
                 default:
                     locale_color = UITheme::disabledColor();
-                    locale_text = "Unknown";
+                    locale_text = i18n::get("settings.status.unknown");
                     break;
             }
             
             ImGui::TextColored(locale_color, "●");
             ImGui::SameLine();
-            ImGui::TextUnformatted("Locale:");
+            ImGui::TextUnformatted(i18n::get("settings.status.locale_label"));
             ImGui::SameLine();
             ImGui::TextColored(locale_color, "%s", locale_text);
         }
@@ -397,9 +399,9 @@ void SettingsPanel::renderStatusSection()
 
 void SettingsPanel::renderWindowManagementSection()
 {
-    if (ImGui::CollapsingHeader("Window Management"))
+    if (ImGui::CollapsingHeader(i18n::get("settings.sections.window_management")))
     {
-        ImGui::TextUnformatted("Window Type");
+        ImGui::TextUnformatted(i18n::get("settings.window_type"));
         renderTypeSelector();
         ImGui::Spacing();
 
@@ -410,22 +412,42 @@ void SettingsPanel::renderWindowManagementSection()
 
 void SettingsPanel::renderAppearanceSection()
 {
-    if (ImGui::CollapsingHeader("Appearance", ImGuiTreeNodeFlags_DefaultOpen))
+    if (ImGui::CollapsingHeader(i18n::get("settings.sections.appearance"), ImGuiTreeNodeFlags_DefaultOpen))
     {
         float ui_scale = 1.0f;
         if (auto* cm = ConfigManager_Get())
             ui_scale = cm->getUIScale();
-        ImGui::TextUnformatted("UI Scale");
+        ImGui::TextUnformatted(i18n::get("settings.ui_scale"));
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::SliderFloat("##ui_scale_slider", &ui_scale, 0.75f, 2.0f, "%.2fx"))
         {
             if (auto* cm = ConfigManager_Get()) cm->setUIScale(ui_scale);
         }
 
+        // UI Language selector (proof of concept)
+        ImGui::TextUnformatted(i18n::get("settings.ui_language.label"));
+        const char* langs[] = {
+            i18n::get("settings.ui_language.option_en"),
+            i18n::get("settings.ui_language.option_zh_cn")
+        };
+        int idx = 0;
+        if (auto* cm = ConfigManager_Get())
+        {
+            const char* code = cm->getUILanguageCode();
+            if (code && std::string(code) == "zh-CN") idx = 1;
+        }
+        ImGui::SetNextItemWidth(220.0f);
+        if (ImGui::Combo("##ui_lang_combo", &idx, langs, IM_ARRAYSIZE(langs)))
+        {
+            const char* new_code = (idx == 1) ? "zh-CN" : "en";
+            if (auto* cm = ConfigManager_Get()) cm->setUILanguageCode(new_code);
+            i18n::set_language(new_code);
+        }
+
         // Borderless windows toggle
         bool borderless = false;
         if (auto* cm = ConfigManager_Get()) borderless = cm->getBorderlessWindows();
-        if (ImGui::Checkbox("Borderless windows", &borderless))
+        if (ImGui::Checkbox(i18n::get("settings.borderless"), &borderless))
         {
             if (auto* cm = ConfigManager_Get()) cm->setBorderlessWindows(borderless);
         }

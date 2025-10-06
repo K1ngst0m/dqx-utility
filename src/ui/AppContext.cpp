@@ -9,6 +9,7 @@
 #include <plog/Log.h>
 #include <cmath>
 #include <algorithm>
+#include "ui/Localization.hpp"
 
 // Constructs an empty context waiting for initialization.
 AppContext::AppContext() = default;
@@ -29,11 +30,11 @@ bool AppContext::initialize()
     {
         std::string sdl_error = SDL_GetError();
         PLOG_FATAL << "SDL_Init failed: " << sdl_error;
-        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            "Failed to initialize graphics system",
+utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            i18n::get("app.init.graphics_failed"),
             std::string("SDL_Init failed: ") + sdl_error);
         utils::NativeMessageBox::ShowFatalError(
-            "Failed to initialize graphics system. Please try updating your graphics drivers or reinstalling the application.",
+            i18n::get("app.init.graphics_failed_long"),
             std::string("SDL_Init error: ") + sdl_error);
         return false;
     }
@@ -44,11 +45,11 @@ bool AppContext::initialize()
     {
         std::string sdl_error = SDL_GetError();
         PLOG_FATAL << "SDL_CreateWindow failed: " << sdl_error;
-        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            "Failed to create application window",
+utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            i18n::get("app.init.window_failed"),
             std::string("SDL_CreateWindow failed: ") + sdl_error);
         utils::NativeMessageBox::ShowFatalError(
-            "Failed to create application window. Your system may not support the required graphics features.",
+            i18n::get("app.init.window_failed_long"),
             std::string("SDL_CreateWindow error: ") + sdl_error);
         shutdown();
         return false;
@@ -59,11 +60,11 @@ bool AppContext::initialize()
     {
         std::string sdl_error = SDL_GetError();
         PLOG_FATAL << "SDL_CreateRenderer failed: " << sdl_error;
-        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            "Failed to create graphics renderer",
+utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            i18n::get("app.init.renderer_failed"),
             std::string("SDL_CreateRenderer failed: ") + sdl_error);
         utils::NativeMessageBox::ShowFatalError(
-            "Failed to initialize graphics renderer. Please update your graphics drivers.",
+            i18n::get("app.init.renderer_failed_long"),
             std::string("SDL_CreateRenderer error: ") + sdl_error);
         shutdown();
         return false;
@@ -80,11 +81,11 @@ bool AppContext::initialize()
     if (!ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_))
     {
         PLOG_FATAL << "ImGui_ImplSDL3_InitForSDLRenderer failed";
-        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            "Failed to initialize UI system (SDL3 backend)",
+utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            i18n::get("app.init.ui_backend_failed"),
             "ImGui_ImplSDL3_InitForSDLRenderer returned false");
         utils::NativeMessageBox::ShowFatalError(
-            "Failed to initialize user interface system.",
+            i18n::get("app.init.ui_failed_long"),
             "ImGui SDL3 backend initialization failed");
         shutdown();
         return false;
@@ -92,11 +93,11 @@ bool AppContext::initialize()
     if (!ImGui_ImplSDLRenderer3_Init(renderer_))
     {
         PLOG_FATAL << "ImGui_ImplSDLRenderer3_Init failed";
-        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            "Failed to initialize UI renderer",
+utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            i18n::get("app.init.ui_renderer_failed"),
             "ImGui_ImplSDLRenderer3_Init returned false");
         utils::NativeMessageBox::ShowFatalError(
-            "Failed to initialize user interface renderer.",
+            i18n::get("app.init.ui_renderer_failed_long"),
             "ImGui SDL renderer backend initialization failed");
         shutdown();
         return false;

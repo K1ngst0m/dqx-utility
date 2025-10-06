@@ -1,0 +1,190 @@
+[settings]
+title = "Global Settings"
+add_dialog = "Add Dialog"
+no_instances = "No instances available."
+rename_instance = "Rename Instance"
+window_type = "Window Type"
+ui_scale = "UI Scale"
+borderless = "Borderless windows"
+logs = "Logs"
+refresh_logs = "Refresh"
+[settings.log_viewer]
+not_found = "[Log file not found: {path}]"
+
+[settings.sections]
+status = "Status"
+window_management = "Window Management"
+appearance = "Appearance"
+debug = "Debug"
+
+[common]
+start = "Start"
+stop = "Stop"
+warning = "Warning:"
+save = "Save"
+cancel = "Cancel"
+settings = "Settings"
+remove = "Remove"
+
+[settings.dqxc]
+debug_title = "DQXClarity Debug"
+status_label = "Status:"
+not_running_hint = "(DQXGame.exe not running)"
+wineserver_mismatch = "dqxclarity is not on the same wineserver as DQXGame.exe. Hooks will not work correctly. Try stopping and relaunching."
+
+[settings.status]
+game_label = "DQX Game:"
+locale_label = "Locale:"
+running = "Running"
+not_running = "Not Running"
+japanese = "Japanese"
+non_japanese = "Non-Japanese"
+unknown = "Unknown"
+
+[settings.table]
+name = "Name"
+type = "Type"
+actions = "Actions"
+
+[window_type]
+dialog = "Dialog"
+
+[window]
+default_name_prefix = "Dialog"
+
+[settings.ui_language]
+label = "UI Language"
+option_en = "English"
+option_zh_cn = "Simplified Chinese"
+
+[menu]
+global_settings = "Global Settings"
+
+total = "Total: {count}"
+apply = "Apply"
+
+[dialog.settings]
+target_language = "Target Language"
+base_url = "Base URL"
+model = "Model"
+api_key = "API Key"
+api_key_optional = "API Key (Optional)"
+google_note = "Leave empty to use free tier. Paid API requires Google Cloud credentials."
+apply_hint = "Settings applied"
+test = "Test"
+testing = "Testing connection..."
+status_label = "Status:"
+ready = "Ready"
+not_ready = "Not Ready"
+translation_cache = "Translation Cache"
+enable_cache = "Enable Cache"
+clear_cache = "Clear Cache"
+font_path = "Font Path"
+reload_font = "Reload Font"
+font_active_label = "Active font:"
+font_active_custom = "custom"
+font_active_default = "default (ASCII only)"
+font_warning_no_cjk = "No CJK font loaded; Japanese text may appear as '?' characters."
+appended_texts = "Appended Texts"
+cache_entries = "Entries: {cur} / {cap}"
+cache_hits = "Hits: {n}"
+cache_misses = "Misses: {n}"
+save_config = "Save Config"
+save_config_failed = "Failed to save config; see logs."
+window_suffix = "Settings"
+test_result = "Test result ({time}): {text}"
+test_result_no_time = "Test result: {text}"
+
+[dialog.settings.target_lang]
+en_us = "English (US)"
+zh_cn = "Chinese (Simplified)"
+zh_tw = "Chinese (Traditional)"
+
+[error]
+title = "Error Report"
+technical_details = "Technical Details"
+time = "Time:"
+copy_to_clipboard = "Copy to Clipboard"
+open_logs_folder = "Open Logs Folder"
+exit_application = "Exit Application"
+continue = "Continue"
+prev = "< Previous"
+next = "Next >"
+counter = "Error {index} of {total}"
+
+[error.severity]
+info = "Info"
+warning = "Warning"
+error = "Error"
+fatal = "Fatal"
+unknown = "Unknown"
+
+# ----------------------------------------
+# Additional dialog/common localization keys
+# ----------------------------------------
+
+[dialog.appearance]
+title = "Appearance"
+auto_scroll = "Auto-scroll to new"
+width = "Dialog Width"
+height = "Dialog Height"
+padding_xy = "Padding XY"
+corner_rounding = "Corner Rounding"
+border_thickness = "Border Thickness"
+dark_border_size = "Dark Border Size"
+background_opacity = "Background Opacity"
+font_size = "Font Size"
+
+[dialog.translate]
+title = "Translate"
+enable = "Enable Translation"
+auto_apply = "Auto-apply changes"
+
+[dialog.translate.backend]
+label = "Backend"
+
+[dialog.translate.backend.items]
+openai_compat = "OpenAI-compatible"
+google = "Google Translate"
+glm4_zhipu = "GLM-4 Flash (Zhipu)"
+qwen_mt = "Qwen-MT (Aliyun)"
+niutrans = "Niutrans (MT)"
+
+[dialog.debug]
+title = "Debug"
+
+[dialog.append]
+edit = "Edit"
+delete = "Delete"
+editing_entry = "Editing Entry #{index}"
+new_text = "Append New Text"
+append_button = "Append"
+
+
+
+[error.category]
+initialization = "Initialization"
+memory_hook = "Memory/Hook"
+process_detection = "Process Detection"
+configuration = "Configuration"
+ipc = "IPC"
+translation = "Translation"
+unknown = "Unknown"
+
+[error.native]
+fatal_title = "DQX Utility - Fatal Error"
+technical_details = "Technical Details:"
+exit_line = "The application will now exit."
+check_logs = "Please check logs/run.log for more information."
+
+[app.init]
+graphics_failed = "Failed to initialize graphics system"
+graphics_failed_long = "Failed to initialize graphics system. Please try updating your graphics drivers or reinstalling the application."
+window_failed = "Failed to create application window"
+window_failed_long = "Failed to create application window. Your system may not support the required graphics features."
+renderer_failed = "Failed to create graphics renderer"
+renderer_failed_long = "Failed to initialize graphics renderer. Please update your graphics drivers."
+ui_backend_failed = "Failed to initialize UI system (SDL3 backend)"
+ui_failed_long = "Failed to initialize user interface system."
+ui_renderer_failed = "Failed to initialize UI renderer"
+ui_renderer_failed_long = "Failed to initialize user interface renderer."

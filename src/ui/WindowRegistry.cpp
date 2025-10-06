@@ -2,6 +2,7 @@
 
 #include "DialogWindow.hpp"
 #include "FontManager.hpp"
+#include "ui/Localization.hpp"
 
 #include <imgui.h>
 #include <algorithm>
@@ -68,5 +69,5 @@ std::string WindowRegistry::makeDialogName()
         value = value / 26 - 1;
     } while (value >= 0);
 
-    return "Dialog " + suffix;
+    return std::string(i18n::get("window.default_name_prefix")) + " " + suffix;
 }

@@ -25,6 +25,10 @@ public:
     bool getBorderlessWindows() const { return borderless_windows_; }
     void setBorderlessWindows(bool v) { borderless_windows_ = v; }
 
+    // GUI localization language (e.g., "en", "zh-CN")
+    const char* getUILanguageCode() const { return ui_language_.c_str(); }
+    void setUILanguageCode(const char* code) { ui_language_ = (code && code[0]) ? code : "en"; }
+
     // Assign registry pointer (used for save/apply)
     void setRegistry(WindowRegistry* reg);
 
@@ -50,6 +54,7 @@ private:
     float ui_scale_ = 1.0f;
     bool append_logs_ = false;
     bool borderless_windows_ = false; // default to bordered (title bar visible)
+    std::string ui_language_ = "en"; // GUI localization language code
     struct ImGuiStyleBackup { bool valid=false; ImGuiStyle style; };
     ImGuiStyleBackup base_;
 };
