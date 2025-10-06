@@ -246,6 +246,7 @@ add_executable(dqx_utility
   ${MAIN_TRANSLATOR_SOURCES}
   src/translate/LabelProcessor.cpp
   src/translate/LabelProcessor.hpp
+  src/translate/TranslateSession.hpp
   src/config/ConfigManager.cpp
   src/config/ConfigManager.hpp
 )

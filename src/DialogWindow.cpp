@@ -92,13 +92,6 @@ DialogWindow::~DialogWindow()
     font_manager_.unregisterDialog(state_.ui_state());
 }
 
-void DialogWindow::clearCaches()
-{
-    for (auto& kv : caches_) kv.second.clear();
-    inflight_.clear();
-    jobs_.clear();
-    cache_hits_ = cache_misses_ = 0;
-}
 
 void DialogWindow::refreshFontBinding()
 {
@@ -147,30 +140,42 @@ void DialogWindow::applyPending()
             // Process labels before translation
             std::string processed_text = label_processor_->processText(m.text);
 
-            std::uint64_t job_id = 0;
-            std::string target_lang_str;
-            switch (state_.translation_config().target_lang_enum)
+            auto submit = session_.submit(
+                processed_text,
+                state_.translation_config().translation_backend,
+                state_.translation_config().target_lang_enum,
+                translator_.get());
+
+            if (submit.kind == TranslateSession::SubmitKind::Cached)
             {
-            case TranslationConfig::TargetLang::EN_US: target_lang_str = "en-us"; break;
-            case TranslationConfig::TargetLang::ZH_CN: target_lang_str = "zh-cn"; break;
-            case TranslationConfig::TargetLang::ZH_TW: target_lang_str = "zh-tw"; break;
+                state_.content_state().segments.emplace_back();
+                safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), submit.text.c_str());
+                if (m.seq > 0) last_applied_seq_ = m.seq;
+                continue;
             }
 
-            bool queued = false;
-            if (translator_ && translator_->isReady())
+            std::uint64_t job_id = submit.job_id;
+            bool show_placeholder = false;
+            if (submit.kind == TranslateSession::SubmitKind::Queued && job_id != 0)
             {
-                queued = translator_->translate(processed_text, "auto", target_lang_str, job_id);
                 last_job_id_ = job_id;
+                show_placeholder = true;
+            }
+            else if (submit.kind == TranslateSession::SubmitKind::DroppedNotReady)
+            {
+                show_placeholder = true;
             }
 
-            // Always show a placeholder while waiting (even if translator not ready)
-            state_.content_state().segments.emplace_back();
-            auto& buf = state_.content_state().segments.back();
-            std::string placeholder = std::string(waiting_text_for_lang(state_.translation_config().target_lang_enum)) + " .";
-            safe_copy_utf8(buf.data(), buf.size(), placeholder);
-            if (queued && job_id != 0)
+            if (show_placeholder)
             {
-                pending_segment_by_job_[job_id] = static_cast<int>(state_.content_state().segments.size()) - 1;
+                state_.content_state().segments.emplace_back();
+                auto& buf = state_.content_state().segments.back();
+                std::string placeholder = std::string(waiting_text_for_lang(state_.translation_config().target_lang_enum)) + " .";
+                safe_copy_utf8(buf.data(), buf.size(), placeholder);
+                if (job_id != 0)
+                {
+                    pending_segment_by_job_[job_id] = static_cast<int>(state_.content_state().segments.size()) - 1;
+                }
             }
         }
         else
@@ -201,22 +206,24 @@ void DialogWindow::render(ImGuiIO& io)
         if (translator_->drain(done))
         {
             appended_since_last_frame_ = true;
-            for (auto& r : done)
+            std::vector<TranslateSession::CompletedEvent> events;
+            session_.onCompleted(done, events);
+            for (auto& ev : events)
             {
-                auto it = pending_segment_by_job_.find(r.id);
+                auto it = pending_segment_by_job_.find(ev.job_id);
                 if (it != pending_segment_by_job_.end())
                 {
                     int idx = it->second;
                     if (idx >= 0 && idx < static_cast<int>(state_.content_state().segments.size()))
                     {
-                        safe_copy_utf8(state_.content_state().segments[idx].data(), state_.content_state().segments[idx].size(), r.text);
+                        safe_copy_utf8(state_.content_state().segments[idx].data(), state_.content_state().segments[idx].size(), ev.text);
                     }
                     pending_segment_by_job_.erase(it);
                 }
                 else
                 {
                     state_.content_state().segments.emplace_back();
-                    safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), r.text);
+                    safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), ev.text);
                 }
             }
         }

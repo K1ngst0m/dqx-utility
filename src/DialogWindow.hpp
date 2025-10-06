@@ -3,6 +3,7 @@
 #include "state/DialogStateManager.hpp"
 #include "FontManager.hpp"
 #include "WindowRegistry.hpp"
+#include "translate/TranslateSession.hpp"
 
 #include <string>
 #include <mutex>
@@ -13,8 +14,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <functional>
-
-#include "utils/LRUCache.hpp"
 
 struct ImGuiIO;
 
@@ -46,12 +45,6 @@ public:
 private:
     struct PendingMsg { std::string text; std::string lang; std::uint64_t seq = 0; };
 
-    struct CacheDomain {
-        int backend = 0; // TranslationConfig::TranslationBackend
-        int target = 0;  // TranslationConfig::TargetLang
-        bool operator==(const CacheDomain& o) const noexcept { return backend == o.backend && target == o.target; }
-    };
-    struct CacheDomainHash { std::size_t operator()(const CacheDomain& d) const noexcept { return (static_cast<std::size_t>(d.backend) * 1315423911u) ^ static_cast<std::size_t>(d.target); } };
 
     void renderDialog(ImGuiIO& io);
     void renderSettingsPanel(ImGuiIO& io);
@@ -84,14 +77,7 @@ private:
     std::uint64_t last_job_id_ = 0;
     std::unique_ptr<LabelProcessor> label_processor_;
     
-    // Translation cache (per dialog, segmented by backend+target)
-    std::unordered_map<CacheDomain, LRUCache<std::string, std::string>, CacheDomainHash> caches_;
-    std::unordered_map<CacheDomain, std::unordered_set<std::string>, CacheDomainHash> inflight_;
-    std::unordered_map<std::uint64_t, std::pair<CacheDomain, std::string>> jobs_; // job_id -> (domain, key)
-    std::size_t cache_capacity_ = 5000; // entries per domain
-    bool cache_disabled_ = false;
-    std::uint64_t cache_hits_ = 0;
-    std::uint64_t cache_misses_ = 0;
+    TranslateSession session_;
 
     // Test connection state (translator)
     bool testing_connection_ = false;
@@ -108,5 +94,4 @@ private:
     float waiting_anim_accum_ = 0.0f;
     int waiting_anim_phase_ = 0; // 0:".", 1:"..", 2:"...", 3:".."
 
-    void clearCaches();
 };
