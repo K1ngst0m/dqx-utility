@@ -231,17 +231,17 @@ set(MAIN_TRANSLATOR_SOURCES
 
 add_executable(dqx_utility
   src/main.cpp
-  src/AppContext.cpp
-  src/DialogWindow.cpp
-  src/FontManager.cpp
-  src/SettingsPanel.cpp
-  src/WindowRegistry.cpp
-  src/ProcessDetector.cpp
-  src/ProcessLocaleChecker.cpp
-  src/WineDetector.cpp
-  src/DQXClarityLauncher.cpp
-  src/DQXClarityService.cpp
-  src/UITheme.cpp
+  src/ui/AppContext.cpp
+  src/ui/DialogWindow.cpp
+  src/ui/FontManager.cpp
+  src/ui/SettingsPanel.cpp
+  src/ui/WindowRegistry.cpp
+  src/platform/ProcessDetector.cpp
+  src/platform/ProcessLocaleChecker.cpp
+  src/platform/WineDetector.cpp
+  src/services/DQXClarityLauncher.cpp
+  src/services/DQXClarityService.cpp
+  src/ui/UITheme.cpp
   src/ipc/TextSourceClient.cpp
   ${MAIN_TRANSLATOR_SOURCES}
   src/translate/LabelProcessor.cpp
@@ -254,8 +254,8 @@ add_executable(dqx_utility
   src/utils/NativeMessageBox.hpp
   src/utils/CrashHandler.cpp
   src/utils/CrashHandler.hpp
-  src/ErrorDialog.cpp
-  src/ErrorDialog.hpp
+  src/ui/ErrorDialog.cpp
+  src/ui/ErrorDialog.hpp
 )
 
 if(MSVC)
@@ -267,6 +267,13 @@ if(MSVC)
 set_target_properties(dqx_utility PROPERTIES OUTPUT_NAME "dqx-utility")
 target_compile_features(dqx_utility PRIVATE cxx_std_20)
 target_link_libraries(dqx_utility PRIVATE SDL3::SDL3 imgui dqxclarity::dqxclarity)
+# Include base src and newly created subdirectories for headers
+target_include_directories(dqx_utility PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/services
+)
 if(cpr_ADDED)
   target_link_libraries(dqx_utility PRIVATE cpr::cpr)
 endif()
