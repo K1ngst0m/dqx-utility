@@ -1,4 +1,5 @@
 #include "FontManager.hpp"
+#include "utils/CrashHandler.hpp"
 
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <imgui.h>
@@ -68,6 +69,7 @@ void FontManager::ensureFont(UIState& state)
 // Attempts to reload the atlas with a user-provided font.
 bool FontManager::reloadFont(const char* path)
 {
+    utils::CrashHandler::SetContext("FontManager::reloadFont");
     ImGui_ImplSDLRenderer3_DestroyDeviceObjects();
     io_.Fonts->ClearFonts();
 

@@ -3,6 +3,7 @@
 #include "../WindowRegistry.hpp"
 #include "../DialogWindow.hpp"
 #include "../state/DialogStateManager.hpp"
+#include "../utils/ErrorReporter.hpp"
 
 #include <toml++/toml.h>
 #include <plog/Log.h>
@@ -42,6 +43,8 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     // GUI properties
     t.insert("width", state.ui_state().width);
     t.insert("height", state.ui_state().height);
+    t.insert("pos_x", state.ui_state().window_pos.x);
+    t.insert("pos_y", state.ui_state().window_pos.y);
     t.insert("padding_x", state.ui_state().padding.x);
     t.insert("padding_y", state.ui_state().padding.y);
     t.insert("rounding", state.ui_state().rounding);
@@ -86,6 +89,8 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
     // GUI properties
     if (auto v = t["width"].value<double>()) state.ui_state().width = static_cast<float>(*v);
     if (auto v = t["height"].value<double>()) state.ui_state().height = static_cast<float>(*v);
+    if (auto v = t["pos_x"].value<double>()) state.ui_state().window_pos.x = static_cast<float>(*v);
+    if (auto v = t["pos_y"].value<double>()) state.ui_state().window_pos.y = static_cast<float>(*v);
     if (auto v = t["padding_x"].value<double>()) state.ui_state().padding.x = static_cast<float>(*v);
     if (auto v = t["padding_y"].value<double>()) state.ui_state().padding.y = static_cast<float>(*v);
     if (auto v = t["rounding"].value<double>()) state.ui_state().rounding = static_cast<float>(*v);
@@ -170,6 +175,9 @@ bool ConfigManager::saveAll()
     if (!ofs)
     {
         last_error_ = "Failed to open temp file for writing";
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
+            "Failed to save configuration",
+            "Could not create temporary file for writing: " + tmp);
         return false;
     }
     ofs << root;
@@ -180,6 +188,9 @@ bool ConfigManager::saveAll()
     if (ec)
     {
         last_error_ = std::string("Failed to rename: ") + ec.message();
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
+            "Failed to save configuration",
+            "Could not rename temporary file: " + ec.message());
         return false;
     }
     last_mtime_ = file_mtime_ms(config_path_);
@@ -261,6 +272,7 @@ bool ConfigManager::loadAndApply()
                     // Restore runtime-only state not persisted in config
                     dw->state().ui_state().window_size = ImVec2(dw->state().ui_state().width, dw->state().ui_state().height);
                     dw->state().ui_state().pending_resize = true;
+                    dw->state().ui_state().pending_reposition = true;
                     dw->state().ui_state().font = nullptr;
                     dw->state().ui_state().font_base_size = dw->state().ui_state().font_size;
                     
@@ -277,6 +289,21 @@ bool ConfigManager::loadAndApply()
     {
         last_error_ = std::string("config parse error: ") + std::string(pe.description());
         PLOG_WARNING << last_error_;
+        
+        // Extract line number and error details if available
+        std::string error_details = "TOML parse error";
+        if (pe.source().begin.line > 0)
+        {
+            error_details = "Error at line " + std::to_string(pe.source().begin.line) + ": " + std::string(pe.description());
+        }
+        else
+        {
+            error_details = std::string(pe.description());
+        }
+        
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+            "Configuration file has errors. Using defaults for invalid entries.",
+            error_details + "\nFile: " + config_path_);
         return false;
     }
 }

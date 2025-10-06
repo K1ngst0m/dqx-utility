@@ -4,6 +4,9 @@
 #include "WindowRegistry.hpp"
 #include "DialogWindow.hpp"
 #include "config/ConfigManager.hpp"
+#include "utils/ErrorReporter.hpp"
+#include "utils/CrashHandler.hpp"
+#include "ErrorDialog.hpp"
 
 #include <SDL3/SDL.h>
 #include <plog/Appenders/ConsoleAppender.h>
@@ -120,6 +123,8 @@ static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bo
 
 int main(int argc, char** argv)
 {
+    utils::CrashHandler::Initialize();
+    
     std::filesystem::create_directories("logs");
     
     // Check config file for append_logs setting (parse without ImGui)
@@ -186,6 +191,7 @@ int main(int argc, char** argv)
         registry.createDialogWindow();
 
     SettingsPanel settings_panel(registry);
+    ErrorDialog error_dialog;
 
     bool show_manager = true;
 
@@ -238,6 +244,19 @@ int main(int argc, char** argv)
         render_global_context_menu(io, registry, show_manager);
         if (show_manager)
             settings_panel.render(show_manager);
+
+        // Check for pending errors and display
+        if (utils::ErrorReporter::HasPendingErrors())
+        {
+            auto errors = utils::ErrorReporter::GetPendingErrors();
+            error_dialog.Show(errors);
+        }
+
+        // Render error dialog (returns true if should exit for fatal error)
+        if (error_dialog.Render())
+        {
+            running = false;
+        }
 
         app.renderVignette();
         app.endFrame();

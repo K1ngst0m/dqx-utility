@@ -1,4 +1,6 @@
 #include "AppContext.hpp"
+#include "utils/ErrorReporter.hpp"
+#include "utils/NativeMessageBox.hpp"
 
 #include <SDL3/SDL.h>
 #include <imgui.h>
@@ -25,7 +27,14 @@ bool AppContext::initialize()
 
     if (!SDL_Init(SDL_INIT_VIDEO))
     {
-        PLOG_FATAL << "SDL_Init failed: " << SDL_GetError();
+        std::string sdl_error = SDL_GetError();
+        PLOG_FATAL << "SDL_Init failed: " << sdl_error;
+        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            "Failed to initialize graphics system",
+            std::string("SDL_Init failed: ") + sdl_error);
+        utils::NativeMessageBox::ShowFatalError(
+            "Failed to initialize graphics system. Please try updating your graphics drivers or reinstalling the application.",
+            std::string("SDL_Init error: ") + sdl_error);
         return false;
     }
 
@@ -33,7 +42,14 @@ bool AppContext::initialize()
     window_ = SDL_CreateWindow("DQX Utility", 800, 600, window_flags);
     if (!window_)
     {
-        PLOG_FATAL << "SDL_CreateWindow failed: " << SDL_GetError();
+        std::string sdl_error = SDL_GetError();
+        PLOG_FATAL << "SDL_CreateWindow failed: " << sdl_error;
+        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            "Failed to create application window",
+            std::string("SDL_CreateWindow failed: ") + sdl_error);
+        utils::NativeMessageBox::ShowFatalError(
+            "Failed to create application window. Your system may not support the required graphics features.",
+            std::string("SDL_CreateWindow error: ") + sdl_error);
         shutdown();
         return false;
     }
@@ -41,7 +57,14 @@ bool AppContext::initialize()
     renderer_ = SDL_CreateRenderer(window_, nullptr);
     if (!renderer_)
     {
-        PLOG_FATAL << "SDL_CreateRenderer failed: " << SDL_GetError();
+        std::string sdl_error = SDL_GetError();
+        PLOG_FATAL << "SDL_CreateRenderer failed: " << sdl_error;
+        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            "Failed to create graphics renderer",
+            std::string("SDL_CreateRenderer failed: ") + sdl_error);
+        utils::NativeMessageBox::ShowFatalError(
+            "Failed to initialize graphics renderer. Please update your graphics drivers.",
+            std::string("SDL_CreateRenderer error: ") + sdl_error);
         shutdown();
         return false;
     }
@@ -57,12 +80,24 @@ bool AppContext::initialize()
     if (!ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_))
     {
         PLOG_FATAL << "ImGui_ImplSDL3_InitForSDLRenderer failed";
+        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            "Failed to initialize UI system (SDL3 backend)",
+            "ImGui_ImplSDL3_InitForSDLRenderer returned false");
+        utils::NativeMessageBox::ShowFatalError(
+            "Failed to initialize user interface system.",
+            "ImGui SDL3 backend initialization failed");
         shutdown();
         return false;
     }
     if (!ImGui_ImplSDLRenderer3_Init(renderer_))
     {
         PLOG_FATAL << "ImGui_ImplSDLRenderer3_Init failed";
+        utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
+            "Failed to initialize UI renderer",
+            "ImGui_ImplSDLRenderer3_Init returned false");
+        utils::NativeMessageBox::ShowFatalError(
+            "Failed to initialize user interface renderer.",
+            "ImGui SDL renderer backend initialization failed");
         shutdown();
         return false;
     }

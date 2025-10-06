@@ -246,12 +246,19 @@ add_executable(dqx_utility
   ${MAIN_TRANSLATOR_SOURCES}
   src/translate/LabelProcessor.cpp
   src/translate/LabelProcessor.hpp
-  src/translate/TranslateSession.hpp
   src/config/ConfigManager.cpp
   src/config/ConfigManager.hpp
+  src/utils/ErrorReporter.cpp
+  src/utils/ErrorReporter.hpp
+  src/utils/NativeMessageBox.cpp
+  src/utils/NativeMessageBox.hpp
+  src/utils/CrashHandler.cpp
+  src/utils/CrashHandler.hpp
+  src/ErrorDialog.cpp
+  src/ErrorDialog.hpp
 )
 
-  if(MSVC)
+if(MSVC)
     target_compile_options(dqx_utility PRIVATE /W4 /permissive-)
   else()
     target_compile_options(dqx_utility PRIVATE -Wall -Wextra -Wpedantic)
@@ -278,6 +285,7 @@ if(plog_SOURCE_DIR)
 endif()
 
 if(WIN32)
+  target_link_libraries(dqx_utility PRIVATE dbghelp)
   target_link_options(dqx_utility PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
 endif()
 
