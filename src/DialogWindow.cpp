@@ -705,6 +705,27 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         ImGui::Separator();
         ImGui::Spacing();
 
+        // Cache Stats Section
+        ImGui::TextUnformatted("Translation Cache");
+        ImGui::Text("Entries: %zu / %zu", session_.cacheEntries(), session_.cacheCapacity());
+        ImGui::Text("Hits: %llu", static_cast<unsigned long long>(session_.cacheHits()));
+        ImGui::Text("Misses: %llu", static_cast<unsigned long long>(session_.cacheMisses()));
+        
+        bool cache_enabled = session_.isCacheEnabled();
+        if (ImGui::Checkbox("Enable Cache", &cache_enabled))
+        {
+            session_.enableCache(cache_enabled);
+        }
+        
+        if (ImGui::Button("Clear Cache"))
+        {
+            session_.clear();
+        }
+        
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
         // Dialog Texts Section
         ImGui::TextUnformatted("Appended Texts");
         // Wrap list in a child region to ensure proper clipping

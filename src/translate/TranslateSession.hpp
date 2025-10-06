@@ -16,7 +16,14 @@ public:
 
     void setCapacity(std::size_t cap) { capacity_ = cap; }
     void enableCache(bool v) { cache_enabled_ = v; }
-    void clear() { cache_.clear(); job_key_.clear(); }
+    void clear() { cache_.clear(); job_key_.clear(); cache_hits_ = 0; cache_misses_ = 0; }
+
+    // Stats accessors
+    std::uint64_t cacheHits() const { return cache_hits_; }
+    std::uint64_t cacheMisses() const { return cache_misses_; }
+    std::size_t cacheEntries() const { return cache_.size(); }
+    std::size_t cacheCapacity() const { return capacity_; }
+    bool isCacheEnabled() const { return cache_enabled_; }
 
     SubmitResult submit(const std::string& processed_text,
                         TranslationConfig::TranslationBackend backend,
@@ -32,8 +39,10 @@ public:
         if (cache_enabled_) {
             auto it = cache_.find(key);
             if (it != cache_.end()) {
+                ++cache_hits_;
                 return SubmitResult{SubmitKind::Cached, 0, it->second};
             }
+            ++cache_misses_;
         }
 
         if (cache_.size() >= capacity_) cache_.clear();
@@ -83,4 +92,6 @@ private:
     std::unordered_map<std::uint64_t, std::string> job_key_;
     std::size_t capacity_ = 5000;
     bool cache_enabled_ = true;
+    std::uint64_t cache_hits_ = 0;
+    std::uint64_t cache_misses_ = 0;
 };
