@@ -178,6 +178,8 @@ void DialogWindow::applyPending()
                     pending_segment_by_job_[job_id] = static_cast<int>(state_.content_state().segments.size()) - 1;
                 }
             }
+
+            if (m.seq > 0) last_applied_seq_ = m.seq;
         }
         else
         {
@@ -323,9 +325,37 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
         for (size_t i = 0; i < state_.content_state().segments.size(); ++i)
         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap_width);
-            ImGui::TextUnformatted(state_.content_state().segments[i].data());
-            ImGui::PopTextWrapPos();
+            // Draw outlined text: render 8 shadow passes around the text, then the main text on top.
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 pos = ImGui::GetCursorScreenPos();
+            ImFont* font_to_use = ImGui::GetFont();
+            float font_size_px = ImGui::GetFontSize();
+            const char* txt = state_.content_state().segments[i].data();
+            float wrap_w = wrap_width;
+
+            // Colors
+            ImVec4 text_col_v4 = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            ImU32 text_col = ImGui::GetColorU32(ImGuiCol_Text);
+            ImU32 outline_col = IM_COL32(0, 0, 0, (int)(text_col_v4.w * 255.0f));
+
+            // Outline thickness scales slightly with font size (clamped)
+            float thickness = std::clamp(std::round(font_size_px * 0.06f), 1.0f, 3.0f);
+
+            // 8-directional outline
+            for (int ox = -1; ox <= 1; ++ox)
+            {
+                for (int oy = -1; oy <= 1; ++oy)
+                {
+                    if (ox == 0 && oy == 0) continue;
+                    dl->AddText(font_to_use, font_size_px, ImVec2(pos.x + ox * thickness, pos.y + oy * thickness), outline_col, txt, nullptr, wrap_w);
+                }
+            }
+            // Main text fill
+            dl->AddText(font_to_use, font_size_px, pos, text_col, txt, nullptr, wrap_w);
+
+            // Advance layout by the wrapped text height
+            ImVec2 text_sz = ImGui::CalcTextSize(txt, nullptr, false, wrap_w);
+            ImGui::Dummy(ImVec2(0.0f, text_sz.y));
             if (i + 1 < state_.content_state().segments.size())
             {
                 ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing()));
@@ -404,6 +434,40 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
         state_.ui_state().pending_reposition = false;
         state_.ui_state().pending_resize     = false;
+
+        // Soft vignette inside the dialog with rounded corners, no overlaps
+        {
+            float thickness = std::max(0.0f, state_.ui_state().vignette_thickness);
+            if (thickness > 0.0f)
+            {
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                ImVec2 win_pos = ImGui::GetWindowPos();
+                ImVec2 win_size = ImGui::GetWindowSize();
+                float rounding0 = std::max(0.0f, state_.ui_state().rounding);
+
+                // Feather steps scale with thickness (capped for perf)
+                int steps = static_cast<int>(std::ceil(thickness * 3.0f));
+                steps = std::clamp(steps, 1, 256);
+
+                // Increase overall darkness as size grows
+                float max_alpha = std::clamp(0.30f + 0.006f * thickness, 0.30f, 0.65f);
+
+                for (int i = 0; i < steps; ++i)
+                {
+                    float t = (steps <= 1) ? 0.0f : (static_cast<float>(i) / (steps - 1));
+                    float inset = t * thickness;
+                    ImVec2 pmin(win_pos.x + inset, win_pos.y + inset);
+                    ImVec2 pmax(win_pos.x + win_size.x - inset, win_pos.y + win_size.y - inset);
+                    float r = std::max(0.0f, rounding0 - inset);
+                    // Smooth fade curve (ease-out), slightly stronger
+                    float a = max_alpha * (1.0f - t);
+                    a = a * a; // quadratic ease-out
+                    if (a <= 0.0f) continue;
+                    ImU32 col = IM_COL32(0, 0, 0, (int)(a * 255.0f));
+                    dl->AddRect(pmin, pmax, col, r, 0, 1.0f);
+                }
+            }
+        }
     }
     ImGui::End();
 
@@ -505,6 +569,11 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         ImGui::TextUnformatted("Border Thickness");
         set_slider_width();
         ImGui::SliderFloat("##dialog_border_slider", &state_.ui_state().border_thickness, 0.5f, 6.0f);
+        ImGui::Spacing();
+
+        ImGui::TextUnformatted("Dark Border Size");
+        set_slider_width();
+        ImGui::SliderFloat("##dialog_vignette_thickness", &state_.ui_state().vignette_thickness, 0.0f, 100.0f);
         ImGui::Spacing();
 
         ImGui::TextUnformatted("Background Opacity");

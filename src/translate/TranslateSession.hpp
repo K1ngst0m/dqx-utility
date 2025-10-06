@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <vector>
 #include <cstdint>
+#include <cstring>
+#include <cctype>
 
 #include "state/TranslationConfig.hpp"
 #include "translate/ITranslator.hpp"
@@ -16,7 +18,7 @@ public:
 
     void setCapacity(std::size_t cap) { capacity_ = cap; }
     void enableCache(bool v) { cache_enabled_ = v; }
-    void clear() { cache_.clear(); job_key_.clear(); cache_hits_ = 0; cache_misses_ = 0; }
+    void clear() { cache_.clear(); job_.clear(); cache_hits_ = 0; cache_misses_ = 0; }
 
     // Stats accessors
     std::uint64_t cacheHits() const { return cache_hits_; }
@@ -31,6 +33,8 @@ public:
                         translate::ITranslator* translator)
     {
         const std::string target_code = toTargetCode(target);
+
+        // Compose a cache key based on the full processed text (including original quotes)
         std::string key;
         key.reserve(processed_text.size() + 32);
         key += "B:"; key += std::to_string(static_cast<int>(backend));
@@ -47,16 +51,26 @@ public:
 
         if (cache_.size() >= capacity_) cache_.clear();
 
+        // Mask corner quotes with tags preserved by OpenAI prompt
+        static constexpr const char* kOpenQuote  = "\xE3\x80\x8C"; // U+300C
+        static constexpr const char* kCloseQuote = "\xE3\x80\x8D"; // U+300D
+        static constexpr const char* kTagOpen    = "<dqxlq/>";
+        static constexpr const char* kTagClose   = "<dqxrq/>";
+
+        std::string to_translate = processed_text;
+        replaceAllInPlace(to_translate, kOpenQuote,  kTagOpen);
+        replaceAllInPlace(to_translate, kCloseQuote, kTagClose);
+
         if (!translator || !translator->isReady()) {
             return SubmitResult{SubmitKind::DroppedNotReady, 0, {}};
         }
 
         std::uint64_t jid = 0;
-        bool ok = translator->translate(processed_text, "auto", target_code, jid);
+        bool ok = translator->translate(to_translate, "auto", target_code, jid);
         if (!ok || jid == 0) {
             return SubmitResult{SubmitKind::DroppedNotReady, 0, {}};
         }
-        job_key_[jid] = std::move(key);
+        job_[jid] = JobInfo{std::move(key)};
         return SubmitResult{SubmitKind::Queued, jid, {}};
     }
 
@@ -66,11 +80,21 @@ public:
         out_events.clear();
         out_events.reserve(results.size());
         for (const auto& r : results) {
-            auto it = job_key_.find(r.id);
-            if (it != job_key_.end()) {
-                cache_[it->second] = r.text;
-                out_events.push_back(CompletedEvent{r.id, r.text});
-                job_key_.erase(it);
+            auto it = job_.find(r.id);
+            if (it != job_.end()) {
+                const JobInfo& ji = it->second;
+                // Unmask tags back to original corner quotes
+                std::string final = r.text;
+                static constexpr const char* kOpenQuote  = "\xE3\x80\x8C"; // U+300C
+                static constexpr const char* kCloseQuote = "\xE3\x80\x8D"; // U+300D
+                static constexpr const char* kTagOpen    = "<dqxlq/>";
+                static constexpr const char* kTagClose   = "<dqxrq/>";
+                replaceAllInPlace(final, kTagOpen,  kOpenQuote);
+                replaceAllInPlace(final, kTagClose, kCloseQuote);
+                alignAfterOpenQuote(final);
+                cache_[ji.key] = final;
+                out_events.push_back(CompletedEvent{r.id, std::move(final)});
+                job_.erase(it);
             } else {
                 out_events.push_back(CompletedEvent{r.id, r.text});
             }
@@ -78,6 +102,10 @@ public:
     }
 
 private:
+    struct JobInfo {
+        std::string key;
+    };
+
     static std::string toTargetCode(TranslationConfig::TargetLang t)
     {
         switch (t) {
@@ -88,8 +116,82 @@ private:
         return "en-us";
     }
 
+    // Align lines following an opening corner quote 「 by ensuring they start with a full-width space (U+3000)
+    static void alignAfterOpenQuote(std::string& s)
+    {
+        static constexpr const char* kOpenQuote = "\xE3\x80\x8C"; // U+300C
+        static constexpr const char* kFWSpace   = "\xE3\x80\x80"; // U+3000
+        const std::size_t LQ = std::strlen(kOpenQuote);
+        const std::size_t FWS = std::strlen(kFWSpace);
+
+        std::string out;
+        out.reserve(s.size() + 8);
+        bool in_block = false;
+        std::size_t pos = 0;
+        while (pos <= s.size())
+        {
+            std::size_t nl = s.find('\n', pos);
+            bool has_nl = (nl != std::string::npos);
+            std::size_t end = has_nl ? nl : s.size();
+            std::string line = s.substr(pos, end - pos);
+
+            // Determine if line is empty (only ASCII spaces/tabs/CR)
+            bool is_empty = true;
+            for (unsigned char c : line) {
+                if (!(c == ' ' || c == '\t' || c == '\r')) { is_empty = false; break; }
+            }
+
+            if (line.size() >= LQ && line.compare(0, LQ, kOpenQuote) == 0)
+            {
+                // First line of a quoted block
+                in_block = true;
+            }
+            else if (in_block)
+            {
+                if (is_empty)
+                {
+                    in_block = false;
+                }
+                else if (line.size() >= LQ && line.compare(0, LQ, kOpenQuote) == 0)
+                {
+                    // New block begins
+                    in_block = true;
+                }
+                else
+                {
+                    // Ensure a full-width space at start if not already present
+                    if (!(line.size() >= FWS && line.compare(0, FWS, kFWSpace) == 0))
+                    {
+                        line.insert(0, kFWSpace);
+                    }
+                }
+            }
+
+            out += line;
+            if (has_nl) out.push_back('\n');
+            if (!has_nl) break;
+            pos = nl + 1;
+        }
+        s.swap(out);
+    }
+
+    // Replace all occurrences of 'from' with 'to' in-place; returns count of replacements
+    static std::size_t replaceAllInPlace(std::string& s, const char* from, const char* to)
+    {
+        if (!from || !*from) return 0;
+        const std::string needle(from);
+        const std::string repl = to ? std::string(to) : std::string();
+        std::size_t pos = 0, count = 0;
+        while ((pos = s.find(needle, pos)) != std::string::npos) {
+            s.replace(pos, needle.size(), repl);
+            pos += repl.size();
+            ++count;
+        }
+        return count;
+    }
+
     std::unordered_map<std::string, std::string> cache_;
-    std::unordered_map<std::uint64_t, std::string> job_key_;
+    std::unordered_map<std::uint64_t, JobInfo> job_;
     std::size_t capacity_ = 5000;
     bool cache_enabled_ = true;
     std::uint64_t cache_hits_ = 0;

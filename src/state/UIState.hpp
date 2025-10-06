@@ -15,6 +15,8 @@ struct UIState
     float background_alpha;
     float font_size;
     float font_base_size;
+    
+    float vignette_thickness;
 
     std::array<char, FontPathSize> font_path{};
     ImVec2 window_pos;
@@ -23,7 +25,6 @@ struct UIState
     bool pending_resize;
     bool has_custom_font;
 
-    // UI behavior flags
     bool auto_scroll_to_new;
 
     ImFont* font;
@@ -38,6 +39,8 @@ struct UIState
         background_alpha = 0.78f;
         font_size = 28.0f;
         font_base_size = 28.0f;
+        
+        vignette_thickness = 12.0f;
         
         font_path.fill('\0');
         window_pos = ImVec2(0.0f, 0.0f);

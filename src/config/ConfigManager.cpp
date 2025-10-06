@@ -50,6 +50,7 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     t.insert("border_thickness", state.ui_state().border_thickness);
     t.insert("background_alpha", state.ui_state().background_alpha);
     t.insert("font_size", state.ui_state().font_size);
+    t.insert("vignette_thickness", state.ui_state().vignette_thickness);
     t.insert("font_path", std::string(state.ui_state().font_path.data()));
 
     return t;
@@ -94,6 +95,7 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
     if (auto v = t["border_thickness"].value<double>()) state.ui_state().border_thickness = static_cast<float>(*v);
     if (auto v = t["background_alpha"].value<double>()) state.ui_state().background_alpha = static_cast<float>(*v);
     if (auto v = t["font_size"].value<double>()) state.ui_state().font_size = static_cast<float>(*v);
+    if (auto v = t["vignette_thickness"].value<double>()) state.ui_state().vignette_thickness = static_cast<float>(*v);
     if (auto v = t["font_path"].value<std::string>())
         std::snprintf(state.ui_state().font_path.data(), state.ui_state().font_path.size(), "%s", v->c_str());
 
@@ -271,7 +273,7 @@ bool ConfigManager::loadAndApply()
                     dw->state().ui_state().pending_resize = true;
                     dw->state().ui_state().pending_reposition = true;
                     dw->state().ui_state().font = nullptr;
-                    dw->state().ui_state().font_base_size = dw->state().ui_state().font_size;
+                    dw->state().ui_state().font_base_size = 0.0f;
                     
                     // Rebind font pointers after state replacement
                     dw->refreshFontBinding();
