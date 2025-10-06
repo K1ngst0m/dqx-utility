@@ -196,7 +196,7 @@ void AppContext::updateRendererScale()
     if (!window_ || !renderer_)
         return;
 
-    const Uint32 flags = SDL_GetWindowFlags(window_);
+    const SDL_WindowFlags flags = SDL_GetWindowFlags(window_);
     if (flags & SDL_WINDOW_MINIMIZED)
         return;
 

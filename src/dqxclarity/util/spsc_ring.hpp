@@ -1,5 +1,10 @@
 #pragma once
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4324) // structure was padded due to alignment specifier
+#endif
+
 #include <atomic>
 #include <array>
 #include <cstddef>
@@ -60,3 +65,7 @@ class SpscRing {
   std::array<T, CapacityPow2> buf_{};
   std::atomic<std::uint64_t> dropped_;
 };
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif

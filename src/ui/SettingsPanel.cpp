@@ -289,7 +289,7 @@ void SettingsPanel::renderDebugSection()
     ImGui::SeparatorText(i18n::get("settings.logs"));
 
     // Refresh log content every 2 seconds
-    float current_time = ImGui::GetTime();
+    float current_time = static_cast<float>(ImGui::GetTime());
     if (current_time - last_log_refresh_time_ > 2.0f)
     {
         // Read the app's own log from current working directory
