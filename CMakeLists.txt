@@ -354,6 +354,7 @@ set(CPACK_GENERATOR "ZIP")
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 set(CPACK_INSTALL_CMAKE_PROJECTS "")
 
+# Existing single portable pack (kept for compatibility)
 set(_PACK_DIR "${CMAKE_BINARY_DIR}/_portable_pack")
 
 add_custom_target(prepare_package ALL
@@ -387,3 +388,50 @@ endif()
 set(CPACK_INSTALLED_DIRECTORIES "${_PACK_DIR};.")
 
 include(CPack)
+
+# ----------------------------------------------------------------------------
+# Multi-language packaging (ZIP): dqx-utility-{lang}-{ver}-{os+arch}.zip
+# ----------------------------------------------------------------------------
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(_OS_ARCH "windows-x64")
+else()
+  set(_OS_ARCH "windows-x86")
+endif()
+
+set(_PACK_EN_DIR    "${CMAKE_BINARY_DIR}/_portable_pack_en")
+set(_PACK_ZHCN_DIR  "${CMAKE_BINARY_DIR}/_portable_pack_zh-CN")
+
+# Helper macro to stage a package
+function(_stage_package STAGE_DIR LANG_TEMPLATE)
+  add_custom_command(OUTPUT "${STAGE_DIR}/.staged"
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "${STAGE_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${STAGE_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqx_utility>" "${STAGE_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "${STAGE_DIR}/assets"
+    # Copy SDL3.dll from target output dir if present
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE_DIR:dqx_utility>/SDL3.dll" "${STAGE_DIR}/" || ""
+    # Place language-specific config as config.toml
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/assets/templates/${LANG_TEMPLATE}" "${STAGE_DIR}/config.toml"
+    COMMAND ${CMAKE_COMMAND} -E touch "${STAGE_DIR}/.staged"
+    DEPENDS dqx_utility
+    COMMENT "Staging ${STAGE_DIR}"
+  )
+endfunction()
+
+_stage_package("${_PACK_EN_DIR}"   "config.en.toml")
+_stage_package("${_PACK_ZHCN_DIR}" "config.zh-CN.toml")
+
+# Create archives
+add_custom_target(package_en
+  COMMAND ${CMAKE_COMMAND} -E tar cfv "${CMAKE_BINARY_DIR}/dqx-utility-en-${PROJECT_VERSION}-${_OS_ARCH}.zip" --format=zip "${_PACK_EN_DIR}"
+  DEPENDS "${_PACK_EN_DIR}/.staged"
+  COMMENT "Packaging EN ZIP"
+)
+
+add_custom_target(package_zh_CN
+  COMMAND ${CMAKE_COMMAND} -E tar cfv "${CMAKE_BINARY_DIR}/dqx-utility-zh-CN-${PROJECT_VERSION}-${_OS_ARCH}.zip" --format=zip "${_PACK_ZHCN_DIR}"
+  DEPENDS "${_PACK_ZHCN_DIR}/.staged"
+  COMMENT "Packaging zh-CN ZIP"
+)
+
+add_custom_target(package_all DEPENDS package_en package_zh_CN)
