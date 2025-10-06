@@ -52,13 +52,20 @@ private:
     uintptr_t m_trampoline_addr = 0;  // allocated exec memory with our code
     uintptr_t m_state_addr = 0;       // allocated byte for state flag
 
-    std::vector<uint8_t> m_original_bytes; // stolen original bytes (8)
+    std::vector<uint8_t> m_original_bytes; // stolen original bytes (instruction-safe)
     std::vector<RestoreSite> m_restore_sites; // hook sites to temporarily restore
 
     bool FindIntegrityAddress(uintptr_t& out_addr);
     bool BuildAndWriteTrampoline();
     bool PatchIntegrityFunction();
     void LogBytes(const char* label, uintptr_t addr, size_t count);
+
+    // Compute an instruction-safe stolen length at m_integrity_addr.
+    // Reads a small window (up to 32 bytes) and decodes x86 instructions
+    // until at least 5 bytes are covered without splitting any instruction.
+    // Falls back to 8 bytes if decoding fails.
+    size_t ComputeInstructionSafeStolenLen();
+    static size_t DecodeInstrLen(const uint8_t* p, size_t max);
 };
 
 } // namespace dqxclarity

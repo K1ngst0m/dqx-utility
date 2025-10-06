@@ -129,7 +129,7 @@ int main(int argc, char** argv)
     std::filesystem::create_directories("logs");
     
     // Check config file for append_logs setting (parse without ImGui)
-    bool append_logs = false;
+    bool append_logs = true;
     try {
         std::ifstream ifs("config.toml");
         if (ifs) {
@@ -151,10 +151,7 @@ int main(int argc, char** argv)
         }
     }
     
-    // Clear existing log file unless append_logs is enabled
-    if (!append_logs && std::filesystem::exists("logs/run.log")) {
-        std::filesystem::remove("logs/run.log");
-    }
+    // Do not delete prior logs; keep appending to preserve crash context across runs
     
     // Initialize logging with console and file output
     static plog::ConsoleAppender<plog::TxtFormatter> console_appender;

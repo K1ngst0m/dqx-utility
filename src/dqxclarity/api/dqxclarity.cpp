@@ -77,14 +77,9 @@ bool Engine::start_hook(StartPolicy policy) {
     status_ = Status::Error;
     return false;
   }
+  // Do NOT change page protection at startup (keeps login stable on this build)
 
-  // Ensure the hook site allows in-process byte stores during integrity restore
-  if (impl_->hook && impl_->hook->GetHookAddress() != 0) {
-    auto& orig = impl_->hook->GetOriginalBytes();
-    if (!orig.empty()) {
-      (void)impl_->memory->SetMemoryProtection(impl_->hook->GetHookAddress(), orig.size(), dqxclarity::MemoryProtectionFlags::ReadWriteExecute);
-    }
-  }
+  // Do NOT pre-change page protections at startup; some builds crash on login if code pages change protection.
 
   // Install integrity detour and configure it to restore dialog hook bytes during checks
   impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
@@ -141,6 +136,10 @@ bool Engine::start_hook(StartPolicy policy) {
         }
       }
     );
+    // Provide restore targets (dialog hook site and original bytes) to monitor for out-of-process restore
+    if (impl_->hook && impl_->hook->GetHookAddress() != 0) {
+      impl_->monitor->AddRestoreTarget(impl_->hook->GetHookAddress(), impl_->hook->GetOriginalBytes());
+    }
     (void)impl_->monitor->start();
   }
 

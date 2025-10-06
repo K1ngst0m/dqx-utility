@@ -11,17 +11,25 @@ bool IntegrityMonitor::start() {
     worker_ = std::thread([this]{
         using namespace std::chrono_literals;
         bool first = true;
+        uint32_t hits = 0;
         while (!stop_.load()) {
             uint8_t flag = 0;
             if (memory_->ReadMemory(state_addr_, &flag, 1) && flag == 1) {
-                if (log_.info) log_.info(first ? "Integrity signal observed; scheduling first enable"
-                                               : "Integrity signal observed; scheduling reapply");
-                std::this_thread::sleep_for(1s);
+                // Out-of-process restore of hook sites immediately on signal
+                for (const auto& site : restore_) {
+                    if (!site.bytes.empty()) {
+                        (void)memory_->WriteMemory(site.addr, site.bytes.data(), site.bytes.size());
+                    }
+                }
+                ++hits;
+                if (log_.info) log_.info(std::string("Integrity signal observed; hits=") + std::to_string(hits) + "; restoring");
+                // Delay before re-applying the dialog hook to avoid racing the checker
+                std::this_thread::sleep_for(std::chrono::milliseconds(2500));
                 if (on_integrity_) on_integrity_(first);
                 first = false;
                 uint8_t zero = 0; (void)memory_->WriteMemory(state_addr_, &zero, 1);
             }
-            std::this_thread::sleep_for(250ms);
+            std::this_thread::sleep_for(1ms);
         }
     });
     return true;
