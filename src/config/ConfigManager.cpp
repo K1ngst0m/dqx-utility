@@ -38,6 +38,12 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     t.insert("openai_model", std::string(state.translation_config().openai_model.data()));
     t.insert("openai_api_key", std::string(state.translation_config().openai_api_key.data()));
     t.insert("google_api_key", std::string(state.translation_config().google_api_key.data()));
+    t.insert("qwen_api_key", std::string(state.translation_config().qwen_api_key.data()));
+    t.insert("qwen_model", std::string(state.translation_config().qwen_model.data()));
+    t.insert("niutrans_api_key", std::string(state.translation_config().niutrans_api_key.data()));
+    t.insert("zhipu_base_url", std::string(state.translation_config().zhipu_base_url.data()));
+    t.insert("zhipu_model", std::string(state.translation_config().zhipu_model.data()));
+    t.insert("zhipu_api_key", std::string(state.translation_config().zhipu_api_key.data()));
 
     // GUI properties
     t.insert("width", state.ui_state().width);
@@ -83,6 +89,18 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
         std::snprintf(state.translation_config().openai_api_key.data(), state.translation_config().openai_api_key.size(), "%s", v->c_str());
     if (auto v = t["google_api_key"].value<std::string>())
         std::snprintf(state.translation_config().google_api_key.data(), state.translation_config().google_api_key.size(), "%s", v->c_str());
+    if (auto v = t["qwen_api_key"].value<std::string>())
+        std::snprintf(state.translation_config().qwen_api_key.data(), state.translation_config().qwen_api_key.size(), "%s", v->c_str());
+    if (auto v = t["qwen_model"].value<std::string>())
+        std::snprintf(state.translation_config().qwen_model.data(), state.translation_config().qwen_model.size(), "%s", v->c_str());
+    if (auto v = t["niutrans_api_key"].value<std::string>())
+        std::snprintf(state.translation_config().niutrans_api_key.data(), state.translation_config().niutrans_api_key.size(), "%s", v->c_str());
+    if (auto v = t["zhipu_base_url"].value<std::string>())
+        std::snprintf(state.translation_config().zhipu_base_url.data(), state.translation_config().zhipu_base_url.size(), "%s", v->c_str());
+    if (auto v = t["zhipu_model"].value<std::string>())
+        std::snprintf(state.translation_config().zhipu_model.data(), state.translation_config().zhipu_model.size(), "%s", v->c_str());
+    if (auto v = t["zhipu_api_key"].value<std::string>())
+        std::snprintf(state.translation_config().zhipu_api_key.data(), state.translation_config().zhipu_api_key.size(), "%s", v->c_str());
 
     // GUI properties
     if (auto v = t["width"].value<double>()) state.ui_state().width = static_cast<float>(*v);

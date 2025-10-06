@@ -51,7 +51,6 @@ private:
 
     void renderAppearanceSection();
     void renderTranslateSection();
-    void renderStatusSection();
     void renderDebugSection();
     void applyPending();
 

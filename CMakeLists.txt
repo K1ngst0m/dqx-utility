@@ -226,6 +226,12 @@ set(MAIN_TRANSLATOR_SOURCES
   src/translate/OpenAITranslator.hpp
   src/translate/GoogleTranslator.cpp
   src/translate/GoogleTranslator.hpp
+  src/translate/ZhipuGLMTranslator.cpp
+  src/translate/ZhipuGLMTranslator.hpp
+  src/translate/QwenMTTranslator.cpp
+  src/translate/QwenMTTranslator.hpp
+  src/translate/NiutransTranslator.cpp
+  src/translate/NiutransTranslator.hpp
   src/translate/TranslatorFactory.cpp
 )
 

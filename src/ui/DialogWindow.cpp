@@ -489,15 +489,36 @@ void DialogWindow::initTranslatorIfEnabled()
     case TranslationConfig::TargetLang::ZH_CN: cfg.target_lang = "zh-cn"; break;
     case TranslationConfig::TargetLang::ZH_TW: cfg.target_lang = "zh-tw"; break;
     }
-    cfg.base_url = state_.translation_config().openai_base_url.data();
-    cfg.model = state_.translation_config().openai_model.data();
     if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
     {
+        cfg.base_url = state_.translation_config().openai_base_url.data();
+        cfg.model = state_.translation_config().openai_model.data();
         cfg.api_key = state_.translation_config().openai_api_key.data();
     }
     else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Google)
     {
+        cfg.base_url.clear();
+        cfg.model.clear();
         cfg.api_key = state_.translation_config().google_api_key.data();
+    }
+    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
+    {
+        cfg.base_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+        cfg.model = "glm-4-flash";
+        cfg.api_key = state_.translation_config().zhipu_api_key.data();
+    }
+    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::QwenMT)
+    {
+        cfg.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+        const char* qm = state_.translation_config().qwen_model.data();
+        cfg.model = (qm && qm[0]) ? qm : "qwen-mt-turbo";
+        cfg.api_key = state_.translation_config().qwen_api_key.data();
+    }
+    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Niutrans)
+    {
+        cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
+        cfg.model.clear();
+        cfg.api_key = state_.translation_config().niutrans_api_key.data();
     }
     translator_ = translate::createTranslator(cfg.backend);
     if (!translator_ || !translator_->init(cfg))
@@ -539,7 +560,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
     ImGui::Spacing();
 
     // APPEARANCE SECTION
-    if (ImGui::CollapsingHeader("Appearance", ImGuiTreeNodeFlags_DefaultOpen))
+    if (ImGui::CollapsingHeader("Appearance"))
     {
         ImGui::Indent();
         
@@ -601,7 +622,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         ImGui::Spacing();
         
         ImGui::TextUnformatted("Backend");
-        const char* backend_items[] = { "OpenAI-compatible", "Google Translate" };
+        const char* backend_items[] = { "OpenAI-compatible", "Google Translate", "GLM-4 Flash (Zhipu)", "Qwen-MT (Aliyun)", "Niutrans (MT)" };
         int current_backend = static_cast<int>(state_.translation_config().translation_backend);
         ImGui::SetNextItemWidth(220.0f);
         bool backend_changed = ImGui::Combo("##translation_backend", &current_backend, backend_items, IM_ARRAYSIZE(backend_items));
@@ -625,6 +646,9 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         bool model_changed = false;
         bool openai_key_changed = false;
         bool google_key_changed = false;
+        bool zhipu_key_changed = false;
+        bool qwen_key_changed = false;
+        bool niutrans_key_changed = false;
         
         if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
         {
@@ -647,16 +671,46 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             google_key_changed = ImGui::InputText("##google_key", state_.translation_config().google_api_key.data(), state_.translation_config().google_api_key.size(), ImGuiInputTextFlags_Password);
             ImGui::TextDisabled("Leave empty to use free tier. Paid API requires Google Cloud credentials.");
         }
+        else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
+        {
+            ImGui::TextUnformatted("API Key");
+            ImGui::SetNextItemWidth(300.0f);
+            zhipu_key_changed = ImGui::InputText("##zhipu_key", state_.translation_config().zhipu_api_key.data(), state_.translation_config().zhipu_api_key.size(), ImGuiInputTextFlags_Password);
+        }
 
         // Check if any config field changed
         bool any_field_changed = enable_changed || auto_apply_changed || backend_changed || lang_changed || 
-                                 base_url_changed || model_changed || openai_key_changed || google_key_changed;
+                                 base_url_changed || model_changed || openai_key_changed || google_key_changed || zhipu_key_changed || qwen_key_changed || niutrans_key_changed;
         
         // Auto-clear test result when config changes
         if (any_field_changed && !test_result_.empty())
         {
             test_result_.clear();
             test_timestamp_.clear();
+        }
+        else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::QwenMT)
+        {
+            ImGui::TextUnformatted("Model");
+            ImGui::SetNextItemWidth(300.0f);
+            int qidx = 1; // default turbo
+            if (std::string(state_.translation_config().qwen_model.data()).find("qwen-mt-plus") == 0) qidx = 0;
+            const char* qwen_models[] = { "qwen-mt-plus", "qwen-mt-turbo" };
+            if (ImGui::Combo("##qwen_model", &qidx, qwen_models, IM_ARRAYSIZE(qwen_models)))
+            {
+                const char* sel = qwen_models[qidx];
+                std::snprintf(state_.translation_config().qwen_model.data(), state_.translation_config().qwen_model.size(), "%s", sel);
+                model_changed = true;
+            }
+
+            ImGui::TextUnformatted("API Key");
+            ImGui::SetNextItemWidth(300.0f);
+            qwen_key_changed = ImGui::InputText("##qwen_key", state_.translation_config().qwen_api_key.data(), state_.translation_config().qwen_api_key.size(), ImGuiInputTextFlags_Password);
+        }
+        else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Niutrans)
+        {
+            ImGui::TextUnformatted("API Key");
+            ImGui::SetNextItemWidth(300.0f);
+            niutrans_key_changed = ImGui::InputText("##niutrans_key", state_.translation_config().niutrans_api_key.data(), state_.translation_config().niutrans_api_key.size(), ImGuiInputTextFlags_Password);
         }
         
         // Auto-apply changes if enabled
@@ -696,21 +750,43 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             case TranslationConfig::TargetLang::ZH_CN: test_cfg.target_lang = "zh-cn"; break;
             case TranslationConfig::TargetLang::ZH_TW: test_cfg.target_lang = "zh-tw"; break;
             }
-            test_cfg.base_url = state_.translation_config().openai_base_url.data();
-            test_cfg.model = state_.translation_config().openai_model.data();
             if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
             {
+                test_cfg.base_url = state_.translation_config().openai_base_url.data();
+                test_cfg.model = state_.translation_config().openai_model.data();
                 test_cfg.api_key = state_.translation_config().openai_api_key.data();
             }
             else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Google)
             {
+                test_cfg.base_url.clear();
+                test_cfg.model.clear();
                 test_cfg.api_key = state_.translation_config().google_api_key.data();
+            }
+            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
+            {
+                test_cfg.base_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+                test_cfg.model = "glm-4-flash";
+                test_cfg.api_key = state_.translation_config().zhipu_api_key.data();
+            }
+            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Niutrans)
+            {
+                // Use default endpoint; only API key is required
+                test_cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
+                test_cfg.model.clear();
+                test_cfg.api_key = state_.translation_config().niutrans_api_key.data();
             }
             
             auto temp_translator = translate::createTranslator(test_cfg.backend);
             if (temp_translator && temp_translator->init(test_cfg))
             {
                 test_result_ = temp_translator->testConnection();
+            }
+            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::QwenMT)
+            {
+                test_cfg.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+                const char* qm = state_.translation_config().qwen_model.data();
+                test_cfg.model = (qm && qm[0]) ? qm : "qwen-mt-turbo";
+                test_cfg.api_key = state_.translation_config().qwen_api_key.data();
             }
             else
             {
@@ -737,7 +813,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         const char* status = (translator_ && translator_->isReady()) ? "Ready" : "Not Ready";
         ImGui::SameLine();
         ImGui::TextDisabled("Status: %s", status);
-        
+
         // Apply success hint (auto-clears after 5 seconds)
         if (apply_hint_timer_ > 0.0f)
         {
@@ -783,8 +859,6 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         ImGui::Unindent();
         ImGui::Spacing();
     }
-
-    renderStatusSection();
 
     // DEBUG SECTION
     if (ImGui::CollapsingHeader("Debug"))
@@ -1028,32 +1102,4 @@ void DialogWindow::rename(const char* new_name)
     name_ = new_name;
     window_label_ = name_ + "###" + id_suffix_;
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
-}
-
-void DialogWindow::renderStatusSection()
-{
-    if (ImGui::CollapsingHeader("Status"))
-    {
-        ImGui::Indent();
-
-        ImGui::TextUnformatted("Translation:");
-        ImGui::SameLine();
-        if (!state_.translation_config().translate_enabled)
-        {
-            ImGui::TextColored(UITheme::disabledColor(), "● Disabled");
-        }
-        else if (translator_ && translator_->isReady())
-        {
-            ImGui::TextColored(UITheme::successColor(), "● OK");
-        }
-        else
-        {
-            const char* error_msg = (translator_ && translator_->lastError() && translator_->lastError()[0]) ? translator_->lastError() : "Not Ready";
-            ImGui::TextColored(UITheme::errorColor(), "● %s", error_msg);
-        }
-
-
-        ImGui::Unindent();
-        ImGui::Spacing();
-    }
 }

@@ -21,7 +21,10 @@ struct TranslationConfig
     enum class TranslationBackend
     {
         OpenAI = 0,
-        Google = 1
+        Google = 1,
+        ZhipuGLM = 2,
+        QwenMT = 3,
+        Niutrans = 4
     };
 
     bool translate_enabled;
@@ -32,6 +35,17 @@ struct TranslationConfig
     std::array<char, ModelSize> openai_model{};
     std::array<char, ApiKeySize> openai_api_key{};
     std::array<char, ApiKeySize> google_api_key{};
+    // Zhipu (BigModel) GLM settings
+    std::array<char, URLSize>   zhipu_base_url{};
+    std::array<char, ModelSize> zhipu_model{};
+    std::array<char, ApiKeySize> zhipu_api_key{};
+
+    // Qwen-MT (Aliyun) settings
+    std::array<char, ModelSize> qwen_model{};
+    std::array<char, ApiKeySize> qwen_api_key{};
+
+    // Niutrans settings
+    std::array<char, ApiKeySize> niutrans_api_key{};
 
     void applyDefaults()
     {
@@ -46,5 +60,17 @@ struct TranslationConfig
         openai_model.fill('\0');
         openai_api_key.fill('\0');
         google_api_key.fill('\0');
+
+        zhipu_base_url.fill('\0');
+        // Default to BigModel domain; translator will append path if needed
+        std::snprintf(zhipu_base_url.data(), zhipu_base_url.size(), "%s", "https://open.bigmodel.cn");
+        zhipu_model.fill('\0');
+        zhipu_api_key.fill('\0');
+
+        qwen_model.fill('\0');
+        std::snprintf(qwen_model.data(), qwen_model.size(), "%s", "qwen-mt-turbo");
+        qwen_api_key.fill('\0');
+
+        niutrans_api_key.fill('\0');
     }
 };

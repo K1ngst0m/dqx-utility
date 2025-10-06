@@ -10,7 +10,10 @@ namespace translate
     enum class Backend
     {
         OpenAI = 0,
-        Google = 1
+        Google = 1,
+        ZhipuGLM = 2,
+        QwenMT = 3,
+        Niutrans = 4
     };
 
     struct TranslatorConfig

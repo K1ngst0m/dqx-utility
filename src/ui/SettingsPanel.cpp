@@ -53,10 +53,9 @@ void SettingsPanel::render(bool& open)
     {
         renderStatusSection();
 
-        renderWindowManagementSection();
-
         renderAppearanceSection();
 
+        renderWindowManagementSection();
         
         if (ImGui::CollapsingHeader("Debug"))
         {
@@ -398,7 +397,7 @@ void SettingsPanel::renderStatusSection()
 
 void SettingsPanel::renderWindowManagementSection()
 {
-    if (ImGui::CollapsingHeader("Window Management", ImGuiTreeNodeFlags_DefaultOpen))
+    if (ImGui::CollapsingHeader("Window Management"))
     {
         ImGui::TextUnformatted("Window Type");
         renderTypeSelector();
