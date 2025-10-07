@@ -58,6 +58,10 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     t.insert("font_size", state.ui_state().font_size);
     t.insert("vignette_thickness", state.ui_state().vignette_thickness);
     t.insert("font_path", std::string(state.ui_state().font_path.data()));
+    
+    // Fade settings
+    t.insert("fade_enabled", state.ui_state().fade_enabled);
+    t.insert("fade_timeout", state.ui_state().fade_timeout);
 
     return t;
 }
@@ -116,6 +120,10 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
     if (auto v = t["vignette_thickness"].value<double>()) state.ui_state().vignette_thickness = static_cast<float>(*v);
     if (auto v = t["font_path"].value<std::string>())
         std::snprintf(state.ui_state().font_path.data(), state.ui_state().font_path.size(), "%s", v->c_str());
+    
+    // Fade settings
+    if (auto v = t["fade_enabled"].value<bool>()) state.ui_state().fade_enabled = *v;
+    if (auto v = t["fade_timeout"].value<double>()) state.ui_state().fade_timeout = static_cast<float>(*v);
 
     return true;
 }
@@ -176,6 +184,8 @@ bool ConfigManager::saveAll()
     global.insert("borderless_windows", borderless_windows_);
     global.insert("app_mode", static_cast<int>(app_mode_));
     global.insert("ui_language", ui_language_);
+    global.insert("dialog_fade_enabled", dialog_fade_enabled_);
+    global.insert("dialog_fade_timeout", dialog_fade_timeout_);
     root.insert("global", std::move(global));
 
     auto windows = registry_->windowsByType(UIWindowType::Dialog);
@@ -243,6 +253,10 @@ bool ConfigManager::loadAndApply()
                 app_mode_ = static_cast<AppMode>(*v);
             if (auto v = (*g)["ui_language"].value<std::string>())
                 ui_language_ = *v;
+            if (auto v = (*g)["dialog_fade_enabled"].value<bool>())
+                dialog_fade_enabled_ = *v;
+            if (auto v = (*g)["dialog_fade_timeout"].value<double>())
+                dialog_fade_timeout_ = static_cast<float>(*v);
         }
 
         if (auto* arr = root["dialogs"].as_array())

@@ -70,6 +70,12 @@ label = "UI Language"
 option_en = "English"
 option_zh_cn = "Simplified Chinese"
 
+[settings.dialog_fade]
+label = "Dialog Auto-Fade"
+enabled = "Enable Auto-fade"
+timeout = "Fade Timeout (seconds)"
+hint = "Dialogs will fade out after inactivity. Hover or new text resets the timer."
+
 total = "Total: {count}"
 apply = "Apply"
 
@@ -144,6 +150,12 @@ border_thickness = "Border Thickness"
 dark_border_size = "Dark Border Size"
 background_opacity = "Background Opacity"
 font_size = "Font Size"
+
+[dialog.appearance.fade]
+label = "Auto-Fade"
+enabled = "Enable Auto-fade"
+timeout = "Fade Timeout (seconds)"
+hint = "Dialog will fade out after inactivity. Hover or new text resets."
 
 [dialog.translate]
 title = "Translate"

@@ -492,5 +492,35 @@ void SettingsPanel::renderAppearanceSection()
         {
             if (auto* cm = ConfigManager_Get()) cm->setAppMode(static_cast<ConfigManager::AppMode>(app_mode_idx));
         }
+        
+        ImGui::Separator();
+        ImGui::Spacing();
+        
+        // Dialog Auto-fade settings
+        ImGui::TextUnformatted(i18n::get("settings.dialog_fade.label"));
+        
+        bool fade_enabled = false;
+        float fade_timeout = 20.0f;
+        if (auto* cm = ConfigManager_Get())
+        {
+            fade_enabled = cm->getDialogFadeEnabled();
+            fade_timeout = cm->getDialogFadeTimeout();
+        }
+        
+        if (ImGui::Checkbox(i18n::get("settings.dialog_fade.enabled"), &fade_enabled))
+        {
+            if (auto* cm = ConfigManager_Get()) cm->setDialogFadeEnabled(fade_enabled);
+        }
+        
+        if (fade_enabled)
+        {
+            ImGui::TextUnformatted(i18n::get("settings.dialog_fade.timeout"));
+            ImGui::SetNextItemWidth(220.0f);
+            if (ImGui::SliderFloat("##fade_timeout_slider", &fade_timeout, 5.0f, 120.0f, "%.0fs"))
+            {
+                if (auto* cm = ConfigManager_Get()) cm->setDialogFadeTimeout(fade_timeout);
+            }
+            ImGui::TextColored(UITheme::disabledColor(), "%s", i18n::get("settings.dialog_fade.hint"));
+        }
     }
 }

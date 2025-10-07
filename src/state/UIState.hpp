@@ -28,6 +28,14 @@ struct UIState
     bool auto_scroll_to_new;
     bool is_docked;  // Cached docked state for context menu
 
+    // Auto-fade settings (per-dialog)
+    bool fade_enabled;
+    float fade_timeout;  // seconds
+    
+    // Auto-fade state
+    float last_activity_time;   // Time since last text append or mouse hover
+    float current_alpha_multiplier;  // Current fade multiplier (1.0 = fully visible, 0.0 = fully hidden)
+
     ImFont* font;
 
     void applyDefaults()
@@ -52,6 +60,11 @@ struct UIState
 
         auto_scroll_to_new = true;
         is_docked = false;
+        
+        fade_enabled = false;
+        fade_timeout = 20.0f;
+        last_activity_time = 0.0f;
+        current_alpha_multiplier = 1.0f;
         
         font = nullptr;
     }

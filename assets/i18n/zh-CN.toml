@@ -70,6 +70,12 @@ label = "界面语言"
 option_en = "英语"
 option_zh_cn = "简体中文"
 
+[settings.dialog_fade]
+label = "对话框自动淡出"
+enabled = "启用自动淡出"
+timeout = "淡出超时（秒）"
+hint = "对话框在无活动时将自动淡出。鼠标悬停或新文本将重置计时器。"
+
 total = "总计：{count}"
 apply = "应用"
 
@@ -144,6 +150,12 @@ border_thickness = "边框粗细"
 dark_border_size = "暗边大小"
 background_opacity = "背景不透明度"
 font_size = "字体大小"
+
+[dialog.appearance.fade]
+label = "自动淡出"
+enabled = "启用自动淡出"
+timeout = "淡出超时（秒）"
+hint = "对话框在无活动时将自动淡出。鼠标悬停或新文本将重置。"
 
 [dialog.translate]
 title = "翻译"

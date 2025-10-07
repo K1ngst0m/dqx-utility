@@ -279,6 +279,53 @@ void DialogWindow::renderDialog(ImGuiIO& io)
     state_.ui_state().padding.y        = std::clamp(state_.ui_state().padding.y, 4.0f, 80.0f);
     state_.ui_state().rounding         = std::clamp(state_.ui_state().rounding, 0.0f, 32.0f);
     state_.ui_state().border_thickness = std::clamp(state_.ui_state().border_thickness, 0.5f, 6.0f);
+    
+    // Auto-fade logic: update timer and calculate alpha multiplier (per-dialog setting)
+    bool fade_enabled = state_.ui_state().fade_enabled;
+    float fade_timeout = state_.ui_state().fade_timeout;
+    
+    if (fade_enabled)
+    {
+        // Initialize timer on first frame
+        if (state_.ui_state().last_activity_time == 0.0f)
+        {
+            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
+        }
+        
+        // Reset timer on new text append
+        if (appended_since_last_frame_)
+        {
+            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
+            state_.ui_state().current_alpha_multiplier = 1.0f;
+        }
+        
+        // Calculate time since last activity
+        float current_time = static_cast<float>(ImGui::GetTime());
+        float time_since_activity = current_time - state_.ui_state().last_activity_time;
+        
+        // Calculate fade effect
+        // Start fading at 75% of timeout (15s for 20s timeout)
+        // Complete fade at 100% of timeout (20s)
+        float fade_start = fade_timeout * 0.75f;
+        float fade_duration = fade_timeout * 0.25f;
+        
+        if (time_since_activity >= fade_start)
+        {
+            float fade_progress = (time_since_activity - fade_start) / fade_duration;
+            fade_progress = std::clamp(fade_progress, 0.0f, 1.0f);
+            
+            // Smooth fade curve (ease-in)
+            state_.ui_state().current_alpha_multiplier = 1.0f - (fade_progress * fade_progress);
+        }
+        else
+        {
+            state_.ui_state().current_alpha_multiplier = 1.0f;
+        }
+    }
+    else
+    {
+        state_.ui_state().current_alpha_multiplier = 1.0f;
+    }
 
     if (auto* cm = ConfigManager_Get())
     {
@@ -311,7 +358,9 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     ImGui::SetNextWindowSizeConstraints(ImVec2(200.0f, 80.0f), ImVec2(max_dialog_width, io.DisplaySize.y));
 
-    UITheme::pushDialogStyle(state_.ui_state().background_alpha, state_.ui_state().padding, state_.ui_state().rounding, state_.ui_state().border_thickness);
+    // Apply fade multiplier to background alpha and border
+    float effective_alpha = state_.ui_state().background_alpha * state_.ui_state().current_alpha_multiplier;
+    UITheme::pushDialogStyle(effective_alpha, state_.ui_state().padding, state_.ui_state().rounding, state_.ui_state().border_thickness, state_.ui_state().current_alpha_multiplier);
 
     ImGuiWindowFlags dialog_flags = ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoSavedSettings |
@@ -327,6 +376,15 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     if (ImGui::Begin(window_label_.c_str(), nullptr, dialog_flags))
     {
+        // Check if mouse is hovering over the dialog window
+        bool is_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+        if (fade_enabled && is_hovered)
+        {
+            // Reset fade timer on hover
+            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
+            state_.ui_state().current_alpha_multiplier = 1.0f;
+        }
+        
         // Soft vignette inside the dialog with rounded corners, no overlaps
         {
             float thickness = std::max(0.0f, state_.ui_state().vignette_thickness);
@@ -354,6 +412,8 @@ void DialogWindow::renderDialog(ImGuiIO& io)
                     // Smooth fade curve (ease-out), slightly stronger
                     float a = max_alpha * (1.0f - t);
                     a = a * a; // quadratic ease-out
+                    // Apply fade multiplier to vignette
+                    a *= state_.ui_state().current_alpha_multiplier;
                     if (a <= 0.0f) continue;
                     ImU32 col = IM_COL32(0, 0, 0, (int)(a * 255.0f));
                     dl->AddRect(pmin, pmax, col, r, 0, 1.0f);
@@ -456,32 +516,41 @@ void DialogWindow::renderDialog(ImGuiIO& io)
                 if (line_width > 5.0f)
                 {
                     float line_y = y + text_size.y * 0.5f;
+                    // Apply fade multiplier to separator color
+                    ImVec4 sep_color = UITheme::dialogSeparatorColor();
+                    sep_color.w *= state_.ui_state().current_alpha_multiplier;
+                    ImU32 sep_col_u32 = ImGui::ColorConvertFloat4ToU32(sep_color);
+                    
                     // Left line
                     draw_list->AddRectFilled(
                         ImVec2(x1, line_y), 
                         ImVec2(x1 + line_width, line_y + UITheme::dialogSeparatorThickness()), 
-                        ImGui::GetColorU32(UITheme::dialogSeparatorColor())
+                        sep_col_u32
                     );
                     // Right line
                     draw_list->AddRectFilled(
                         ImVec2(x2 - line_width, line_y), 
                         ImVec2(x2, line_y + UITheme::dialogSeparatorThickness()), 
-                        ImGui::GetColorU32(UITheme::dialogSeparatorColor())
+                        sep_col_u32
                     );
                 }
                 
-                // Draw centered NPC name text
+                // Draw centered NPC name text with fade
+                ImVec4 sep_text_color = UITheme::dialogSeparatorColor();
+                sep_text_color.w *= state_.ui_state().current_alpha_multiplier;
                 ImVec2 text_pos((x1 + x2 - text_size.x) * 0.5f, y);
-                draw_list->AddText(text_pos, ImGui::GetColorU32(UITheme::dialogSeparatorColor()), speaker.c_str());
+                draw_list->AddText(text_pos, ImGui::ColorConvertFloat4ToU32(sep_text_color), speaker.c_str());
                 
                 ImGui::Dummy(ImVec2(0.0f, text_size.y + UITheme::dialogSeparatorSpacing()));
             } else {
-                // Draw plain separator line for No_NPC or corrupted names
+                // Draw plain separator line for No_NPC or corrupted names with fade
                 float line_y = y;
+                ImVec4 sep_color = UITheme::dialogSeparatorColor();
+                sep_color.w *= state_.ui_state().current_alpha_multiplier;
                 draw_list->AddRectFilled(
                     ImVec2(x1, line_y), 
                     ImVec2(x2, line_y + UITheme::dialogSeparatorThickness()), 
-                    ImGui::GetColorU32(UITheme::dialogSeparatorColor())
+                    ImGui::ColorConvertFloat4ToU32(sep_color)
                 );
                 ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing() + UITheme::dialogSeparatorThickness()));
             }
@@ -494,9 +563,10 @@ void DialogWindow::renderDialog(ImGuiIO& io)
             const char* txt = state_.content_state().segments[i].data();
             float wrap_w = wrap_width;
 
-            // Colors
+            // Colors (apply fade multiplier)
             ImVec4 text_col_v4 = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-            ImU32 text_col = ImGui::GetColorU32(ImGuiCol_Text);
+            text_col_v4.w *= state_.ui_state().current_alpha_multiplier;
+            ImU32 text_col = ImGui::ColorConvertFloat4ToU32(text_col_v4);
             ImU32 outline_col = IM_COL32(0, 0, 0, (int)(text_col_v4.w * 255.0f));
 
             // Outline thickness scales slightly with font size (clamped)
@@ -723,6 +793,21 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         float min_font = std::max(8.0f, state_.ui_state().font_base_size * 0.5f);
         float max_font = state_.ui_state().font_base_size * 2.5f;
         font_changed = ImGui::SliderFloat("##dialog_font_size_slider", &state_.ui_state().font_size, min_font, max_font);
+        ImGui::Spacing();
+        
+        // Auto-fade settings
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::TextUnformatted(i18n::get("dialog.appearance.fade.label"));
+        ImGui::Checkbox(i18n::get("dialog.appearance.fade.enabled"), &state_.ui_state().fade_enabled);
+        
+        if (state_.ui_state().fade_enabled)
+        {
+            ImGui::TextUnformatted(i18n::get("dialog.appearance.fade.timeout"));
+            set_slider_width();
+            ImGui::SliderFloat("##fade_timeout_slider", &state_.ui_state().fade_timeout, 5.0f, 120.0f, "%.0fs");
+            ImGui::TextColored(UITheme::disabledColor(), "%s", i18n::get("dialog.appearance.fade.hint"));
+        }
         
         ImGui::Unindent();
         ImGui::Spacing();

@@ -17,7 +17,7 @@ void UITheme::popSettingsWindowStyle()
     ImGui::PopStyleVar(3);
 }
 
-void UITheme::pushDialogStyle(float background_alpha, const ImVec2& padding, float rounding, float border_thickness)
+void UITheme::pushDialogStyle(float background_alpha, const ImVec2& padding, float rounding, float border_thickness, float alpha_multiplier)
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, rounding);
@@ -27,7 +27,12 @@ void UITheme::pushDialogStyle(float background_alpha, const ImVec2& padding, flo
     ImVec4 dialog_bg = dialogBgColor();
     dialog_bg.w = background_alpha;
     ImGui::PushStyleColor(ImGuiCol_WindowBg, dialog_bg);
-    ImGui::PushStyleColor(ImGuiCol_Border, dialogBorderColor());
+    
+    // Apply fade multiplier to border color
+    ImVec4 border_color = dialogBorderColor();
+    border_color.w *= alpha_multiplier;
+    ImGui::PushStyleColor(ImGuiCol_Border, border_color);
+    
     ImGui::PushStyleColor(ImGuiCol_Text, dialogTextColor());
 }
 
