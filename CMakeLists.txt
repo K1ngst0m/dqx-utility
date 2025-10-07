@@ -406,9 +406,7 @@ function(_stage_package STAGE_DIR LANG_TEMPLATE)
     COMMAND ${CMAKE_COMMAND} -E make_directory "${STAGE_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqx_utility>" "${STAGE_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "${STAGE_DIR}/assets"
-    # Copy SDL3.dll from target output dir if present
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE_DIR:dqx_utility>/SDL3.dll" "${STAGE_DIR}/" || ""
-    # Place language-specific config as config.toml
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE_DIR:dqx_utility>/SDL3.dll" "${STAGE_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/assets/templates/${LANG_TEMPLATE}" "${STAGE_DIR}/config.toml"
     COMMAND ${CMAKE_COMMAND} -E touch "${STAGE_DIR}/.staged"
     DEPENDS dqx_utility
@@ -421,13 +419,13 @@ _stage_package("${_PACK_ZHCN_DIR}" "config.zh-CN.toml")
 
 # Create archives
 add_custom_target(package_en
-  COMMAND ${CMAKE_COMMAND} -E tar cfv "${CMAKE_BINARY_DIR}/dqx-utility-en-${PROJECT_VERSION}-${_OS_ARCH}.zip" --format=zip "${_PACK_EN_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E chdir "${_PACK_EN_DIR}" ${CMAKE_COMMAND} -E tar cf "${CMAKE_BINARY_DIR}/dqx-utility-en-${PROJECT_VERSION}-${_OS_ARCH}.zip" --format=zip dqx-utility.exe SDL3.dll config.toml assets/
   DEPENDS "${_PACK_EN_DIR}/.staged"
   COMMENT "Packaging EN ZIP"
 )
 
 add_custom_target(package_zh_CN
-  COMMAND ${CMAKE_COMMAND} -E tar cfv "${CMAKE_BINARY_DIR}/dqx-utility-zh-CN-${PROJECT_VERSION}-${_OS_ARCH}.zip" --format=zip "${_PACK_ZHCN_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E chdir "${_PACK_ZHCN_DIR}" ${CMAKE_COMMAND} -E tar cf "${CMAKE_BINARY_DIR}/dqx-utility-zh-CN-${PROJECT_VERSION}-${_OS_ARCH}.zip" --format=zip dqx-utility.exe SDL3.dll config.toml assets/
   DEPENDS "${_PACK_ZHCN_DIR}/.staged"
   COMMENT "Packaging zh-CN ZIP"
 )
