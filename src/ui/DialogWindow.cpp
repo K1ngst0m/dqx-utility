@@ -10,6 +10,8 @@
 #include <cstring>
 #include <cmath>
 #include <ctime>
+#include <sstream>
+#include <iomanip>
 
 #include "translate/ITranslator.hpp"
 #include "translate/LabelProcessor.hpp"
@@ -119,9 +121,13 @@ void DialogWindow::applyPending()
             std::lock_guard<std::mutex> lock(pending_mutex_);
             for (auto& m : msgs)
             {
-                if (!m.text.empty() && !is_blank(m.text))
+                // Accept messages with text OR valid NPC names
+                bool hasValidText = !m.text.empty() && !is_blank(m.text);
+                bool hasValidSpeaker = !m.speaker.empty() && m.speaker != "No_NPC";
+                
+                if (hasValidText || hasValidSpeaker)
                 {
-                    PendingMsg pm; pm.text = std::move(m.text); pm.lang = std::move(m.lang); pm.seq = m.seq;
+                    PendingMsg pm; pm.text = std::move(m.text); pm.lang = std::move(m.lang); pm.speaker = std::move(m.speaker); pm.seq = m.seq;
                     pending_.push_back(std::move(pm));
                 }
             }
@@ -140,8 +146,11 @@ void DialogWindow::applyPending()
     {
         if (state_.translation_config().translate_enabled)
         {
+            // Handle empty text for NPC-only messages
+            std::string text_to_process = m.text.empty() ? " " : m.text; // Use space for empty text
+            
             // Process labels before translation
-            std::string processed_text = label_processor_->processText(m.text);
+            std::string processed_text = label_processor_->processText(text_to_process);
 
             auto submit = session_.submit(
                 processed_text,
@@ -152,6 +161,7 @@ void DialogWindow::applyPending()
             if (submit.kind == TranslateSession::SubmitKind::Cached)
             {
                 state_.content_state().segments.emplace_back();
+                state_.content_state().speakers.push_back(m.speaker);
                 safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), submit.text.c_str());
                 if (m.seq > 0) last_applied_seq_ = m.seq;
                 continue;
@@ -172,6 +182,7 @@ void DialogWindow::applyPending()
             if (show_placeholder)
             {
                 state_.content_state().segments.emplace_back();
+                state_.content_state().speakers.push_back(m.speaker);
                 auto& buf = state_.content_state().segments.back();
                 std::string placeholder = std::string(waiting_text_for_lang(state_.translation_config().target_lang_enum)) + " .";
                 safe_copy_utf8(buf.data(), buf.size(), placeholder);
@@ -186,7 +197,9 @@ void DialogWindow::applyPending()
         else
         {
             state_.content_state().segments.emplace_back();
-            safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), m.text);
+            state_.content_state().speakers.push_back(m.speaker);
+            std::string text_to_copy = m.text.empty() ? " " : m.text;
+            safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), text_to_copy);
         }
         if (m.seq > 0)
         {
@@ -229,6 +242,7 @@ void DialogWindow::render(ImGuiIO& io)
                 else
                 {
                     state_.content_state().segments.emplace_back();
+                    state_.content_state().speakers.emplace_back();  // No speaker info for late-arriving translations
                     safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), ev.text);
                 }
             }
@@ -378,8 +392,90 @@ void DialogWindow::renderDialog(ImGuiIO& io)
             }
         }
 
+        // Filter out No_NPC and names containing corruption characters
+        auto isValidNpcName = [](const std::string& name) -> bool {
+            if (name.empty() || name == "No_NPC") return false;
+            
+            // Filter names containing corruption characters
+            if (name.find('?') != std::string::npos ||
+                name.find('(') != std::string::npos ||
+                name.find(')') != std::string::npos ||
+                name.find('<') != std::string::npos ||
+                name.find('>') != std::string::npos) {
+                return false;
+            }
+            
+            return true;
+        };
+        
+        
         for (size_t i = 0; i < state_.content_state().segments.size(); ++i)
         {
+            // Determine if we have a valid NPC name for this segment
+            bool hasValidNpc = false;
+            std::string currentSpeaker;
+            if (i < state_.content_state().speakers.size()) {
+                currentSpeaker = state_.content_state().speakers[i];
+                hasValidNpc = isValidNpcName(currentSpeaker);
+                
+            }
+            
+            // Draw separator (either with NPC name or plain line)
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            ImVec2 win_pos = ImGui::GetWindowPos();
+            ImVec2 cr_min = ImGui::GetWindowContentRegionMin();
+            ImVec2 cr_max = ImGui::GetWindowContentRegionMax();
+            float content_width = cr_max.x - cr_min.x;
+            float x1 = win_pos.x + cr_min.x;
+            float x2 = win_pos.x + cr_max.x;
+            
+            ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing()));
+            float y = ImGui::GetCursorScreenPos().y;
+            
+            if (hasValidNpc) {
+                // Draw NPC name separator
+                const std::string& speaker = currentSpeaker;
+                
+                // Calculate text width for centering
+                ImVec2 text_size = ImGui::CalcTextSize(speaker.c_str());
+                float padding = 10.0f;
+                float text_area_width = text_size.x + padding * 2.0f;
+                float line_width = (content_width - text_area_width) * 0.5f;
+                
+                // Only draw separator lines if there's enough space
+                if (line_width > 5.0f)
+                {
+                    float line_y = y + text_size.y * 0.5f;
+                    // Left line
+                    draw_list->AddRectFilled(
+                        ImVec2(x1, line_y), 
+                        ImVec2(x1 + line_width, line_y + UITheme::dialogSeparatorThickness()), 
+                        ImGui::GetColorU32(UITheme::dialogSeparatorColor())
+                    );
+                    // Right line
+                    draw_list->AddRectFilled(
+                        ImVec2(x2 - line_width, line_y), 
+                        ImVec2(x2, line_y + UITheme::dialogSeparatorThickness()), 
+                        ImGui::GetColorU32(UITheme::dialogSeparatorColor())
+                    );
+                }
+                
+                // Draw centered NPC name text
+                ImVec2 text_pos((x1 + x2 - text_size.x) * 0.5f, y);
+                draw_list->AddText(text_pos, ImGui::GetColorU32(UITheme::dialogSeparatorColor()), speaker.c_str());
+                
+                ImGui::Dummy(ImVec2(0.0f, text_size.y + UITheme::dialogSeparatorSpacing()));
+            } else {
+                // Draw plain separator line for No_NPC or corrupted names
+                float line_y = y;
+                draw_list->AddRectFilled(
+                    ImVec2(x1, line_y), 
+                    ImVec2(x2, line_y + UITheme::dialogSeparatorThickness()), 
+                    ImGui::GetColorU32(UITheme::dialogSeparatorColor())
+                );
+                ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing() + UITheme::dialogSeparatorThickness()));
+            }
+            
             // Draw outlined text: render 8 shadow passes around the text, then the main text on top.
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -411,19 +507,6 @@ void DialogWindow::renderDialog(ImGuiIO& io)
             // Advance layout by the wrapped text height
             ImVec2 text_sz = ImGui::CalcTextSize(txt, nullptr, false, wrap_w);
             ImGui::Dummy(ImVec2(0.0f, text_sz.y));
-            if (i + 1 < state_.content_state().segments.size())
-            {
-                ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing()));
-                ImDrawList* draw_list = ImGui::GetWindowDrawList();
-                ImVec2 win_pos = ImGui::GetWindowPos();
-                ImVec2 cr_min = ImGui::GetWindowContentRegionMin();
-                ImVec2 cr_max = ImGui::GetWindowContentRegionMax();
-                float x1 = win_pos.x + cr_min.x;
-                float x2 = win_pos.x + cr_max.x;
-                float y  = ImGui::GetCursorScreenPos().y;
-                draw_list->AddRectFilled(ImVec2(x1, y), ImVec2(x2, y + UITheme::dialogSeparatorThickness()), ImGui::GetColorU32(UITheme::dialogSeparatorColor()));
-                ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing() + UITheme::dialogSeparatorThickness()));
-            }
         }
 
         if (active_font)
@@ -1028,7 +1111,11 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
                 ImGui::PopID();
             }
             if (to_delete >= 0 && to_delete < static_cast<int>(state_.content_state().segments.size()))
+            {
                 state_.content_state().segments.erase(state_.content_state().segments.begin() + to_delete);
+                if (to_delete < static_cast<int>(state_.content_state().speakers.size()))
+                    state_.content_state().speakers.erase(state_.content_state().speakers.begin() + to_delete);
+            }
         }
         ImGui::EndChild();
 
@@ -1071,6 +1158,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
                 if (state_.content_state().append_buffer[0] != '\0')
                 {
                     state_.content_state().segments.emplace_back();
+                    state_.content_state().speakers.emplace_back();  // No speaker for manual appends
                     safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), state_.content_state().append_buffer.data());
                     state_.content_state().append_buffer[0] = '\0';
                 }

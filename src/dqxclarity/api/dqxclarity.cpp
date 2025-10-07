@@ -154,7 +154,7 @@ bool Engine::start_hook(StartPolicy policy) {
         DialogMessage msg;
         msg.seq = ++impl_->seq;
         msg.text = impl_->hook->GetLastDialogText();
-        msg.speaker.clear();
+        msg.speaker = impl_->hook->GetLastNpcName();
         msg.lang.clear();
         if (!msg.text.empty()) {
           impl_->ring.try_push(std::move(msg));

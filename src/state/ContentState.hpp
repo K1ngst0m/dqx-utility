@@ -2,6 +2,7 @@
 
 #include <array>
 #include <vector>
+#include <string>
 
 struct ContentState
 {
@@ -10,6 +11,7 @@ struct ContentState
     static constexpr std::size_t EntryBufferSize = 2048;
 
     std::vector<std::array<char, EntryBufferSize>> segments;
+    std::vector<std::string> speakers;  // NPC names parallel to segments
     std::array<char, EntryBufferSize> append_buffer{};
     int editing_index;
     std::array<char, BodyBufferSize> edit_buffer{};
@@ -19,6 +21,8 @@ struct ContentState
         segments.clear();
         segments.emplace_back();
         segments.back().fill('\0');
+        speakers.clear();
+        speakers.emplace_back();
         
         append_buffer.fill('\0');
         editing_index = -1;
