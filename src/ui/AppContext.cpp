@@ -360,6 +360,12 @@ void AppContext::getWindowPosition(int& x, int& y)
     SDL_GetWindowPosition(window_, &x, &y);
 }
 
+void AppContext::getWindowSize(int& w, int& h)
+{
+    if (!window_) { w = h = 0; return; }
+    SDL_GetWindowSize(window_, &w, &h);
+}
+
 SDL_HitTestResult SDLCALL AppContext::HitTestCallback(SDL_Window* win, const SDL_Point* area, void* data)
 {
     AppContext* self = reinterpret_cast<AppContext*>(data);

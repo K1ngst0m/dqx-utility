@@ -34,6 +34,7 @@ public:
     // Move window on screen
     void setWindowPosition(int x, int y);
     void getWindowPosition(int& x, int& y);
+    void getWindowSize(int& w, int& h);
 
     // Enable/disable OS-native drag/resize hit-testing for borderless windows
     void enableHitTest(bool enable, int drag_height_px = 28, int border_px = 8);

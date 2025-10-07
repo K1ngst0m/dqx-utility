@@ -259,10 +259,10 @@ int main(int argc, char** argv)
         {
             if (current_mode == ConfigManager::AppMode::Mini)
             {
-                // Mini mode: borderless 400x800 window, enable OS-native drag/resize hit-test
+                // Mini mode: borderless 600x800 window
                 app.setWindowBorderless(true);
                 app.restoreWindow();
-                app.setWindowSize(400, 800);
+                app.setWindowSize(600, 800);
             }
             else if (current_mode == ConfigManager::AppMode::Borderless)
             {
@@ -330,7 +330,54 @@ int main(int argc, char** argv)
         }
         DockState::SetDockspace(dockspace_id);
 
-        // No special OS hit-test or native move in Normal/Borderless; Mini mode uses styled container docking only
+        // Mini-mode: Alt-drag anywhere to move window (using native OS drag)
+        if (cfg_mgr.getAppMode() == ConfigManager::AppMode::Mini)
+        {
+            ImGuiIO& io2 = ImGui::GetIO();
+            
+            if (io2.KeyAlt)
+            {
+                // Use viewport-relative mouse coordinates
+                ImGuiViewport* vp = ImGui::GetMainViewport();
+                ImVec2 mp = ImGui::GetMousePos();
+                ImVec2 vp_min = vp->Pos;
+                ImVec2 vp_max = ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y);
+                bool inside = (mp.x >= vp_min.x && mp.x < vp_max.x && mp.y >= vp_min.y && mp.y < vp_max.y);
+                
+                if (inside)
+                {
+                    // Show move cursor when Alt is held inside the window
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                    
+                    // Trigger native OS window drag on Alt+Click (only once at start)
+                    static bool alt_drag_triggered = false;
+                    if (!alt_drag_triggered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                    {
+                        PLOG_INFO << "[Alt-Drag] Triggering native OS window drag";
+#ifdef _WIN32
+                        // Windows: Use native window dragging via WM_NCLBUTTONDOWN
+                        SDL_Window* sdl_win = app.window();
+                        if (sdl_win)
+                        {
+                            HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_win), SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+                            if (hwnd)
+                            {
+                                ReleaseCapture();
+                                SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+                            }
+                        }
+#endif
+                        alt_drag_triggered = true;
+                    }
+                    
+                    // Reset trigger when mouse released
+                    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+                    {
+                        alt_drag_triggered = false;
+                    }
+                }
+            }
+        }
 
         for (auto& window : registry.windows())
         {
