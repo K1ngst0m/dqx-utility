@@ -289,8 +289,8 @@ void DialogWindow::renderDialog(ImGuiIO& io)
         }
         else if (cm->getAppMode() == ConfigManager::AppMode::Mini)
         {
-            ImGuiCond cond = DockState::ShouldReDock() ? ImGuiCond_Always : ImGuiCond_Once;
-            ImGui::SetNextWindowDockID(DockState::GetDockspace(), cond);
+            // Lock dialog into the dockspace while in Mini mode
+            ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
         }
     }
 
@@ -313,9 +313,17 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     UITheme::pushDialogStyle(state_.ui_state().background_alpha, state_.ui_state().padding, state_.ui_state().rounding, state_.ui_state().border_thickness);
 
-    const ImGuiWindowFlags dialog_flags = ImGuiWindowFlags_NoTitleBar |
+    ImGuiWindowFlags dialog_flags = ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoCollapse;
+
+    if (auto* cm = ConfigManager_Get())
+    {
+        if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        {
+            dialog_flags |= ImGuiWindowFlags_NoMove;
+        }
+    }
 
     if (ImGui::Begin(window_label_.c_str(), nullptr, dialog_flags))
     {
@@ -401,6 +409,8 @@ void DialogWindow::renderDialog(ImGuiIO& io)
                 name.find('(') != std::string::npos ||
                 name.find(')') != std::string::npos ||
                 name.find('<') != std::string::npos ||
+                name.find('_') != std::string::npos ||
+                name.find('^') != std::string::npos ||
                 name.find('>') != std::string::npos) {
                 return false;
             }

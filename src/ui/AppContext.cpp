@@ -11,6 +11,9 @@
 #include <algorithm>
 #include "ui/Localization.hpp"
 #include "UITheme.hpp"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 // Constructs an empty context waiting for initialization.
 AppContext::AppContext() = default;
@@ -344,3 +347,104 @@ void AppContext::setWindowSize(int w, int h)
     if (!window_) return;
     SDL_SetWindowSize(window_, w, h);
 }
+
+void AppContext::setWindowPosition(int x, int y)
+{
+    if (!window_) return;
+    SDL_SetWindowPosition(window_, x, y);
+}
+
+void AppContext::getWindowPosition(int& x, int& y)
+{
+    if (!window_) { x = y = 0; return; }
+    SDL_GetWindowPosition(window_, &x, &y);
+}
+
+SDL_HitTestResult SDLCALL AppContext::HitTestCallback(SDL_Window* win, const SDL_Point* area, void* data)
+{
+    AppContext* self = reinterpret_cast<AppContext*>(data);
+    if (!self || !self->hit_test_enabled_) return SDL_HITTEST_NORMAL;
+
+    int w = 0, h = 0;
+    SDL_GetWindowSize(win, &w, &h);
+    const int x = area->x;
+    const int y = area->y;
+    const int B = self->hit_border_px_;
+    const int T = self->hit_drag_height_px_;
+    const int S = self->hit_drag_side_px_;
+
+    // Corners first (resize gets priority over drag)
+    if (x < B && y < B) return SDL_HITTEST_RESIZE_TOPLEFT;
+    if (x >= w - B && y < B) return SDL_HITTEST_RESIZE_TOPRIGHT;
+    if (x < B && y >= h - B) return SDL_HITTEST_RESIZE_BOTTOMLEFT;
+    if (x >= w - B && y >= h - B) return SDL_HITTEST_RESIZE_BOTTOMRIGHT;
+
+    // Edges
+    if (y < B) return SDL_HITTEST_RESIZE_TOP;
+    if (y >= h - B) return SDL_HITTEST_RESIZE_BOTTOM;
+    if (x < B) return SDL_HITTEST_RESIZE_LEFT;
+    if (x >= w - B) return SDL_HITTEST_RESIZE_RIGHT;
+
+    // Drag region (top bar) only at left/right sides to keep tab clicks working in the center
+    if (y < T)
+    {
+        if (x < S || x >= (w - S))
+            return SDL_HITTEST_DRAGGABLE;
+    }
+
+    return SDL_HITTEST_NORMAL;
+}
+
+void AppContext::enableHitTest(bool enable, int drag_height_px, int border_px)
+{
+    hit_test_enabled_ = enable;
+    hit_drag_height_px_ = drag_height_px;
+    hit_border_px_ = border_px;
+    if (!window_) return;
+    SDL_SetWindowResizable(window_, true);
+    (void)SDL_SetWindowHitTest(window_, enable ? &AppContext::HitTestCallback : nullptr, enable ? this : nullptr);
+}
+
+void AppContext::setHitTestDragHeight(int drag_height_px)
+{
+    hit_drag_height_px_ = drag_height_px;
+}
+
+void AppContext::setHitTestBorder(int border_px)
+{
+    hit_border_px_ = border_px;
+}
+
+void AppContext::setHitTestSideMargin(int side_margin_px)
+{
+    hit_drag_side_px_ = side_margin_px;
+}
+
+#ifdef _WIN32
+static HWND get_hwnd_from_sdl(SDL_Window* w)
+{
+    if (!w) return nullptr;
+    SDL_PropertiesID props = SDL_GetWindowProperties(w);
+    void* hwnd_ptr = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+    return reinterpret_cast<HWND>(hwnd_ptr);
+}
+
+void AppContext::nativeNCClick(int ht_code)
+{
+    if (!window_) return;
+    HWND hwnd = get_hwnd_from_sdl(window_);
+    if (!hwnd) return;
+    ReleaseCapture();
+    SendMessage(hwnd, WM_NCLBUTTONDOWN, static_cast<WPARAM>(ht_code), 0);
+}
+
+void AppContext::beginNativeMove() { nativeNCClick(HTCAPTION); }
+void AppContext::beginNativeResizeLeft() { nativeNCClick(HTLEFT); }
+void AppContext::beginNativeResizeRight() { nativeNCClick(HTRIGHT); }
+void AppContext::beginNativeResizeTop() { nativeNCClick(HTTOP); }
+void AppContext::beginNativeResizeBottom() { nativeNCClick(HTBOTTOM); }
+void AppContext::beginNativeResizeTopLeft() { nativeNCClick(HTTOPLEFT); }
+void AppContext::beginNativeResizeTopRight() { nativeNCClick(HTTOPRIGHT); }
+void AppContext::beginNativeResizeBottomLeft() { nativeNCClick(HTBOTTOMLEFT); }
+void AppContext::beginNativeResizeBottomRight() { nativeNCClick(HTBOTTOMRIGHT); }
+#endif

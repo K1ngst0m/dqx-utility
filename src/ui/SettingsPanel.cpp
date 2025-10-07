@@ -55,8 +55,7 @@ void SettingsPanel::render(bool& open)
     {
         if (cm->getAppMode() == ConfigManager::AppMode::Mini)
         {
-            ImGuiCond cond = DockState::ShouldReDock() ? ImGuiCond_Always : ImGuiCond_Once;
-            ImGui::SetNextWindowDockID(DockState::GetDockspace(), cond);
+            ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
         }
     }
 
@@ -80,7 +79,12 @@ void SettingsPanel::render(bool& open)
     }
     UITheme::pushSettingsWindowStyle();
 
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+    if (auto* cm2 = ConfigManager_Get())
+    {
+        if (cm2->getAppMode() == ConfigManager::AppMode::Mini)
+            flags |= ImGuiWindowFlags_NoMove;
+    }
     if (ImGui::Begin((std::string(i18n::get("settings.title")) + "###global_settings").c_str(), &open, flags))
     {
         renderStatusSection();

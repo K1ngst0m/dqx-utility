@@ -259,8 +259,8 @@ int main(int argc, char** argv)
         {
             if (current_mode == ConfigManager::AppMode::Mini)
             {
-                // Mini mode: 400x800 windowed
-                app.setWindowBorderless(false);
+                // Mini mode: borderless 400x800 window, enable OS-native drag/resize hit-test
+                app.setWindowBorderless(true);
                 app.restoreWindow();
                 app.setWindowSize(400, 800);
             }
@@ -308,13 +308,29 @@ int main(int argc, char** argv)
         ImGuiID dockspace_id = 0;
         if (cfg_mgr.getAppMode() == ConfigManager::AppMode::Mini)
         {
-            dockspace_id = ImGui::DockSpaceOverViewport(
-                ImGui::GetID("DockSpace_Mini"),
-                ImGui::GetMainViewport(),
-                ImGuiDockNodeFlags_PassthruCentralNode
-            );
+            // Styled container window that fills the OS window client area
+            ImGuiViewport* vp = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(vp->Pos);
+            ImGui::SetNextWindowSize(vp->Size);
+            ImGuiWindowFlags container_flags = ImGuiWindowFlags_NoTitleBar |
+                                              ImGuiWindowFlags_NoCollapse |
+                                              ImGuiWindowFlags_NoResize |
+                                              ImGuiWindowFlags_NoSavedSettings |
+                                              ImGuiWindowFlags_NoMove |
+                                              ImGuiWindowFlags_NoScrollbar |
+                                              ImGuiWindowFlags_NoScrollWithMouse;
+            if (ImGui::Begin("MiniContainer###MiniContainer", nullptr, container_flags))
+            {
+                // Create internal dockspace with no splitting/resizing and no undocking
+                ImGuiDockNodeFlags dock_flags = ImGuiDockNodeFlags_NoSplit | ImGuiDockNodeFlags_NoResize | ImGuiDockNodeFlags_NoUndocking;
+                dockspace_id = ImGui::GetID("DockSpace_MiniContainer");
+                ImGui::DockSpace(dockspace_id, ImVec2(0, 0), dock_flags);
+            }
+            ImGui::End();
         }
         DockState::SetDockspace(dockspace_id);
+
+        // No special OS hit-test or native move in Normal/Borderless; Mini mode uses styled container docking only
 
         for (auto& window : registry.windows())
         {
