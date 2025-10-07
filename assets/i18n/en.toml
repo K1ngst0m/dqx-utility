@@ -37,8 +37,8 @@ game_label = "DQX Game:"
 locale_label = "Locale:"
 running = "Running"
 not_running = "Not Running"
-japanese = "Japanese"
-non_japanese = "Non-Japanese"
+japanese = "JP"
+non_japanese = "Non-JP"
 unknown = "Unknown"
 
 [settings.table]

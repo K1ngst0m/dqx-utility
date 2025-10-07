@@ -1,0 +1,54 @@
+# Chinese (Simplified) distribution defaults
+
+[global]
+ui_scale = 1.0
+append_logs = false
+borderless_windows = false
+ui_language = "zh-CN"   # UI language: en or zh-CN
+
+# One sample dialog window (copy to add more)
+[[dialogs]]
+name = "对话框 A"
+
+# Dialog UI defaults
+width = 580.0
+height = 220.0
+pos_x = 0.0
+pos_y = 0.0
+padding_x = 24.0
+padding_y = 18.0
+rounding = 16.0
+border_thickness = 2.0
+background_alpha = 0.78
+font_size = 28.0
+vignette_thickness = 12.0
+font_path = ""
+
+# Behavior
+auto_scroll_to_new = true
+
+# Translation settings
+translate_enabled = false           # 初始关闭；准备好后可在 UI 中启用
+auto_apply_changes = false
+translation_backend = 0             # 0=OpenAI, 1=Google, 2=Zhipu, 3=Qwen-MT, 4=Niutrans
+target_lang = "zh-cn"              # en-us, zh-cn, zh-tw
+
+# OpenAI-compatible
+openai_base_url = "https://api.openai.com"
+openai_model = ""
+openai_api_key = ""
+
+# Google
+google_api_key = ""
+
+# Zhipu GLM
+zhipu_base_url = "https://open.bigmodel.cn"
+zhipu_model = ""
+zhipu_api_key = ""
+
+# Qwen-MT
+qwen_model = "qwen-mt-turbo"
+qwen_api_key = ""
+
+# Niutrans
+niutrans_api_key = ""
