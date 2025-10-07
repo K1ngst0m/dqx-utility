@@ -1,3 +1,6 @@
+// Application main entry point
+// Handles initialization, main loop, and app mode management (Normal, Borderless, Mini)
+
 #include "AppContext.hpp"
 #include "FontManager.hpp"
 #include "SettingsPanel.hpp"
@@ -8,9 +11,11 @@
 #include "utils/CrashHandler.hpp"
 #include "ErrorDialog.hpp"
 #include "ui/Localization.hpp"
+#include "ui/DockState.hpp"
 #include "services/DQXClarityService.hpp"
 
 #include <SDL3/SDL.h>
+#include <imgui.h>
 #include <plog/Appenders/ConsoleAppender.h>
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Init.h>
@@ -19,10 +24,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <cstring>
 #include <toml++/toml.h>
-#include <imgui.h>
-#include <imgui_internal.h>
-#include "ui/DockState.hpp"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -30,15 +33,17 @@
 #endif
 #include <windows.h>
 #include <clocale>
-#include <fcntl.h>
-#include <io.h>
+
+// ============================================================================
+// Windows-specific helpers
+// ============================================================================
+
 static void SetupUtf8Console()
 {
     // Set Windows console to UTF-8 so Japanese text displays correctly
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
     
-    // Enable UTF-8 mode for console output
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hOut && hOut != INVALID_HANDLE_VALUE)
     {
@@ -49,10 +54,13 @@ static void SetupUtf8Console()
         }
     }
     
-    // Set C locale to UTF-8
     std::setlocale(LC_ALL, ".UTF-8");
 }
 #endif
+
+// ============================================================================
+// Logging and event handling
+// ============================================================================
 
 static void SDLCALL sdl_log_bridge(void* userdata, int category, SDL_LogPriority priority, const char* message)
 {
@@ -69,7 +77,10 @@ static void SDLCALL sdl_log_bridge(void* userdata, int category, SDL_LogPriority
     }
 }
 
-// Check if mouse is outside all dialog windows
+// ============================================================================
+// UI helper functions
+// ============================================================================
+
 static bool is_mouse_outside_dialogs(ImGuiIO& io, WindowRegistry& registry)
 {
     if (!ImGui::IsMousePosValid(&io.MousePos))
@@ -82,9 +93,11 @@ static bool is_mouse_outside_dialogs(ImGuiIO& io, WindowRegistry& registry)
         if (dialog)
         {
             const auto& state = dialog->state();
-            bool within_dialog = ImGui::IsMouseHoveringRect(state.ui_state().window_pos,
+            bool within_dialog = ImGui::IsMouseHoveringRect(
+                state.ui_state().window_pos,
                 ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
-                       state.ui_state().window_pos.y + state.ui_state().window_size.y), false);
+                       state.ui_state().window_pos.y + state.ui_state().window_size.y),
+                false);
             if (within_dialog)
                 return false;
         }
@@ -116,44 +129,195 @@ static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bo
     if (ImGui::BeginPopup("GlobalContextMenu"))
     {
         if (ImGui::MenuItem(i18n::get("menu.global_settings")))
-        {
-            if (!show_manager)
-                show_manager = true;
-        }
+            show_manager = true;
 
         if (ImGui::BeginMenu(i18n::get("menu.app_mode")))
         {
             if (auto* cm = ConfigManager_Get())
             {
                 auto mode = cm->getAppMode();
-                bool sel_normal = (mode == ConfigManager::AppMode::Normal);
-                bool sel_borderless = (mode == ConfigManager::AppMode::Borderless);
-                bool sel_mini = (mode == ConfigManager::AppMode::Mini);
-                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal)) cm->setAppMode(ConfigManager::AppMode::Normal);
-                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless)) cm->setAppMode(ConfigManager::AppMode::Borderless);
-                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, sel_mini)) cm->setAppMode(ConfigManager::AppMode::Mini);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, mode == ConfigManager::AppMode::Normal))
+                    cm->setAppMode(ConfigManager::AppMode::Normal);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, mode == ConfigManager::AppMode::Borderless))
+                    cm->setAppMode(ConfigManager::AppMode::Borderless);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, mode == ConfigManager::AppMode::Mini))
+                    cm->setAppMode(ConfigManager::AppMode::Mini);
             }
             ImGui::EndMenu();
         }
 
         ImGui::Separator();
         if (ImGui::MenuItem(i18n::get("menu.quit")))
-        {
             quit_requested = true;
-        }
         
         ImGui::EndPopup();
     }
 }
 
+// ============================================================================
+// App mode management
+// ============================================================================
 
-int main(int argc, char** argv)
+static void apply_app_mode_window_settings(AppContext& app, ConfigManager::AppMode mode)
 {
-    utils::CrashHandler::Initialize();
+    switch (mode)
+    {
+    case ConfigManager::AppMode::Mini:
+        app.setWindowBorderless(true);
+        app.restoreWindow();
+        app.setWindowSize(600, 800);
+        break;
+        
+    case ConfigManager::AppMode::Borderless:
+        app.setWindowBorderless(true);
+        app.maximizeWindow();
+        break;
+        
+    case ConfigManager::AppMode::Normal:
+        app.setWindowBorderless(false);
+        app.restoreWindow();
+        app.setWindowSize(1024, 800);
+        break;
+    }
+}
+
+static void restore_dialogs_from_mini_mode(WindowRegistry& registry)
+{
+    float y_offset = 0.0f;
+    for (auto& window : registry.windows())
+    {
+        if (!window || window->type() != UIWindowType::Dialog)
+            continue;
+            
+        if (auto* dw = dynamic_cast<DialogWindow*>(window.get()))
+        {
+            auto& ui = dw->state().ui_state();
+            ui.width = 800.0f;
+            ui.height = 600.0f;
+            ui.window_pos = ImVec2(0.0f, y_offset);
+            ui.pending_resize = true;
+            ui.pending_reposition = true;
+            y_offset += 40.0f;
+        }
+    }
+}
+
+static void handle_app_mode_change(AppContext& app, WindowRegistry& registry, 
+                                   ConfigManager::AppMode old_mode, ConfigManager::AppMode new_mode)
+{
+    apply_app_mode_window_settings(app, new_mode);
     
+    // When leaving Mini mode, restore dialog positions
+    if (old_mode == ConfigManager::AppMode::Mini && new_mode != ConfigManager::AppMode::Mini)
+    {
+        restore_dialogs_from_mini_mode(registry);
+    }
+    
+    DockState::RequestReDock();
+}
+
+// ============================================================================
+// Mini mode: Alt+Drag to move window
+// ============================================================================
+
+static void handle_mini_mode_alt_drag(AppContext& app)
+{
+    static bool drag_triggered = false;
+    
+    ImGuiIO& io = ImGui::GetIO();
+    
+    // Only enable drag when Alt key is held
+    if (io.KeyAlt)
+    {
+        // Show hand cursor when Alt is held
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        
+        // Trigger native OS window drag on Alt+Click (once per drag)
+        if (!drag_triggered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            PLOG_INFO << "[Mini-Drag] Starting native window drag (Alt+Drag)";
+#ifdef _WIN32
+            SDL_Window* sdl_win = app.window();
+            if (sdl_win)
+            {
+                HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_win), 
+                                                         SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+                if (hwnd)
+                {
+                    ReleaseCapture();
+                    SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+                }
+            }
+#endif
+            drag_triggered = true;
+        }
+    }
+    
+    // Reset drag trigger when mouse is released
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    {
+        drag_triggered = false;
+    }
+}
+
+// ============================================================================
+// Mini mode: Dockspace container setup
+// ============================================================================
+
+static ImGuiID setup_mini_mode_dockspace(WindowRegistry& registry)
+{
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(vp->Pos);
+    ImGui::SetNextWindowSize(vp->Size);
+    
+    // Get background alpha from first dialog (if any) to match transparency
+    float background_alpha = 1.0f;
+    auto dialogs = registry.windowsByType(UIWindowType::Dialog);
+    if (!dialogs.empty())
+    {
+        if (auto* dialog = dynamic_cast<DialogWindow*>(dialogs[0]))
+        {
+            background_alpha = dialog->state().ui_state().background_alpha;
+        }
+    }
+    
+    // Set window background to match dialog transparency
+    ImGui::SetNextWindowBgAlpha(background_alpha);
+    
+    ImGuiWindowFlags container_flags = 
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse;
+    
+    ImGuiID dockspace_id = 0;
+    if (ImGui::Begin("MiniContainer###MiniContainer", nullptr, container_flags))
+    {
+        ImGuiDockNodeFlags dock_flags = 
+            ImGuiDockNodeFlags_NoSplit | 
+            ImGuiDockNodeFlags_NoResize | 
+            ImGuiDockNodeFlags_NoUndocking;
+        
+        dockspace_id = ImGui::GetID("DockSpace_MiniContainer");
+        ImGui::DockSpace(dockspace_id, ImVec2(0, 0), dock_flags);
+    }
+    ImGui::End();
+    
+    return dockspace_id;
+}
+
+// ============================================================================
+// Application initialization
+// ============================================================================
+
+static bool initialize_logging(int argc, char** argv)
+{
     std::filesystem::create_directories("logs");
     
-    // Check config file for append_logs setting (parse without ImGui)
+    // Check config file for append_logs setting
     bool append_logs = true;
     try {
         std::ifstream ifs("config.toml");
@@ -169,21 +333,32 @@ int main(int argc, char** argv)
         // Ignore parse errors during early init
     }
     
-    // Check command-line override for append_logs
+    // Check command-line override
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--append-logs") == 0) {
             append_logs = true;
         }
     }
     
-    // Do not delete prior logs; keep appending to preserve crash context across runs
-    
-    // Initialize logging with console and file output
+    // Initialize plog with file and console output
+    static plog::RollingFileAppender<plog::TxtFormatter> file_appender("logs/run.log", 1024 * 1024 * 10, 3);
     static plog::ConsoleAppender<plog::TxtFormatter> console_appender;
-    plog::init(plog::info, "logs/run.log");
+    plog::init(plog::info, &file_appender);
     if (auto logger = plog::get())
         logger->addAppender(&console_appender);
+    
+    return true;
+}
 
+// ============================================================================
+// Main entry point
+// ============================================================================
+
+int main(int argc, char** argv)
+{
+    utils::CrashHandler::Initialize();
+    initialize_logging(argc, argv);
+    
 #ifdef _WIN32
     SetupUtf8Console();
 #endif
@@ -200,195 +375,88 @@ int main(int argc, char** argv)
     FontManager font_manager(io);
     WindowRegistry registry(font_manager, io);
 
-    // Init config manager and bind to registry
+    // Initialize config manager
     static ConfigManager cfg_mgr;
     ConfigManager_Set(&cfg_mgr);
     cfg_mgr.setRegistry(&registry);
-
-    // Load config at startup
     cfg_mgr.loadAtStartup();
-
-    // Initialize GUI localization with global setting (default "en")
+    
+    // Initialize localization
     i18n::init(cfg_mgr.getUILanguageCode());
     
+    // Create initial dialog if none exist
     if (registry.windowsByType(UIWindowType::Dialog).empty())
-    {
         registry.createDialogWindow();
-    }
-
+    
+    // UI components
     SettingsPanel settings_panel(registry);
     ErrorDialog error_dialog;
-
+    
+    // Application state
     bool show_manager = true;
     bool quit_requested = false;
-
-    Uint64 last_time = SDL_GetTicks();
     bool running = true;
+    Uint64 last_time = SDL_GetTicks();
     
-    // Always start in Normal mode to ensure consistent window layout
+    // Start in Normal mode for consistent layout
     cfg_mgr.setAppMode(ConfigManager::AppMode::Normal);
-    ConfigManager::AppMode last_app_mode = cfg_mgr.getAppMode();
-    
-    // Apply Normal mode window layout
-    app.setWindowBorderless(false);
-    app.restoreWindow();
-    app.setWindowSize(1024, 800);
+    apply_app_mode_window_settings(app, ConfigManager::AppMode::Normal);
+    ConfigManager::AppMode last_app_mode = ConfigManager::AppMode::Normal;
 
+    // ========================================================================
+    // Main loop
+    // ========================================================================
     while (running)
     {
+        // Frame timing
         Uint64 current_time = SDL_GetTicks();
         float delta_time = (current_time - last_time) / 1000.0f;
         last_time = current_time;
-
+        
+        // Process SDL events
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
             if (app.processEvent(event))
-            {
                 quit_requested = true;
-            }
         }
-
+        
         if (!running)
             break;
-
+        
         app.updateVignette(delta_time);
-
+        
+        // Handle app mode changes
         ConfigManager::AppMode current_mode = cfg_mgr.getAppMode();
         if (current_mode != last_app_mode)
         {
-            if (current_mode == ConfigManager::AppMode::Mini)
-            {
-                // Mini mode: borderless 600x800 window
-                app.setWindowBorderless(true);
-                app.restoreWindow();
-                app.setWindowSize(600, 800);
-            }
-            else if (current_mode == ConfigManager::AppMode::Borderless)
-            {
-                // Borderless: TRUE fullscreen (maximize)
-                app.setWindowBorderless(true);
-                app.maximizeWindow();
-            }
-            else if (current_mode == ConfigManager::AppMode::Normal)
-            {
-                // Normal: 1024x800 windowed
-                app.setWindowBorderless(false);
-                app.restoreWindow();
-                app.setWindowSize(1024, 800);
-            }
-            if (last_app_mode == ConfigManager::AppMode::Mini && current_mode != ConfigManager::AppMode::Mini)
-            {
-                float y_offset = 0.0f;
-                for (auto& window : registry.windows())
-                {
-                    if (!window) continue;
-                    if (window->type() == UIWindowType::Dialog)
-                    {
-                        if (auto* dw = dynamic_cast<DialogWindow*>(window.get()))
-                        {
-                            auto& ui = dw->state().ui_state();
-                            ui.width = 800.0f;
-                            ui.height = 600.0f;
-                            ui.window_pos = ImVec2(0.0f, y_offset);
-                            ui.pending_resize = true;
-                            ui.pending_reposition = true;
-                            y_offset += 40.0f;
-                        }
-                    }
-                }
-            }
-            // Request all windows to re-dock when mode changes
-            DockState::RequestReDock();
+            handle_app_mode_change(app, registry, last_app_mode, current_mode);
             last_app_mode = current_mode;
         }
-
+        
+        // Begin ImGui frame
         app.beginFrame();
-
+        
+        // Setup dockspace for Mini mode
         ImGuiID dockspace_id = 0;
-        if (cfg_mgr.getAppMode() == ConfigManager::AppMode::Mini)
-        {
-            // Styled container window that fills the OS window client area
-            ImGuiViewport* vp = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(vp->Pos);
-            ImGui::SetNextWindowSize(vp->Size);
-            ImGuiWindowFlags container_flags = ImGuiWindowFlags_NoTitleBar |
-                                              ImGuiWindowFlags_NoCollapse |
-                                              ImGuiWindowFlags_NoResize |
-                                              ImGuiWindowFlags_NoSavedSettings |
-                                              ImGuiWindowFlags_NoMove |
-                                              ImGuiWindowFlags_NoScrollbar |
-                                              ImGuiWindowFlags_NoScrollWithMouse;
-            if (ImGui::Begin("MiniContainer###MiniContainer", nullptr, container_flags))
-            {
-                // Create internal dockspace with no splitting/resizing and no undocking
-                ImGuiDockNodeFlags dock_flags = ImGuiDockNodeFlags_NoSplit | ImGuiDockNodeFlags_NoResize | ImGuiDockNodeFlags_NoUndocking;
-                dockspace_id = ImGui::GetID("DockSpace_MiniContainer");
-                ImGui::DockSpace(dockspace_id, ImVec2(0, 0), dock_flags);
-            }
-            ImGui::End();
-        }
+        if (current_mode == ConfigManager::AppMode::Mini)
+            dockspace_id = setup_mini_mode_dockspace(registry);
         DockState::SetDockspace(dockspace_id);
-
-        // Mini-mode: Alt-drag anywhere to move window (using native OS drag)
-        if (cfg_mgr.getAppMode() == ConfigManager::AppMode::Mini)
-        {
-            ImGuiIO& io2 = ImGui::GetIO();
-            
-            if (io2.KeyAlt)
-            {
-                // Use viewport-relative mouse coordinates
-                ImGuiViewport* vp = ImGui::GetMainViewport();
-                ImVec2 mp = ImGui::GetMousePos();
-                ImVec2 vp_min = vp->Pos;
-                ImVec2 vp_max = ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y);
-                bool inside = (mp.x >= vp_min.x && mp.x < vp_max.x && mp.y >= vp_min.y && mp.y < vp_max.y);
-                
-                if (inside)
-                {
-                    // Show move cursor when Alt is held inside the window
-                    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-                    
-                    // Trigger native OS window drag on Alt+Click (only once at start)
-                    static bool alt_drag_triggered = false;
-                    if (!alt_drag_triggered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-                    {
-                        PLOG_INFO << "[Alt-Drag] Triggering native OS window drag";
-#ifdef _WIN32
-                        // Windows: Use native window dragging via WM_NCLBUTTONDOWN
-                        SDL_Window* sdl_win = app.window();
-                        if (sdl_win)
-                        {
-                            HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_win), SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
-                            if (hwnd)
-                            {
-                                ReleaseCapture();
-                                SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
-                            }
-                        }
-#endif
-                        alt_drag_triggered = true;
-                    }
-                    
-                    // Reset trigger when mouse released
-                    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
-                    {
-                        alt_drag_triggered = false;
-                    }
-                }
-            }
-        }
-
+        
+        // Render all windows
         for (auto& window : registry.windows())
         {
             if (window)
-            {
                 window->render(io);
-            }
         }
-
+        
         registry.processRemovals();
+        
+        // Mini mode: Alt+Drag to move window
+        if (current_mode == ConfigManager::AppMode::Mini)
+            handle_mini_mode_alt_drag(app);
 
+        // Handle transparent area clicks and context menu
         handle_transparent_area_click(io, registry, app);
         render_global_context_menu(io, registry, show_manager, quit_requested);
         
@@ -404,42 +472,39 @@ int main(int argc, char** argv)
             cfg_mgr.consumeQuitRequest();
         }
         
+        // Render settings panel
         if (show_manager)
-        {
             settings_panel.render(show_manager);
-        }
-
-        // Check for pending errors and display
+        
+        // Handle errors
         if (utils::ErrorReporter::HasPendingErrors())
         {
             auto errors = utils::ErrorReporter::GetPendingErrors();
             error_dialog.Show(errors);
         }
-
-        // Render error dialog (returns true if should exit for fatal error)
+        
         if (error_dialog.Render())
-        {
             quit_requested = true;
-        }
-
-        // Immediate quit path (no confirmation)
+        
+        // Handle quit
         if (quit_requested)
         {
-            if (auto* dqxc = DQXClarityService_Get()) dqxc->stop();
+            if (auto* dqxc = DQXClarityService_Get())
+                dqxc->stop();
             cfg_mgr.saveAll();
             running = false;
-            quit_requested = false;
         }
-
-        // Consume re-dock flag after all windows have seen it this frame
+        
+        // Finalize frame
         DockState::ConsumeReDock();
-
         app.renderVignette();
         app.endFrame();
         SDL_Delay(16);
     }
-
-    // Save config on quit
-    if (auto* cm = ConfigManager_Get()) cm->saveAll();
+    
+    // Cleanup
+    if (auto* cm = ConfigManager_Get())
+        cm->saveAll();
+    
     return 0;
 }
