@@ -2,6 +2,7 @@
 
 #include <imgui.h>
 #include <plog/Log.h>
+#include "ui/DockState.hpp"
 
 #include <algorithm>
 #include <cfloat>
@@ -195,6 +196,7 @@ void DialogWindow::applyPending()
     }
 }
 
+
 void DialogWindow::render(ImGuiIO& io)
 {
     appended_since_last_frame_ = false;
@@ -263,6 +265,20 @@ void DialogWindow::renderDialog(ImGuiIO& io)
     state_.ui_state().padding.y        = std::clamp(state_.ui_state().padding.y, 4.0f, 80.0f);
     state_.ui_state().rounding         = std::clamp(state_.ui_state().rounding, 0.0f, 32.0f);
     state_.ui_state().border_thickness = std::clamp(state_.ui_state().border_thickness, 0.5f, 6.0f);
+
+    if (auto* cm = ConfigManager_Get())
+    {
+        if (DockState::IsScattering())
+        {
+            ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
+            ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
+        }
+        else if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        {
+            ImGuiCond cond = DockState::ShouldReDock() ? ImGuiCond_Always : ImGuiCond_Once;
+            ImGui::SetNextWindowDockID(DockState::GetDockspace(), cond);
+        }
+    }
 
     if (state_.ui_state().pending_reposition)
     {
@@ -334,6 +350,10 @@ void DialogWindow::renderDialog(ImGuiIO& io)
         }
 
         const float wrap_width = std::max(40.0f, state_.ui_state().width - state_.ui_state().padding.x * 2.0f);
+        
+        // Check if window is docked (must be called inside Begin/End)
+        bool is_docked = ImGui::IsWindowDocked();
+        state_.ui_state().is_docked = is_docked;
 
         // Update 'Waiting...' placeholder animation for in-flight translations
         if (!pending_segment_by_job_.empty())
@@ -1092,6 +1112,19 @@ void DialogWindow::renderDialogContextMenu()
         ImGui::OpenPopup(("DialogContextMenu###" + id_suffix_).c_str());
     }
 
+    // Use cached docked state from render
+    bool is_docked = state_.ui_state().is_docked;
+    
+    // Get total dialog count from config manager registry
+    int dialog_count = 0;
+    if (auto* cm = ConfigManager_Get())
+    {
+        if (auto* reg = cm->registry())
+        {
+            dialog_count = static_cast<int>(reg->windowsByType(UIWindowType::Dialog).size());
+        }
+    }
+
     // Render the context menu
     std::string popup_id = "DialogContextMenu###" + id_suffix_;
     if (ImGui::BeginPopup(popup_id.c_str()))
@@ -1101,10 +1134,50 @@ void DialogWindow::renderDialogContextMenu()
             show_settings_window_ = !show_settings_window_;
         }
         
-        if (ImGui::MenuItem(i18n::get("common.remove")))
+        // Disable remove button if this is the only dialog
+        bool can_remove = dialog_count > 1;
+        if (ImGui::MenuItem(i18n::get("common.remove"), nullptr, false, can_remove))
         {
             // Signal for removal - we'll handle this in the registry
             should_be_removed_ = true;
+        }
+        
+        // Add global options when docked
+        if (is_docked)
+        {
+            ImGui::Separator();
+            
+            if (ImGui::MenuItem(i18n::get("menu.global_settings")))
+            {
+                if (auto* cm = ConfigManager_Get())
+                {
+                    cm->requestShowGlobalSettings();
+                }
+            }
+            
+            if (ImGui::BeginMenu(i18n::get("menu.app_mode")))
+            {
+                if (auto* cm = ConfigManager_Get())
+                {
+                    auto mode = cm->getAppMode();
+                    bool sel_normal = (mode == ConfigManager::AppMode::Normal);
+                    bool sel_borderless = (mode == ConfigManager::AppMode::Borderless);
+                    bool sel_mini = (mode == ConfigManager::AppMode::Mini);
+                    if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal)) cm->setAppMode(ConfigManager::AppMode::Normal);
+                    if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless)) cm->setAppMode(ConfigManager::AppMode::Borderless);
+                    if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, sel_mini)) cm->setAppMode(ConfigManager::AppMode::Mini);
+                }
+                ImGui::EndMenu();
+            }
+            
+            ImGui::Separator();
+            if (ImGui::MenuItem(i18n::get("menu.quit")))
+            {
+                if (auto* cm = ConfigManager_Get())
+                {
+                    cm->requestQuit();
+                }
+            }
         }
         
         ImGui::EndPopup();
@@ -1118,6 +1191,20 @@ void DialogWindow::renderSettingsWindow(ImGuiIO& io)
 
     ImGui::SetNextWindowSize(ImVec2(480.0f, 560.0f), ImGuiCond_FirstUseEver);
     std::string settings_title = name_ + " " + std::string(i18n::get("dialog.settings.window_suffix")) + "###" + settings_id_suffix_;
+    if (auto* cm = ConfigManager_Get())
+    {
+        if (DockState::IsScattering())
+        {
+            ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
+            ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
+        }
+        else if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        {
+            ImGuiCond cond = DockState::ShouldReDock() ? ImGuiCond_Always : ImGuiCond_Once;
+            ImGui::SetNextWindowDockID(DockState::GetDockspace(), cond);
+        }
+    }
+
     if (ImGui::Begin(settings_title.c_str(), &show_settings_window_))
     {
         renderSettingsPanel(io);

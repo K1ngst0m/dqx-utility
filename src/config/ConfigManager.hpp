@@ -11,6 +11,8 @@ class WindowRegistry;
 class ConfigManager
 {
 public:
+    enum class AppMode : int { Normal = 0, Borderless = 1, Mini = 2 };
+
     ConfigManager();
     ~ConfigManager();
 
@@ -21,9 +23,9 @@ public:
     // Append logs option
     bool getAppendLogs() const { return append_logs_; }
 
-    // Borderless windows (hide title bar on dialog windows)
-    bool getBorderlessWindows() const { return borderless_windows_; }
-    void setBorderlessWindows(bool v) { borderless_windows_ = v; }
+    // Application mode
+    AppMode getAppMode() const { return app_mode_; }
+    void setAppMode(AppMode m) { app_mode_ = m; }
 
     // GUI localization language (e.g., "en", "zh-CN")
     const char* getUILanguageCode() const { return ui_language_.c_str(); }
@@ -31,6 +33,7 @@ public:
 
     // Assign registry pointer (used for save/apply)
     void setRegistry(WindowRegistry* reg);
+    WindowRegistry* registry() const { return registry_; }
 
     // Poll config.toml for external changes; on valid parse, apply to dialogs
     void pollAndApply();
@@ -40,6 +43,15 @@ public:
     bool saveAll();
 
     const char* lastError() const { return last_error_.c_str(); }
+    
+    // UI requests from context menus
+    void requestShowGlobalSettings() { show_global_settings_requested_ = true; }
+    bool isGlobalSettingsRequested() const { return show_global_settings_requested_; }
+    void consumeGlobalSettingsRequest() { show_global_settings_requested_ = false; }
+    
+    void requestQuit() { quit_requested_ = true; }
+    bool isQuitRequested() const { return quit_requested_; }
+    void consumeQuitRequest() { quit_requested_ = false; }
 
 private:
     bool loadAndApply();
@@ -54,9 +66,14 @@ private:
     float ui_scale_ = 1.0f;
     bool append_logs_ = false;
     bool borderless_windows_ = false; // default to bordered (title bar visible)
+    AppMode app_mode_ = AppMode::Normal;
     std::string ui_language_ = "en"; // GUI localization language code
     struct ImGuiStyleBackup { bool valid=false; ImGuiStyle style; };
     ImGuiStyleBackup base_;
+    
+    // UI requests
+    bool show_global_settings_requested_ = false;
+    bool quit_requested_ = false;
 };
 
 // global accessors

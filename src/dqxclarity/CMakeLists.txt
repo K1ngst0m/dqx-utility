@@ -63,17 +63,19 @@ if(WIN32)
 endif()
 
 # Optional CLI tool built on the library (for development)
-add_executable(dqxclarity-cpp ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
+if(BUILD_DQXCLARITY_CLI)
+  add_executable(dqxclarity-cpp ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
-target_include_directories(dqxclarity-cpp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_include_directories(dqxclarity-cpp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_compile_features(dqxclarity-cpp PRIVATE cxx_std_20)
-if(MSVC)
-  target_compile_options(dqxclarity-cpp PRIVATE /W4 /permissive-)
-else()
-  target_compile_options(dqxclarity-cpp PRIVATE -Wall -Wextra -Wpedantic)
+  target_compile_features(dqxclarity-cpp PRIVATE cxx_std_20)
+  if(MSVC)
+    target_compile_options(dqxclarity-cpp PRIVATE /W4 /permissive-)
+  else()
+    target_compile_options(dqxclarity-cpp PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+
+  target_link_libraries(dqxclarity-cpp PRIVATE dqxclarity)
+
+  set_target_properties(dqxclarity-cpp PROPERTIES OUTPUT_NAME "dqxclarity-cpp")
 endif()
-
-target_link_libraries(dqxclarity-cpp PRIVATE dqxclarity)
-
-set_target_properties(dqxclarity-cpp PROPERTIES OUTPUT_NAME "dqxclarity-cpp")

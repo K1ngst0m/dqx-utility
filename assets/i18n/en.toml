@@ -17,6 +17,19 @@ window_management = "Window Management"
 appearance = "Appearance"
 debug = "Debug"
 
+[settings.app_mode]
+label = "App Mode"
+
+[settings.app_mode.items]
+normal = "Normal"
+borderless = "Borderless Fullscreen"
+mini = "Mini Mode"
+
+[menu]
+global_settings = "Global Settings"
+app_mode = "App Mode"
+quit = "Quit"
+
 [common]
 start = "Start"
 stop = "Stop"
@@ -56,9 +69,6 @@ default_name_prefix = "Dialog"
 label = "UI Language"
 option_en = "English"
 option_zh_cn = "Simplified Chinese"
-
-[menu]
-global_settings = "Global Settings"
 
 total = "Total: {count}"
 apply = "Apply"

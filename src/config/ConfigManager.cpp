@@ -174,6 +174,7 @@ bool ConfigManager::saveAll()
     global.insert("ui_scale", ui_scale_);
     global.insert("append_logs", append_logs_);
     global.insert("borderless_windows", borderless_windows_);
+    global.insert("app_mode", static_cast<int>(app_mode_));
     global.insert("ui_language", ui_language_);
     root.insert("global", std::move(global));
 
@@ -238,6 +239,8 @@ bool ConfigManager::loadAndApply()
                 append_logs_ = *v;
             if (auto v = (*g)["borderless_windows"].value<bool>())
                 borderless_windows_ = *v;
+            if (auto v = (*g)["app_mode"].value<int>())
+                app_mode_ = static_cast<AppMode>(*v);
             if (auto v = (*g)["ui_language"].value<std::string>())
                 ui_language_ = *v;
         }

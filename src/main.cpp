@@ -8,6 +8,7 @@
 #include "utils/CrashHandler.hpp"
 #include "ErrorDialog.hpp"
 #include "ui/Localization.hpp"
+#include "services/DQXClarityService.hpp"
 
 #include <SDL3/SDL.h>
 #include <plog/Appenders/ConsoleAppender.h>
@@ -20,6 +21,8 @@
 #include <fstream>
 #include <toml++/toml.h>
 #include <imgui.h>
+#include <imgui_internal.h>
+#include "ui/DockState.hpp"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -103,7 +106,7 @@ static void handle_transparent_area_click(ImGuiIO& io, WindowRegistry& registry,
     app.triggerVignette(io.MousePos.x, io.MousePos.y);
 }
 
-static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bool& show_manager)
+static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bool& show_manager, bool& quit_requested)
 {
     if (is_mouse_outside_dialogs(io, registry) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
     {
@@ -116,6 +119,27 @@ static void render_global_context_menu(ImGuiIO& io, WindowRegistry& registry, bo
         {
             if (!show_manager)
                 show_manager = true;
+        }
+
+        if (ImGui::BeginMenu(i18n::get("menu.app_mode")))
+        {
+            if (auto* cm = ConfigManager_Get())
+            {
+                auto mode = cm->getAppMode();
+                bool sel_normal = (mode == ConfigManager::AppMode::Normal);
+                bool sel_borderless = (mode == ConfigManager::AppMode::Borderless);
+                bool sel_mini = (mode == ConfigManager::AppMode::Mini);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal)) cm->setAppMode(ConfigManager::AppMode::Normal);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless)) cm->setAppMode(ConfigManager::AppMode::Borderless);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, sel_mini)) cm->setAppMode(ConfigManager::AppMode::Mini);
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::Separator();
+        if (ImGui::MenuItem(i18n::get("menu.quit")))
+        {
+            quit_requested = true;
         }
         
         ImGui::EndPopup();
@@ -181,26 +205,34 @@ int main(int argc, char** argv)
     ConfigManager_Set(&cfg_mgr);
     cfg_mgr.setRegistry(&registry);
 
-    // Load config at startup; if no dialogs loaded, create a default one
+    // Load config at startup
     cfg_mgr.loadAtStartup();
 
     // Initialize GUI localization with global setting (default "en")
     i18n::init(cfg_mgr.getUILanguageCode());
-    // Always start with bordered window regardless of config, and sync the flag for UI
-    cfg_mgr.setBorderlessWindows(false);
-    app.setWindowBorderless(false);
+    
     if (registry.windowsByType(UIWindowType::Dialog).empty())
+    {
         registry.createDialogWindow();
+    }
 
     SettingsPanel settings_panel(registry);
     ErrorDialog error_dialog;
 
     bool show_manager = true;
+    bool quit_requested = false;
 
     Uint64 last_time = SDL_GetTicks();
     bool running = true;
-    // Track last-applied borderless state to detect changes
-    bool last_borderless = cfg_mgr.getBorderlessWindows();
+    
+    // Always start in Normal mode to ensure consistent window layout
+    cfg_mgr.setAppMode(ConfigManager::AppMode::Normal);
+    ConfigManager::AppMode last_app_mode = cfg_mgr.getAppMode();
+    
+    // Apply Normal mode window layout
+    app.setWindowBorderless(false);
+    app.restoreWindow();
+    app.setWindowSize(1024, 800);
 
     while (running)
     {
@@ -213,8 +245,7 @@ int main(int argc, char** argv)
         {
             if (app.processEvent(event))
             {
-                running = false;
-                break;
+                quit_requested = true;
             }
         }
 
@@ -223,35 +254,97 @@ int main(int argc, char** argv)
 
         app.updateVignette(delta_time);
 
-        // Apply borderless changes live if toggled in settings
-        bool current_borderless = cfg_mgr.getBorderlessWindows();
-        if (current_borderless != last_borderless)
+        ConfigManager::AppMode current_mode = cfg_mgr.getAppMode();
+        if (current_mode != last_app_mode)
         {
-            app.setWindowBorderless(current_borderless);
-            last_borderless = current_borderless;
+            if (current_mode == ConfigManager::AppMode::Mini)
+            {
+                // Mini mode: 400x800 windowed
+                app.setWindowBorderless(false);
+                app.restoreWindow();
+                app.setWindowSize(400, 800);
+            }
+            else if (current_mode == ConfigManager::AppMode::Borderless)
+            {
+                // Borderless: TRUE fullscreen (maximize)
+                app.setWindowBorderless(true);
+                app.maximizeWindow();
+            }
+            else if (current_mode == ConfigManager::AppMode::Normal)
+            {
+                // Normal: 1024x800 windowed
+                app.setWindowBorderless(false);
+                app.restoreWindow();
+                app.setWindowSize(1024, 800);
+            }
+            if (last_app_mode == ConfigManager::AppMode::Mini && current_mode != ConfigManager::AppMode::Mini)
+            {
+                float y_offset = 0.0f;
+                for (auto& window : registry.windows())
+                {
+                    if (!window) continue;
+                    if (window->type() == UIWindowType::Dialog)
+                    {
+                        if (auto* dw = dynamic_cast<DialogWindow*>(window.get()))
+                        {
+                            auto& ui = dw->state().ui_state();
+                            ui.width = 800.0f;
+                            ui.height = 600.0f;
+                            ui.window_pos = ImVec2(0.0f, y_offset);
+                            ui.pending_resize = true;
+                            ui.pending_reposition = true;
+                            y_offset += 40.0f;
+                        }
+                    }
+                }
+            }
+            // Request all windows to re-dock when mode changes
+            DockState::RequestReDock();
+            last_app_mode = current_mode;
         }
 
         app.beginFrame();
 
-        ImGui::DockSpaceOverViewport(
-            0,
-            ImGui::GetMainViewport(),
-            ImGuiDockNodeFlags_PassthruCentralNode
-        );
+        ImGuiID dockspace_id = 0;
+        if (cfg_mgr.getAppMode() == ConfigManager::AppMode::Mini)
+        {
+            dockspace_id = ImGui::DockSpaceOverViewport(
+                ImGui::GetID("DockSpace_Mini"),
+                ImGui::GetMainViewport(),
+                ImGuiDockNodeFlags_PassthruCentralNode
+            );
+        }
+        DockState::SetDockspace(dockspace_id);
 
         for (auto& window : registry.windows())
         {
             if (window)
+            {
                 window->render(io);
+            }
         }
 
-        // Process any dialog windows marked for removal
         registry.processRemovals();
 
         handle_transparent_area_click(io, registry, app);
-        render_global_context_menu(io, registry, show_manager);
+        render_global_context_menu(io, registry, show_manager, quit_requested);
+        
+        // Handle UI requests from dialog context menus
+        if (cfg_mgr.isGlobalSettingsRequested())
+        {
+            show_manager = true;
+            cfg_mgr.consumeGlobalSettingsRequest();
+        }
+        if (cfg_mgr.isQuitRequested())
+        {
+            quit_requested = true;
+            cfg_mgr.consumeQuitRequest();
+        }
+        
         if (show_manager)
+        {
             settings_panel.render(show_manager);
+        }
 
         // Check for pending errors and display
         if (utils::ErrorReporter::HasPendingErrors())
@@ -263,8 +356,20 @@ int main(int argc, char** argv)
         // Render error dialog (returns true if should exit for fatal error)
         if (error_dialog.Render())
         {
-            running = false;
+            quit_requested = true;
         }
+
+        // Immediate quit path (no confirmation)
+        if (quit_requested)
+        {
+            if (auto* dqxc = DQXClarityService_Get()) dqxc->stop();
+            cfg_mgr.saveAll();
+            running = false;
+            quit_requested = false;
+        }
+
+        // Consume re-dock flag after all windows have seen it this frame
+        DockState::ConsumeReDock();
 
         app.renderVignette();
         app.endFrame();

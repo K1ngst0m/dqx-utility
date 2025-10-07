@@ -27,6 +27,9 @@ public:
 
     // Toggle OS-level window decorations (title bar, borders)
     void setWindowBorderless(bool borderless);
+    void maximizeWindow();
+    void restoreWindow();
+    void setWindowSize(int w, int h);
 
 private:
     void updateRendererScale();

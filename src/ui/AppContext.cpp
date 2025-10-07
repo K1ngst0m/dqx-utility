@@ -41,7 +41,7 @@ utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
     }
 
     const Uint32 window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_TRANSPARENT | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    window_ = SDL_CreateWindow("DQX Utility", 800, 600, window_flags);
+    window_ = SDL_CreateWindow("DQX Utility", 1024, 800, window_flags);
     if (!window_)
     {
         std::string sdl_error = SDL_GetError();
@@ -324,6 +324,23 @@ void AppContext::renderVignette()
 void AppContext::setWindowBorderless(bool borderless)
 {
     if (!window_) return;
-    // SDL_SetWindowBordered(window, bordered) where bordered=false -> borderless
     SDL_SetWindowBordered(window_, !borderless);
+}
+
+void AppContext::maximizeWindow()
+{
+    if (!window_) return;
+    SDL_MaximizeWindow(window_);
+}
+
+void AppContext::restoreWindow()
+{
+    if (!window_) return;
+    SDL_RestoreWindow(window_);
+}
+
+void AppContext::setWindowSize(int w, int h)
+{
+    if (!window_) return;
+    SDL_SetWindowSize(window_, w, h);
 }

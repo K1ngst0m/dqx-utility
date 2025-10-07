@@ -10,12 +10,9 @@ include(CheckCXXCompilerFlag)
 
 check_cxx_compiler_flag("-Wno-deprecated-literal-operator" HAS_NO_DEPRECATED_LITERAL_OPERATOR)
 
-# Build dqxclarity-cpp early (no external dependencies)
-option(BUILD_DQXCLARITY "Build DQXClarity C++ executable" OFF)
-
-if(BUILD_DQXCLARITY)
-  add_subdirectory(src/dqxclarity)
-endif()
+# Build dqxclarity library (always needed) and optionally the CLI tool
+option(BUILD_DQXCLARITY_CLI "Build DQXClarity C++ CLI executable" OFF)
+add_subdirectory(src/dqxclarity)
 
 # Configure CPM cache to reuse downloaded dependencies across builds
 set(CPM_SOURCE_CACHE "${CMAKE_SOURCE_DIR}/.cpm-cache" CACHE PATH "CPM source cache directory")
@@ -249,6 +246,7 @@ add_executable(dqx_utility
   src/services/DQXClarityService.cpp
   src/ui/UITheme.cpp
   src/ui/Localization.cpp
+  src/ui/DockState.cpp
   ${MAIN_TRANSLATOR_SOURCES}
   src/translate/LabelProcessor.cpp
   src/translate/LabelProcessor.hpp

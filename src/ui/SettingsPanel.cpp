@@ -9,6 +9,7 @@
 #include "DQXClarityService.hpp"
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "ui/Localization.hpp"
+#include "ui/DockState.hpp"
 
 #include <algorithm>
 #include <imgui.h>
@@ -45,8 +46,38 @@ void SettingsPanel::render(bool& open)
     if (!open)
         return;
 
-    ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(440.0f, 480.0f), ImGuiCond_FirstUseEver);
+    if (DockState::IsScattering())
+    {
+        ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
+    }
+    else if (auto* cm = ConfigManager_Get())
+    {
+        if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        {
+            ImGuiCond cond = DockState::ShouldReDock() ? ImGuiCond_Always : ImGuiCond_Once;
+            ImGui::SetNextWindowDockID(DockState::GetDockspace(), cond);
+        }
+    }
+
+    if (auto* cm = ConfigManager_Get())
+    {
+        if (cm->getAppMode() != ConfigManager::AppMode::Mini && DockState::ShouldReDock())
+        {
+            ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(800.0f, 400.0f), ImGuiCond_Always);
+        }
+        else
+        {
+            ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(800.0f, 400.0f), ImGuiCond_FirstUseEver);
+        }
+    }
+    else
+    {
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(800.0f, 400.0f), ImGuiCond_FirstUseEver);
+    }
     UITheme::pushSettingsWindowStyle();
 
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
@@ -444,12 +475,18 @@ void SettingsPanel::renderAppearanceSection()
             i18n::set_language(new_code);
         }
 
-        // Borderless windows toggle
-        bool borderless = false;
-        if (auto* cm = ConfigManager_Get()) borderless = cm->getBorderlessWindows();
-        if (ImGui::Checkbox(i18n::get("settings.borderless"), &borderless))
+        ImGui::TextUnformatted(i18n::get("settings.app_mode.label"));
+        const char* app_modes[] = {
+            i18n::get("settings.app_mode.items.normal"),
+            i18n::get("settings.app_mode.items.borderless"),
+            i18n::get("settings.app_mode.items.mini")
+        };
+        int app_mode_idx = 0;
+        if (auto* cm = ConfigManager_Get()) app_mode_idx = static_cast<int>(cm->getAppMode());
+        ImGui::SetNextItemWidth(220.0f);
+        if (ImGui::Combo("##app_mode_combo", &app_mode_idx, app_modes, IM_ARRAYSIZE(app_modes)))
         {
-            if (auto* cm = ConfigManager_Get()) cm->setBorderlessWindows(borderless);
+            if (auto* cm = ConfigManager_Get()) cm->setAppMode(static_cast<ConfigManager::AppMode>(app_mode_idx));
         }
     }
 }

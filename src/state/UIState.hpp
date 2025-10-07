@@ -26,6 +26,7 @@ struct UIState
     bool has_custom_font;
 
     bool auto_scroll_to_new;
+    bool is_docked;  // Cached docked state for context menu
 
     ImFont* font;
 
@@ -50,6 +51,7 @@ struct UIState
         has_custom_font = false;
 
         auto_scroll_to_new = true;
+        is_docked = false;
         
         font = nullptr;
     }

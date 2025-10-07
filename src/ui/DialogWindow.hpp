@@ -34,6 +34,7 @@ public:
     void render(ImGuiIO& io) override;
     void renderSettings(ImGuiIO& io) override;
 
+
     DialogStateManager& state() { return state_; }
 
     // Exposed for config manager apply
@@ -48,6 +49,7 @@ private:
     void renderSettingsPanel(ImGuiIO& io);
     void renderSettingsWindow(ImGuiIO& io);
     void renderDialogContextMenu();
+
 
     void renderAppearanceSection();
     void renderTranslateSection();

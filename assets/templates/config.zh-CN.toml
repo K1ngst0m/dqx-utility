@@ -4,6 +4,7 @@
 ui_scale = 1.0
 append_logs = false
 borderless_windows = false
+app_mode = 0             # 0=Normal, 1=Borderless, 2=Mini
 ui_language = "zh-CN"   # UI language: en or zh-CN
 
 # One sample dialog window (copy to add more)
