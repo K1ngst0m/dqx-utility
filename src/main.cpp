@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <fstream>
 #include <toml++/toml.h>
+#include <imgui.h>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -231,6 +232,12 @@ int main(int argc, char** argv)
         }
 
         app.beginFrame();
+
+        ImGui::DockSpaceOverViewport(
+            0,
+            ImGui::GetMainViewport(),
+            ImGuiDockNodeFlags_PassthruCentralNode
+        );
 
         for (auto& window : registry.windows())
         {

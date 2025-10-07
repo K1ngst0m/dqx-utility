@@ -108,8 +108,8 @@ CPMAddPackage(
 
 CPMAddPackage(
   NAME imgui
-  URL https://github.com/ocornut/imgui/archive/refs/tags/v1.92.3.tar.gz
-  URL_HASH SHA256=9212ee7c4718b1466a5d99e64bce3ef1965704afea4ba651f8d978d0791b7c7c
+  GITHUB_REPOSITORY ocornut/imgui
+  GIT_TAG docking
 )
 
 CPMAddPackage(

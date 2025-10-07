@@ -76,6 +76,10 @@ utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    }
     ImGui::StyleColorsDark();
 
     if (!ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_))
