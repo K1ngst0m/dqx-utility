@@ -10,6 +10,7 @@
 #include <cmath>
 #include <algorithm>
 #include "ui/Localization.hpp"
+#include "UITheme.hpp"
 
 // Constructs an empty context waiting for initialization.
 AppContext::AppContext() = default;
@@ -81,6 +82,7 @@ utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     }
     ImGui::StyleColorsDark();
+    UITheme::applyDockingTheme();
 
     if (!ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_))
     {

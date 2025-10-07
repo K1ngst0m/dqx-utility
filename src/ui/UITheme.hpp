@@ -26,6 +26,8 @@ public:
 
     static ImVec4 statusColor(bool is_success, bool is_error = false, bool is_disabled = false);
 
+    static void applyDockingTheme();
+
 private:
     static constexpr ImVec4 dialog_bg_        = ImVec4(0.0f, 0.0f, 0.0f, 0.78f);
     static constexpr ImVec4 dialog_border_    = ImVec4(1.0f, 1.0f, 1.0f, 0.92f);
