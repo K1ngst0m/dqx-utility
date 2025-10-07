@@ -289,6 +289,40 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     if (ImGui::Begin(window_label_.c_str(), nullptr, dialog_flags))
     {
+        // Soft vignette inside the dialog with rounded corners, no overlaps
+        {
+            float thickness = std::max(0.0f, state_.ui_state().vignette_thickness);
+            if (thickness > 0.0f)
+            {
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                ImVec2 win_pos = ImGui::GetWindowPos();
+                ImVec2 win_size = ImGui::GetWindowSize();
+                float rounding0 = std::max(0.0f, state_.ui_state().rounding);
+
+                // Feather steps scale with thickness (capped for perf)
+                int steps = static_cast<int>(std::ceil(thickness * 3.0f));
+                steps = std::clamp(steps, 1, 256);
+
+                // Increase overall darkness as size grows
+                float max_alpha = std::clamp(0.30f + 0.006f * thickness, 0.30f, 0.65f);
+
+                for (int i = 0; i < steps; ++i)
+                {
+                    float t = (steps <= 1) ? 0.0f : (static_cast<float>(i) / (steps - 1));
+                    float inset = t * thickness;
+                    ImVec2 pmin(win_pos.x + inset, win_pos.y + inset);
+                    ImVec2 pmax(win_pos.x + win_size.x - inset, win_pos.y + win_size.y - inset);
+                    float r = std::max(0.0f, rounding0 - inset);
+                    // Smooth fade curve (ease-out), slightly stronger
+                    float a = max_alpha * (1.0f - t);
+                    a = a * a; // quadratic ease-out
+                    if (a <= 0.0f) continue;
+                    ImU32 col = IM_COL32(0, 0, 0, (int)(a * 255.0f));
+                    dl->AddRect(pmin, pmax, col, r, 0, 1.0f);
+                }
+            }
+        }
+
         ImFont* active_font = state_.ui_state().font;
         float font_scale = 1.0f;
         if (active_font && state_.ui_state().font_base_size > 0.0f)
@@ -436,39 +470,7 @@ void DialogWindow::renderDialog(ImGuiIO& io)
         state_.ui_state().pending_reposition = false;
         state_.ui_state().pending_resize     = false;
 
-        // Soft vignette inside the dialog with rounded corners, no overlaps
-        {
-            float thickness = std::max(0.0f, state_.ui_state().vignette_thickness);
-            if (thickness > 0.0f)
-            {
-                ImDrawList* dl = ImGui::GetWindowDrawList();
-                ImVec2 win_pos = ImGui::GetWindowPos();
-                ImVec2 win_size = ImGui::GetWindowSize();
-                float rounding0 = std::max(0.0f, state_.ui_state().rounding);
 
-                // Feather steps scale with thickness (capped for perf)
-                int steps = static_cast<int>(std::ceil(thickness * 3.0f));
-                steps = std::clamp(steps, 1, 256);
-
-                // Increase overall darkness as size grows
-                float max_alpha = std::clamp(0.30f + 0.006f * thickness, 0.30f, 0.65f);
-
-                for (int i = 0; i < steps; ++i)
-                {
-                    float t = (steps <= 1) ? 0.0f : (static_cast<float>(i) / (steps - 1));
-                    float inset = t * thickness;
-                    ImVec2 pmin(win_pos.x + inset, win_pos.y + inset);
-                    ImVec2 pmax(win_pos.x + win_size.x - inset, win_pos.y + win_size.y - inset);
-                    float r = std::max(0.0f, rounding0 - inset);
-                    // Smooth fade curve (ease-out), slightly stronger
-                    float a = max_alpha * (1.0f - t);
-                    a = a * a; // quadratic ease-out
-                    if (a <= 0.0f) continue;
-                    ImU32 col = IM_COL32(0, 0, 0, (int)(a * 255.0f));
-                    dl->AddRect(pmin, pmax, col, r, 0, 1.0f);
-                }
-            }
-        }
     }
     ImGui::End();
 
