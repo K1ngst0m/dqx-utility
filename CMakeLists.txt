@@ -34,6 +34,12 @@ set(MAIN_TRANSLATOR_SOURCES
   src/translate/TranslatorFactory.cpp
 )
 
+if(WIN32)
+  set(APP_ICON_RC src/app.rc)
+else()
+  set(APP_ICON_RC)
+endif()
+
 add_executable(dqx_utility
   src/main.cpp
   src/ui/AppContext.cpp
@@ -62,6 +68,7 @@ add_executable(dqx_utility
   src/utils/CrashHandler.hpp
   src/ui/ErrorDialog.cpp
   src/ui/ErrorDialog.hpp
+  ${APP_ICON_RC}
 )
 
 set_project_warnings(dqx_utility)
