@@ -20,19 +20,25 @@ std::optional<uintptr_t> PatternFinder::FindWithFallback(const Pattern& pattern,
     if (auto m = FindInModule(pattern, module_name)) return m;
     if (auto e = FindInProcessExec(pattern)) return e;
 
-    // Fallback: manual chunk scan from module base
+    // Fallback: region-wise scan within [base, base + scan_size_bytes), ignoring pathname
     if (!memory_ || !memory_->IsProcessAttached()) return std::nullopt;
     uintptr_t base = memory_->GetModuleBaseAddress(module_name);
     if (base == 0) return std::nullopt;
 
-    const size_t chunk_size = 64 * 1024;
-    std::vector<uint8_t> buffer(chunk_size);
+    auto regions = MemoryRegionParser::ParseMapsFiltered(memory_->GetAttachedPid(), /*require_readable=*/true, /*require_executable=*/false);
+    for (const auto& region : regions) {
+        // Restrict to the address window relative to the module base
+        if (region.end <= base || region.start >= base + scan_size_bytes) continue;
+        uintptr_t start = (std::max)(region.start, base);
+        uintptr_t end   = (std::min)(region.end,   base + scan_size_bytes);
+        size_t size = static_cast<size_t>(end - start);
+        if (size < pattern.Size()) continue;
 
-    for (uintptr_t addr = base; addr < base + scan_size_bytes; addr += chunk_size) {
-        if (!memory_->ReadMemory(addr, buffer.data(), buffer.size())) continue;
+        std::vector<uint8_t> buffer(size);
+        if (!memory_->ReadMemory(start, buffer.data(), buffer.size())) continue;
         for (size_t i = 0; i + pattern.Size() <= buffer.size(); ++i) {
             if (MatchAt(buffer, i, pattern)) {
-                return addr + i;
+                return start + i;
             }
         }
     }

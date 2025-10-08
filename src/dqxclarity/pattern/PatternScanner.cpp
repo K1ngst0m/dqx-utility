@@ -91,6 +91,17 @@ std::optional<uintptr_t> PatternScanner::ScanRegion(
         return std::nullopt;
     }
 
+    // If pattern contains any wildcards, prefer a safe naive scan for correctness.
+    // The BM bad-character heuristic is not adapted for masked bytes here and can miss matches.
+    bool has_wildcards = std::find(pattern.mask.begin(), pattern.mask.end(), false) != pattern.mask.end();
+    if (has_wildcards) {
+        auto all = FindPatternInBufferAll(buffer.data(), buffer.size(), pattern);
+        if (!all.empty()) {
+            return region.start + all.front();
+        }
+        return std::nullopt;
+    }
+
     auto bad_char_table = BuildBadCharTable(pattern);
     auto offset = FindPatternInBuffer(buffer.data(), buffer.size(), pattern, bad_char_table);
 

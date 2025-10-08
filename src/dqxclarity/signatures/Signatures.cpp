@@ -15,7 +15,7 @@ void Signatures::InitializeSignatures() {
     );
 
     s_signatures["integrity_check"] = Pattern::FromString(
-        "89 54 24 FC 8D 64 24 FC 8D 64 24 FC 89 0C 24 8D 64 24 FC 89 04 24 E9 ?? ?? ?? ?? 6A 03"
+        "89 54 24 FC 8D 64 24 FC 89 4C 24 FC 8D 64 24 FC 8D 64 24 FC 89 04 24 E9 ?? ?? ?? ?? 89"
     );
 
     s_signatures["network_text"] = Pattern::FromString(

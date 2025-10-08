@@ -85,6 +85,7 @@ bool Engine::start_hook(StartPolicy policy) {
   impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
   impl_->integrity->SetVerbose(impl_->cfg.verbose);
   impl_->integrity->SetLogger(impl_->log);
+  impl_->integrity->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
   // Provide restoration info so integrity trampoline can unhook temporarily
   if (impl_->hook && impl_->hook->GetHookAddress() != 0) {
     impl_->integrity->AddRestoreTarget(impl_->hook->GetHookAddress(), impl_->hook->GetOriginalBytes());

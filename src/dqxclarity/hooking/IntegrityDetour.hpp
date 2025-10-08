@@ -30,6 +30,7 @@ public:
     bool IsInstalled() const { return m_installed; }
 
     void SetLogger(const dqxclarity::Logger& log) { m_log = log; }
+    void SetDiagnosticsEnabled(bool d) { m_diag = d; }
 
     // Provide a list of hook sites to temporarily restore during integrity.
     // Each call adds one site with its original bytes.
@@ -46,6 +47,7 @@ private:
     std::shared_ptr<IProcessMemory> m_memory;
     bool m_verbose = false;
     bool m_installed = false;
+    bool m_diag = false; // detailed diagnostics switch
     dqxclarity::Logger m_log{};
 
     uintptr_t m_integrity_addr = 0;   // address of integrity function where we patch

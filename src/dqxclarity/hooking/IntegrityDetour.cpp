@@ -1,16 +1,28 @@
 #include "IntegrityDetour.hpp"
+#include "../pattern/PatternFinder.hpp"
 #include "../pattern/PatternScanner.hpp"
+#include "../pattern/MemoryRegion.hpp"
 #include "../signatures/Signatures.hpp"
 #include "Codegen.hpp"
 #include "../memory/MemoryPatch.hpp"
+#include <algorithm>
+#include <cctype>
 
 #include <iostream>
 #include <cstdio>
 #include <iomanip>
 #include <sstream>
 #include <chrono>
+#include <map>
 
 namespace dqxclarity {
+
+// Forward declarations for diagnostics helpers used below
+static std::string PatternToString(const dqxclarity::Pattern& pat);
+static bool FullMatchAt(dqxclarity::IProcessMemory& mem, uintptr_t addr, const dqxclarity::Pattern& pat,
+                        size_t& first_mismatch_index, uint8_t& got, uint8_t& expected);
+static dqxclarity::Pattern MakeAnchor(const dqxclarity::Pattern& pat, size_t n);
+static std::string HexDump(const uint8_t* data, size_t count, size_t bytes_per_group = 1); // defined below
 
 IntegrityDetour::IntegrityDetour(std::shared_ptr<IProcessMemory> memory)
     : m_memory(std::move(memory)) {}
@@ -20,23 +32,203 @@ IntegrityDetour::~IntegrityDetour() {
 }
 
 bool IntegrityDetour::FindIntegrityAddress(uintptr_t& out_addr) {
-    PatternScanner scanner(m_memory);
     auto pat = Signatures::GetIntegrityCheck();
 
-    // Prefer scanning the module
-    if (auto mod = scanner.ScanModule(pat, "DQXGame.exe")) {
-        out_addr = *mod;
-        return true;
+    // Diagnostics: dump pattern and environment (only when diagnostics enabled or verbose)
+    if (m_diag) {
+        if (m_log.info) {
+            std::ostringstream oss;
+            oss << "Integrity scan: pattern size=" << pat.Size() << " bytes=" << PatternToString(pat);
+            m_log.info(oss.str());
+        }
     }
-    // Fallback: process-wide executable regions
-    if (auto any = scanner.ScanProcess(pat, /*require_executable=*/true)) {
-        out_addr = *any;
-        return true;
+    if (m_verbose && !m_diag) {
+        std::cout << "Integrity scan: pattern size=" << pat.Size() << "\n";
     }
+
+    uintptr_t base = m_memory->GetModuleBaseAddress("DQXGame.exe");
+    if (m_diag && m_log.info) {
+        std::ostringstream oss;
+        oss << "Integrity scan: module base DQXGame.exe=0x" << std::hex << base << std::dec;
+        m_log.info(oss.str());
+    }
+
+    // Region stats (diagnostics only)
+    if (m_diag) {
+        auto regions_all = MemoryRegionParser::ParseMaps(m_memory->GetAttachedPid());
+        size_t total = regions_all.size();
+        size_t exec_cnt = 0, read_cnt = 0, mod_cnt = 0;
+        for (const auto& r : regions_all) {
+            if (r.IsReadable()) ++read_cnt;
+            if (r.IsExecutable()) ++exec_cnt;
+            std::string path = r.pathname; std::string mod = "DQXGame.exe";
+            std::transform(path.begin(), path.end(), path.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+            std::transform(mod.begin(), mod.end(), mod.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+            if (!mod.empty() && path.find(mod) != std::string::npos) ++mod_cnt;
+        }
+        if (m_log.info) {
+            std::ostringstream oss;
+            oss << "Integrity scan: regions total=" << total << ", readable=" << read_cnt << ", exec=" << exec_cnt << ", module-matched=" << mod_cnt;
+            m_log.info(oss.str());
+        }
+    }
+
+    // Use robust finder (module -> exec -> chunked fallback)
+    PatternFinder finder(m_memory);
+
+    if (m_diag && m_log.info) m_log.info("Integrity scan step: module scan DQXGame.exe");
+    if (auto a = finder.FindInModule(pat, "DQXGame.exe")) {
+        out_addr = *a;
+        if (m_diag && m_log.info) {
+            std::ostringstream oss; oss << "Integrity scan: FOUND in module @0x" << std::hex << out_addr << std::dec; m_log.info(oss.str());
+        }
+        return true;
+    } else {
+        if (m_diag && m_log.info) m_log.info("Integrity scan: module scan result: not found");
+    }
+
+    if (m_diag && m_log.info) m_log.info("Integrity scan step: process exec regions");
+    if (auto b = finder.FindInProcessExec(pat)) {
+        out_addr = *b;
+        if (m_diag && m_log.info) {
+            std::ostringstream oss; oss << "Integrity scan: FOUND in exec regions @0x" << std::hex << out_addr << std::dec; m_log.info(oss.str());
+        }
+        return true;
+    } else {
+        if (m_diag && m_log.info) m_log.info("Integrity scan: exec regions result: not found");
+    }
+
+    if (m_diag && m_log.info) m_log.info("Integrity scan step: chunked fallback from module base");
+    if (auto c = finder.FindWithFallback(pat, "DQXGame.exe", 80u * 1024u * 1024u)) {
+        out_addr = *c;
+        if (m_diag && m_log.info) {
+            std::ostringstream oss; oss << "Integrity scan: FOUND via fallback @0x" << std::hex << out_addr << std::dec; m_log.info(oss.str());
+        }
+        return true;
+    } else {
+        if (m_diag && m_log.info) m_log.info("Integrity scan: fallback result: not found");
+    }
+
+    // Deep diagnostics (anchor, histograms, naive parity) only if enabled
+    if (!m_diag) {
+        return false;
+    }
+
+    // Deep diagnostics: search for an anchor (first 12 fixed bytes) and analyze mismatches across ALL hits
+    const size_t kAnchorLen = 12;
+    auto anchor = MakeAnchor(pat, kAnchorLen);
+    if (m_log.info) {
+        std::ostringstream oss; oss << "Integrity diag: searching for anchor (" << kAnchorLen << " bytes) in exec regions"; m_log.info(oss.str());
+    }
+
+    PatternScanner scanner(m_memory);
+    auto anchors = scanner.ScanProcessAll(anchor, /*require_executable=*/true);
+    if (!anchors.empty()) {
+        if (m_log.info) {
+            std::ostringstream oss; oss << "Integrity diag: anchor hits=" << anchors.size() << "; first=0x" << std::hex << anchors[0] << std::dec; m_log.info(oss.str());
+        }
+        // Histogram opcodes at +16 and mismatch stats; check full match across ALL anchors
+        std::map<uint8_t, size_t> op16_hist;
+        size_t full_matches = 0;
+        size_t sampled_dumps = 0;
+        for (size_t i = 0; i < anchors.size(); ++i) {
+            // Read a small window to classify op at +16
+            uint8_t wnd[32] = {0};
+            (void)m_memory->ReadMemory(anchors[i], wnd, sizeof(wnd));
+            uint8_t op16 = wnd[16];
+            op16_hist[op16]++;
+
+            size_t mm_idx = 0; uint8_t got = 0, exp = 0;
+            if (FullMatchAt(*m_memory, anchors[i], pat, mm_idx, got, exp)) {
+                ++full_matches;
+                if (full_matches == 1) {
+                    out_addr = anchors[i];
+                    if (m_log.info) {
+                        std::ostringstream oss; oss << "Integrity diag: full pattern MATCHES at anchor 0x" << std::hex << out_addr << std::dec; m_log.info(oss.str());
+                    }
+                    // We do NOT return early here; we want to complete diagnostics
+                }
+            } else if (sampled_dumps < 5) {
+                // Dump a small window around first mismatches to characterize deltas
+                uint8_t window[64] = {0};
+                uintptr_t dump_from = anchors[i] + (mm_idx > 16 ? mm_idx - 16 : 0);
+                size_t dump_len = sizeof(window);
+                (void)m_memory->ReadMemory(dump_from, window, dump_len);
+                if (m_log.info) {
+                    std::ostringstream oss;
+                    oss << "Integrity diag: anchor 0x" << std::hex << anchors[i] << std::dec
+                        << " mismatch at +" << mm_idx << ": got=" << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << (int)got
+                        << ", expected=" << std::setw(2) << (int)exp << std::dec;
+                    m_log.info(oss.str());
+                    std::ostringstream dump;
+                    dump << "Bytes[" << std::hex << dump_from << std::dec << "]:\n" << HexDump(window, dump_len);
+                    m_log.info(dump.str());
+                }
+                ++sampled_dumps;
+            }
+        }
+        // Log histogram summary
+        if (m_log.info) {
+            std::ostringstream oss; oss << "Integrity diag: op@+16 histogram: ";
+            size_t shown = 0;
+            for (const auto& kv : op16_hist) {
+                oss << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << (int)kv.first << "=>" << std::dec << kv.second << " ";
+                ++shown;
+            }
+            m_log.info(oss.str());
+            std::ostringstream oss2; oss2 << "Integrity diag: full matches among anchors=" << full_matches; m_log.info(oss2.str());
+        }
+
+        // Module-naive diagnostics: enumerate all exact matches in module (parity with Python)
+        PatternFinder diag_finder(m_memory);
+        auto naive_hits = diag_finder.FindAllInModuleNaive(pat, "DQXGame.exe");
+        if (m_log.info) {
+            std::ostringstream oss; oss << "Integrity diag: naive module scan matches=" << naive_hits.size(); m_log.info(oss.str());
+            size_t list_n = (std::min)(naive_hits.size(), static_cast<size_t>(3));
+            for (size_t i = 0; i < list_n; ++i) {
+                std::ostringstream e; e << " - hit[" << i << "]=0x" << std::hex << naive_hits[i] << std::dec; m_log.info(e.str());
+            }
+        }
+
+        // If naive found hits but earlier scans failed, compare within those regions using BM-based scanner to locate the discrepancy
+        if (!naive_hits.empty()) {
+            // Build MemoryRegion list once
+            auto regs = MemoryRegionParser::ParseMaps(m_memory->GetAttachedPid());
+            for (size_t i = 0; i < (std::min)(naive_hits.size(), static_cast<size_t>(3)); ++i) {
+                uintptr_t addr = naive_hits[i];
+                // Find the region containing this address
+                bool region_found = false;
+                MemoryRegion region{};
+                for (const auto& r : regs) {
+                    if (addr >= r.start && addr + pat.Size() <= r.end) { region = r; region_found = true; break; }
+                }
+                if (!region_found) continue;
+                // Use BM-based path on this region
+                auto bm_res = scanner.ScanRegion(region, pat);
+                if (!bm_res) {
+                    if (m_log.warn) {
+                        std::ostringstream warn; warn << "Integrity diag: BM scanner FAILED in region containing naive hit 0x" << std::hex << addr << std::dec; m_log.warn(warn.str());
+                    }
+                } else {
+                    if (m_log.info) {
+                        std::ostringstream ok; ok << "Integrity diag: BM scanner found 0x" << std::hex << *bm_res << std::dec << " in region containing naive hit"; m_log.info(ok.str());
+                    }
+                }
+            }
+        }
+
+        // If we saw any full matches, prefer the first
+        if (full_matches > 0) {
+            return true;
+        }
+    } else {
+        if (m_log.info) m_log.info("Integrity diag: no anchor hits in exec regions");
+    }
+
     return false;
 }
 
-static std::string HexDump(const uint8_t* data, size_t count, size_t bytes_per_group = 1) {
+static std::string HexDump(const uint8_t* data, size_t count, size_t bytes_per_group) {
     std::ostringstream oss;
     for (size_t i = 0; i < count; ++i) {
         if (i && (i % 16 == 0)) oss << "\n";
@@ -49,6 +241,40 @@ static std::string HexDump(const uint8_t* data, size_t count, size_t bytes_per_g
 
 // Forward declaration for branch detection utility
 static bool HasPcRelativeBranch(const uint8_t* data, size_t n);
+
+static std::string PatternToString(const dqxclarity::Pattern& pat) {
+    std::ostringstream oss;
+    for (size_t i = 0; i < pat.Size(); ++i) {
+        if (pat.mask[i]) {
+            oss << std::uppercase << std::hex << std::setw(2) << std::setfill('0')
+                << static_cast<int>(pat.bytes[i]) << ' ';
+        } else {
+            oss << "?? ";
+        }
+    }
+    return oss.str();
+}
+
+static bool FullMatchAt(dqxclarity::IProcessMemory& mem, uintptr_t addr, const dqxclarity::Pattern& pat, size_t& first_mismatch_index, uint8_t& got, uint8_t& expected) {
+    std::vector<uint8_t> buf(pat.Size());
+    if (!mem.ReadMemory(addr, buf.data(), buf.size())) return false;
+    for (size_t j = 0; j < pat.Size(); ++j) {
+        if (!pat.mask[j]) continue;
+        if (buf[j] != pat.bytes[j]) {
+            first_mismatch_index = j; got = buf[j]; expected = pat.bytes[j];
+            return false;
+        }
+    }
+    return true;
+}
+
+static dqxclarity::Pattern MakeAnchor(const dqxclarity::Pattern& pat, size_t n) {
+    dqxclarity::Pattern a;
+    size_t k = (std::min)(n, pat.Size());
+    a.bytes.assign(pat.bytes.begin(), pat.bytes.begin() + k);
+    a.mask.assign(k, true);
+    return a;
+}
 
 void IntegrityDetour::LogBytes(const char* label, uintptr_t addr, size_t count) {
     if (!m_verbose) return;
@@ -196,7 +422,7 @@ bool IntegrityDetour::Install() {
     }
 
     // Pre-patch diagnostics: dump surrounding bytes (selected site)
-    {
+    if (m_diag || m_verbose) {
         uint8_t pre[64] = {0};
         if (m_memory->ReadMemory(m_integrity_addr, pre, sizeof(pre))) {
             std::ostringstream ctx;
@@ -218,7 +444,7 @@ bool IntegrityDetour::Install() {
     m_original_bytes.resize(stolen_len);
     if (!m_memory->ReadMemory(m_integrity_addr, m_original_bytes.data(), stolen_len)) return false;
 
-    {
+    if (m_diag || m_verbose) {
         std::ostringstream oss;
         oss << "Integrity stolen_len=" << stolen_len;
         oss << " bytes=" << HexDump(m_original_bytes.data(), m_original_bytes.size());
