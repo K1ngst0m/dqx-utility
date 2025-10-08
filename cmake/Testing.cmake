@@ -31,6 +31,7 @@ endif()
 
 add_executable(dqx_utility_tests
   tests/test_main.cpp
+  tests/test_text_processing.cpp
   tests/dqxclarity/test_memory.cpp
   tests/dqxclarity/test_pattern_scanner.cpp
   tests/dqxclarity/test_process_finder.cpp
