@@ -95,6 +95,9 @@ private:
 
     // Pending translation placeholders and animation
     std::unordered_map<std::uint64_t, int> pending_segment_by_job_;
+    std::unordered_set<int> failed_segments_;
+    std::unordered_map<int, std::string> failed_original_text_;
+    std::unordered_map<int, std::string> failed_error_messages_;
     float waiting_anim_accum_ = 0.0f;
     int waiting_anim_phase_ = 0; // 0:".", 1:"..", 2:"...", 3:".."
 

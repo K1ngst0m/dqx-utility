@@ -38,6 +38,7 @@ save = "保存"
 cancel = "取消"
 settings = "设置"
 remove = "移除"
+apply = "应用"
 
 [settings.dqxc]
 debug_title = "DQXClarity 调试"
@@ -77,7 +78,6 @@ timeout = "淡出超时（秒）"
 hint = "对话框在无活动时将自动淡出。鼠标悬停或新文本将重置计时器。"
 
 total = "总计：{count}"
-apply = "应用"
 
 [dialog.settings]
 target_language = "目标语言"
@@ -146,6 +146,7 @@ width = "对话框宽度"
 height = "对话框高度"
 padding_xy = "内边距 XY"
 corner_rounding = "圆角"
+border_enabled = "启用边框"
 border_thickness = "边框粗细"
 dark_border_size = "暗边大小"
 background_opacity = "背景不透明度"
@@ -181,6 +182,22 @@ delete = "删除"
 editing_entry = "正在编辑条目 #{index}"
 new_text = "追加新文本"
 append_button = "追加"
+
+[dialog.translate.validation]
+config_error = "配置错误："
+missing_api_key = "缺少 API 密钥"
+missing_base_url = "缺少基础地址"
+missing_model = "缺少模型"
+
+[dialog.translate.timeout]
+failed = "翻译失败："
+reason = "原因："
+copy = "复制"
+retry = "重试"
+
+[dialog.context_menu]
+increase_font = "增大字体"
+decrease_font = "减小字体"
 
 
 [error.category]

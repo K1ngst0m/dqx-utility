@@ -94,7 +94,14 @@ void NiutransTranslator::workerLoop()
         if (doRequest(j.text, j.dst, out))
         {
             PLOG_INFO << "Niutrans Translation [auto -> " << j.dst << "]: '" << j.text << "' -> '" << out << "'";
-            Completed c; c.id = j.id; c.text = std::move(out);
+            Completed c; c.id = j.id; c.text = std::move(out); c.failed = false;
+            std::lock_guard<std::mutex> lk(r_mtx_);
+            results_.push_back(std::move(c));
+        }
+        else
+        {
+            PLOG_WARNING << "Niutrans Translation failed [auto -> " << j.dst << "]: '" << j.text << "' - " << last_error_;
+            Completed c; c.id = j.id; c.failed = true; c.original_text = j.text; c.error_message = last_error_;
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(c));
         }

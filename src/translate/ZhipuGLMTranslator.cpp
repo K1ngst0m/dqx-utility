@@ -94,7 +94,14 @@ void ZhipuGLMTranslator::workerLoop()
         if (doRequest(j.text, j.dst, out))
         {
             PLOG_INFO << "GLM Translation [" << j.src << " -> " << j.dst << "]: '" << j.text << "' -> '" << out << "'";
-            Completed c; c.id = j.id; c.text = std::move(out);
+            Completed c; c.id = j.id; c.text = std::move(out); c.failed = false;
+            std::lock_guard<std::mutex> lk(r_mtx_);
+            results_.push_back(std::move(c));
+        }
+        else
+        {
+            PLOG_WARNING << "GLM Translation failed [" << j.src << " -> " << j.dst << "]: '" << j.text << "' - " << last_error_;
+            Completed c; c.id = j.id; c.failed = true; c.original_text = j.text; c.error_message = last_error_;
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(c));
         }
@@ -191,7 +198,7 @@ bool ZhipuGLMTranslator::doRequest(const std::string& text, const std::string& t
     session.SetHeader(headers);
     session.SetBody(cpr::Body{body});
     session.SetConnectTimeout(cpr::ConnectTimeout{5000});
-    session.SetTimeout(cpr::Timeout{15000});
+    session.SetTimeout(cpr::Timeout{45000});
     session.SetProgressCallback(cpr::ProgressCallback(
         [](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t userdata) -> bool {
             auto flag = reinterpret_cast<std::atomic<bool>*>(userdata);
@@ -237,9 +244,12 @@ bool ZhipuGLMTranslator::doRequest(const std::string& text, const std::string& t
 
 std::string ZhipuGLMTranslator::testConnection()
 {
-    // Minimal test by attempting a short request (a real /models endpoint may not be available)
-    if (cfg_.model.empty() || cfg_.base_url.empty())
-        return "Error: Missing configuration (model or base URL)";
+    if (cfg_.api_key.empty())
+        return "Config Error: Missing API key";
+    if (cfg_.base_url.empty())
+        return "Config Error: Missing base URL";
+    if (cfg_.model.empty())
+        return "Config Error: Missing model";
 
     std::string result;
     if (!doRequest("Hello", cfg_.target_lang.empty() ? "zh-cn" : cfg_.target_lang, result))

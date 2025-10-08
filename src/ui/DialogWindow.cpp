@@ -69,6 +69,44 @@ namespace
         }
         return ".";
     }
+    
+    // Collapses consecutive newlines to at most 2 (limiting empty space in dialog)
+    std::string collapse_newlines(const std::string& text)
+    {
+        if (text.empty()) return text;
+        
+        std::string result;
+        result.reserve(text.size());
+        
+        int consecutive_newlines = 0;
+        for (size_t i = 0; i < text.size(); ++i)
+        {
+            char c = text[i];
+            if (c == '\n' || c == '\r')
+            {
+                // Handle both \n and \r\n
+                if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+                {
+                    // Skip the \r, we'll process \n next
+                    continue;
+                }
+                
+                consecutive_newlines++;
+                // Only allow up to 2 consecutive newlines (1 empty line)
+                if (consecutive_newlines <= 2)
+                {
+                    result += '\n';
+                }
+            }
+            else
+            {
+                consecutive_newlines = 0;
+                result += c;
+            }
+        }
+        
+        return result;
+    }
 }
 
 
@@ -147,10 +185,10 @@ void DialogWindow::applyPending()
         if (state_.translation_config().translate_enabled)
         {
             // Handle empty text for NPC-only messages
-            std::string text_to_process = m.text.empty() ? " " : m.text; // Use space for empty text
+            std::string text_to_process = m.text.empty() ? " " : m.text;
             
-            // Process labels before translation
             std::string processed_text = label_processor_->processText(text_to_process);
+            processed_text = collapse_newlines(processed_text);
 
             auto submit = session_.submit(
                 processed_text,
@@ -162,7 +200,8 @@ void DialogWindow::applyPending()
             {
                 state_.content_state().segments.emplace_back();
                 state_.content_state().speakers.push_back(m.speaker);
-                safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), submit.text.c_str());
+                std::string collapsed_text = collapse_newlines(submit.text);
+                safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), collapsed_text);
                 if (m.seq > 0) last_applied_seq_ = m.seq;
                 continue;
             }
@@ -199,7 +238,8 @@ void DialogWindow::applyPending()
             state_.content_state().segments.emplace_back();
             state_.content_state().speakers.push_back(m.speaker);
             std::string text_to_copy = m.text.empty() ? " " : m.text;
-            safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), text_to_copy);
+            std::string collapsed_text = collapse_newlines(text_to_copy);
+            safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), collapsed_text);
         }
         if (m.seq > 0)
         {
@@ -235,15 +275,43 @@ void DialogWindow::render(ImGuiIO& io)
                     int idx = it->second;
                     if (idx >= 0 && idx < static_cast<int>(state_.content_state().segments.size()))
                     {
-                        safe_copy_utf8(state_.content_state().segments[idx].data(), state_.content_state().segments[idx].size(), ev.text);
+                        if (ev.failed)
+                        {
+                            std::string failure_msg = i18n::get_str("dialog.translate.timeout.failed") + " " + ev.original_text;
+                            safe_copy_utf8(state_.content_state().segments[idx].data(), state_.content_state().segments[idx].size(), failure_msg);
+                            failed_segments_.insert(idx);
+                            failed_original_text_[idx] = ev.original_text;
+                            failed_error_messages_[idx] = ev.error_message;
+                        }
+                        else
+                        {
+                            std::string collapsed_text = collapse_newlines(ev.text);
+                            safe_copy_utf8(state_.content_state().segments[idx].data(), state_.content_state().segments[idx].size(), collapsed_text);
+                            failed_segments_.erase(idx);
+                            failed_original_text_.erase(idx);
+                            failed_error_messages_.erase(idx);
+                        }
                     }
                     pending_segment_by_job_.erase(it);
                 }
                 else
                 {
                     state_.content_state().segments.emplace_back();
-                    state_.content_state().speakers.emplace_back();  // No speaker info for late-arriving translations
-                    safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), ev.text);
+                    state_.content_state().speakers.emplace_back();
+                    int new_idx = static_cast<int>(state_.content_state().segments.size()) - 1;
+                    if (ev.failed)
+                    {
+                        std::string failure_msg = i18n::get_str("dialog.translate.timeout.failed") + " " + ev.original_text;
+                        safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), failure_msg);
+                        failed_segments_.insert(new_idx);
+                        failed_original_text_[new_idx] = ev.original_text;
+                        failed_error_messages_[new_idx] = ev.error_message;
+                    }
+                    else
+                    {
+                        std::string collapsed_text = collapse_newlines(ev.text);
+                        safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), collapsed_text);
+                    }
                 }
             }
         }
@@ -360,7 +428,7 @@ void DialogWindow::renderDialog(ImGuiIO& io)
 
     // Apply fade multiplier to background alpha and border
     float effective_alpha = state_.ui_state().background_alpha * state_.ui_state().current_alpha_multiplier;
-    UITheme::pushDialogStyle(effective_alpha, state_.ui_state().padding, state_.ui_state().rounding, state_.ui_state().border_thickness, state_.ui_state().current_alpha_multiplier);
+    UITheme::pushDialogStyle(effective_alpha, state_.ui_state().padding, state_.ui_state().rounding, state_.ui_state().border_thickness, state_.ui_state().border_enabled, state_.ui_state().current_alpha_multiplier);
 
     ImGuiWindowFlags dialog_flags = ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoSavedSettings |
@@ -587,6 +655,61 @@ void DialogWindow::renderDialog(ImGuiIO& io)
             // Advance layout by the wrapped text height
             ImVec2 text_sz = ImGui::CalcTextSize(txt, nullptr, false, wrap_w);
             ImGui::Dummy(ImVec2(0.0f, text_sz.y));
+            
+            // Show copy/retry buttons for failed translations
+            if (failed_segments_.count(static_cast<int>(i)))
+            {
+                ImGui::Spacing();
+                
+                // Display error message if available (with fade)
+                auto err_it = failed_error_messages_.find(static_cast<int>(i));
+                if (err_it != failed_error_messages_.end() && !err_it->second.empty())
+                {
+                    std::string reason_label = i18n::get_str("dialog.translate.timeout.reason");
+                    ImVec4 reason_color(1.0f, 0.6f, 0.4f, 1.0f);
+                    reason_color.w *= state_.ui_state().current_alpha_multiplier;
+                    ImGui::TextColored(reason_color, "%s %s", reason_label.c_str(), err_it->second.c_str());
+                    ImGui::Spacing();
+                }
+                
+                std::string copy_btn_id = std::string(i18n::get("dialog.translate.timeout.copy")) + "##copy_" + std::to_string(i);
+                std::string retry_btn_id = std::string(i18n::get("dialog.translate.timeout.retry")) + "##retry_" + std::to_string(i);
+                
+                if (ImGui::Button(copy_btn_id.c_str()))
+                {
+                    auto it = failed_original_text_.find(static_cast<int>(i));
+                    if (it != failed_original_text_.end())
+                    {
+                        ImGui::SetClipboardText(it->second.c_str());
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button(retry_btn_id.c_str()))
+                {
+                    auto it = failed_original_text_.find(static_cast<int>(i));
+                    if (it != failed_original_text_.end() && translator_ && translator_->isReady())
+                    {
+                        std::string text_to_retry = it->second;
+                        std::string processed_text = label_processor_->processText(text_to_retry);
+                        auto submit = session_.submit(
+                            processed_text,
+                            state_.translation_config().translation_backend,
+                            state_.translation_config().target_lang_enum,
+                            translator_.get());
+                        
+                        if (submit.kind == TranslateSession::SubmitKind::Queued && submit.job_id != 0)
+                        {
+                            pending_segment_by_job_[submit.job_id] = static_cast<int>(i);
+                            std::string placeholder = std::string(waiting_text_for_lang(state_.translation_config().target_lang_enum)) + " .";
+                            safe_copy_utf8(state_.content_state().segments[i].data(), state_.content_state().segments[i].size(), placeholder);
+                            failed_segments_.erase(static_cast<int>(i));
+                            failed_original_text_.erase(static_cast<int>(i));
+                            failed_error_messages_.erase(static_cast<int>(i));
+                        }
+                    }
+                }
+                ImGui::Spacing();
+            }
         }
 
         if (active_font)
@@ -773,10 +896,16 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         ImGui::SliderFloat("##dialog_rounding_slider", &state_.ui_state().rounding, 0.0f, 32.0f);
         ImGui::Spacing();
 
-        ImGui::TextUnformatted(i18n::get("dialog.appearance.border_thickness"));
-        set_slider_width();
-        ImGui::SliderFloat("##dialog_border_slider", &state_.ui_state().border_thickness, 0.5f, 6.0f);
+        ImGui::Checkbox(i18n::get("dialog.appearance.border_enabled"), &state_.ui_state().border_enabled);
         ImGui::Spacing();
+        
+        if (state_.ui_state().border_enabled)
+        {
+            ImGui::TextUnformatted(i18n::get("dialog.appearance.border_thickness"));
+            set_slider_width();
+            ImGui::SliderFloat("##dialog_border_slider", &state_.ui_state().border_thickness, 0.5f, 6.0f);
+            ImGui::Spacing();
+        }
 
         ImGui::TextUnformatted(i18n::get("dialog.appearance.dark_border_size"));
         set_slider_width();
@@ -888,17 +1017,6 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             ImGui::SetNextItemWidth(300.0f);
             zhipu_key_changed = ImGui::InputText("##zhipu_key", state_.translation_config().zhipu_api_key.data(), state_.translation_config().zhipu_api_key.size(), ImGuiInputTextFlags_Password);
         }
-
-        // Check if any config field changed
-        bool any_field_changed = enable_changed || auto_apply_changed || backend_changed || lang_changed || 
-                                 base_url_changed || model_changed || openai_key_changed || google_key_changed || zhipu_key_changed || qwen_key_changed || niutrans_key_changed;
-        
-        // Auto-clear test result when config changes
-        if (any_field_changed && !test_result_.empty())
-        {
-            test_result_.clear();
-            test_timestamp_.clear();
-        }
         else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::QwenMT)
         {
             ImGui::TextUnformatted(i18n::get("dialog.settings.model"));
@@ -924,6 +1042,17 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             niutrans_key_changed = ImGui::InputText("##niutrans_key", state_.translation_config().niutrans_api_key.data(), state_.translation_config().niutrans_api_key.size(), ImGuiInputTextFlags_Password);
         }
         
+        // Check if any config field changed
+        bool any_field_changed = enable_changed || auto_apply_changed || backend_changed || lang_changed || 
+                                 base_url_changed || model_changed || openai_key_changed || google_key_changed || zhipu_key_changed || qwen_key_changed || niutrans_key_changed;
+        
+        // Auto-clear test result when config changes
+        if (any_field_changed && !test_result_.empty())
+        {
+            test_result_.clear();
+            test_timestamp_.clear();
+        }
+        
         // Auto-apply changes if enabled
         if (state_.translation_config().auto_apply_changes && any_field_changed)
         {
@@ -937,7 +1066,7 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
         // Manual Apply button (only shown if auto-apply is off)
         if (!state_.translation_config().auto_apply_changes)
         {
-            if (ImGui::Button(i18n::get("apply")))
+            if (ImGui::Button(i18n::get("common.apply")))
             {
                 initTranslatorIfEnabled();
                 apply_hint_ = i18n::get("dialog.settings.apply_hint");
@@ -979,9 +1108,15 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
                 test_cfg.model = "glm-4-flash";
                 test_cfg.api_key = state_.translation_config().zhipu_api_key.data();
             }
+            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::QwenMT)
+            {
+                test_cfg.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+                const char* qm = state_.translation_config().qwen_model.data();
+                test_cfg.model = (qm && qm[0]) ? qm : "qwen-mt-turbo";
+                test_cfg.api_key = state_.translation_config().qwen_api_key.data();
+            }
             else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Niutrans)
             {
-                // Use default endpoint; only API key is required
                 test_cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
                 test_cfg.model.clear();
                 test_cfg.api_key = state_.translation_config().niutrans_api_key.data();
@@ -991,13 +1126,6 @@ void DialogWindow::renderSettingsPanel(ImGuiIO& io)
             if (temp_translator && temp_translator->init(test_cfg))
             {
                 test_result_ = temp_translator->testConnection();
-            }
-            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::QwenMT)
-            {
-                test_cfg.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-                const char* qm = state_.translation_config().qwen_model.data();
-                test_cfg.model = (qm && qm[0]) ? qm : "qwen-mt-turbo";
-                test_cfg.api_key = state_.translation_config().qwen_api_key.data();
             }
             else
             {
@@ -1316,6 +1444,26 @@ void DialogWindow::renderDialogContextMenu()
         {
             show_settings_window_ = !show_settings_window_;
         }
+        
+        ImGui::Separator();
+        
+        // Font size controls
+        float min_font = std::max(8.0f, state_.ui_state().font_base_size * 0.5f);
+        float max_font = state_.ui_state().font_base_size * 2.5f;
+        bool can_increase = state_.ui_state().font_size < max_font;
+        bool can_decrease = state_.ui_state().font_size > min_font;
+        
+        if (ImGui::MenuItem(i18n::get("dialog.context_menu.increase_font"), nullptr, false, can_increase))
+        {
+            state_.ui_state().font_size = std::min(state_.ui_state().font_size + 2.0f, max_font);
+        }
+        
+        if (ImGui::MenuItem(i18n::get("dialog.context_menu.decrease_font"), nullptr, false, can_decrease))
+        {
+            state_.ui_state().font_size = std::max(state_.ui_state().font_size - 2.0f, min_font);
+        }
+        
+        ImGui::Separator();
         
         // Disable remove button if this is the only dialog
         bool can_remove = dialog_count > 1;

@@ -95,7 +95,14 @@ void OpenAITranslator::workerLoop()
         if (doRequest(j.text, j.dst, out))
         {
             PLOG_INFO << "Translation [" << j.src << " -> " << j.dst << "]: '" << j.text << "' -> '" << out << "'";
-            Completed c; c.id = j.id; c.text = std::move(out);
+            Completed c; c.id = j.id; c.text = std::move(out); c.failed = false;
+            std::lock_guard<std::mutex> lk(r_mtx_);
+            results_.push_back(std::move(c));
+        }
+        else
+        {
+            PLOG_WARNING << "Translation failed [" << j.src << " -> " << j.dst << "]: '" << j.text << "' - " << last_error_;
+            Completed c; c.id = j.id; c.failed = true; c.original_text = j.text; c.error_message = last_error_;
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(c));
         }
@@ -228,7 +235,7 @@ bool OpenAITranslator::doRequest(const std::string& text, const std::string& tar
     session.SetBody(cpr::Body{body});
     // Set bounded timeouts to avoid hanging on exit; keep conservative defaults
     session.SetConnectTimeout(cpr::ConnectTimeout{5000});   // 5s to connect
-    session.SetTimeout(cpr::Timeout{15000});                 // 15s total
+    session.SetTimeout(cpr::Timeout{45000});                 // 45s total
     // Allow shutdown() to abort in-flight requests quickly
     session.SetProgressCallback(cpr::ProgressCallback(
         [](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t userdata) -> bool {
@@ -275,8 +282,12 @@ bool OpenAITranslator::doRequest(const std::string& text, const std::string& tar
 
 std::string OpenAITranslator::testConnection()
 {
-    if (cfg_.api_key.empty() || cfg_.model.empty() || cfg_.base_url.empty())
-        return "Error: Missing configuration (API key, model, or base URL)";
+    if (cfg_.api_key.empty())
+        return "Config Error: Missing API key";
+    if (cfg_.base_url.empty())
+        return "Config Error: Missing base URL";
+    if (cfg_.model.empty())
+        return "Config Error: Missing model";
     
     // Step 1: Check base URL connection
     std::string models_url = cfg_.base_url;

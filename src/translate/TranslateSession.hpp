@@ -14,7 +14,7 @@ class TranslateSession {
 public:
     enum class SubmitKind { Cached, Queued, DroppedNotReady };
     struct SubmitResult { SubmitKind kind; std::uint64_t job_id = 0; std::string text; };
-    struct CompletedEvent { std::uint64_t job_id = 0; std::string text; };
+    struct CompletedEvent { std::uint64_t job_id = 0; std::string text; bool failed = false; std::string original_text; std::string error_message; };
 
     void setCapacity(std::size_t cap) { capacity_ = cap; }
     void enableCache(bool v) { cache_enabled_ = v; }
@@ -83,20 +83,32 @@ public:
             auto it = job_.find(r.id);
             if (it != job_.end()) {
                 const JobInfo& ji = it->second;
-                // Unmask tags back to original corner quotes
-                std::string final = r.text;
-                static constexpr const char* kOpenQuote  = "\xE3\x80\x8C"; // U+300C
-                static constexpr const char* kCloseQuote = "\xE3\x80\x8D"; // U+300D
-                static constexpr const char* kTagOpen    = "<dqxlq/>";
-                static constexpr const char* kTagClose   = "<dqxrq/>";
-                replaceAllInPlace(final, kTagOpen,  kOpenQuote);
-                replaceAllInPlace(final, kTagClose, kCloseQuote);
-                alignAfterOpenQuote(final);
-                cache_[ji.key] = final;
-                out_events.push_back(CompletedEvent{r.id, std::move(final)});
+                if (r.failed) {
+                    // Unmask original text
+                    std::string orig = r.original_text;
+                    static constexpr const char* kOpenQuote  = "\xE3\x80\x8C"; // U+300C
+                    static constexpr const char* kCloseQuote = "\xE3\x80\x8D"; // U+300D
+                    static constexpr const char* kTagOpen    = "<dqxlq/>";
+                    static constexpr const char* kTagClose   = "<dqxrq/>";
+                    replaceAllInPlace(orig, kTagOpen,  kOpenQuote);
+                    replaceAllInPlace(orig, kTagClose, kCloseQuote);
+                    out_events.push_back(CompletedEvent{r.id, {}, true, std::move(orig), r.error_message});
+                } else {
+                    // Unmask tags back to original corner quotes
+                    std::string final = r.text;
+                    static constexpr const char* kOpenQuote  = "\xE3\x80\x8C"; // U+300C
+                    static constexpr const char* kCloseQuote = "\xE3\x80\x8D"; // U+300D
+                    static constexpr const char* kTagOpen    = "<dqxlq/>";
+                    static constexpr const char* kTagClose   = "<dqxrq/>";
+                    replaceAllInPlace(final, kTagOpen,  kOpenQuote);
+                    replaceAllInPlace(final, kTagClose, kCloseQuote);
+                    alignAfterOpenQuote(final);
+                    cache_[ji.key] = final;
+                    out_events.push_back(CompletedEvent{r.id, std::move(final), false, {}, {}});
+                }
                 job_.erase(it);
             } else {
-                out_events.push_back(CompletedEvent{r.id, r.text});
+                out_events.push_back(CompletedEvent{r.id, r.text, r.failed, r.original_text, r.error_message});
             }
         }
     }

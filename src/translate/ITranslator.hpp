@@ -29,6 +29,9 @@ namespace translate
     {
         std::uint64_t id = 0;
         std::string text;
+        bool failed = false;
+        std::string original_text;
+        std::string error_message;
     };
 
     class ITranslator

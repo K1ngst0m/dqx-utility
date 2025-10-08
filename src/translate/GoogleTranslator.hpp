@@ -29,7 +29,7 @@ namespace translate
     private:
         struct Job
         {
-            std::uint64_t id;
+            std::uint64_t id = 0;
             std::string text;
             std::string src;
             std::string dst;
