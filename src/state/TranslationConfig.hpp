@@ -50,7 +50,7 @@ struct TranslationConfig
     void applyDefaults()
     {
         translate_enabled = false;
-        auto_apply_changes = false;
+        auto_apply_changes = true;
         translation_backend = TranslationBackend::OpenAI;
         target_lang_enum = TargetLang::EN_US;
         

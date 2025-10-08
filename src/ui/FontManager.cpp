@@ -138,6 +138,7 @@ ImFont* FontManager::loadFontFromPath(const char* path, bool& custom_loaded)
     if (font)
     {
         custom_loaded = true;
+        io_.Fonts->Build();
         PLOG_INFO << "Loaded dialog font: " << path;
     }
     else
@@ -160,6 +161,7 @@ ImFont* FontManager::loadFallbackFont(bool& custom_loaded)
 
     PLOG_WARNING << "Using ImGui default font; CJK glyphs may be missing.";
     ImFont* font = io_.Fonts->AddFontDefault();
+    io_.Fonts->Build();
     custom_loaded = false;
     return font;
 }

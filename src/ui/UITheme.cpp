@@ -17,11 +17,11 @@ void UITheme::popSettingsWindowStyle()
     ImGui::PopStyleVar(3);
 }
 
-void UITheme::pushDialogStyle(float background_alpha, const ImVec2& padding, float rounding, float border_thickness, float alpha_multiplier)
+void UITheme::pushDialogStyle(float background_alpha, const ImVec2& padding, float rounding, float border_thickness, bool border_enabled, float alpha_multiplier)
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, rounding);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, border_thickness);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, border_enabled ? border_thickness : 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.0f);
 
     ImVec4 dialog_bg = dialogBgColor();

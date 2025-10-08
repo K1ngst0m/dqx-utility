@@ -12,6 +12,7 @@ struct UIState
     ImVec2 padding;
     float rounding;
     float border_thickness;
+    bool border_enabled;
     float background_alpha;
     float font_size;
     float font_base_size;
@@ -45,6 +46,7 @@ struct UIState
         padding = ImVec2(24.0f, 18.0f);
         rounding = 16.0f;
         border_thickness = 2.0f;
+        border_enabled = true;
         background_alpha = 0.78f;
         font_size = 28.0f;
         font_base_size = 28.0f;
