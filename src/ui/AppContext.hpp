@@ -55,6 +55,13 @@ public:
 
 private:
     void updateRendererScale();
+    
+    // Initialization phase helpers
+    bool initializeSDL();
+    bool createWindow();
+    bool createRenderer();
+    bool initializeImGui();
+    void reportInitError(const char* phase, const std::string& i18n_key, const std::string& details);
 
     SDL_Window* window_        = nullptr;
     SDL_Renderer* renderer_    = nullptr;

@@ -30,87 +30,10 @@ bool AppContext::initialize()
     if (initialized_)
         return true;
 
-    if (!SDL_Init(SDL_INIT_VIDEO))
-    {
-        std::string sdl_error = SDL_GetError();
-        PLOG_FATAL << "SDL_Init failed: " << sdl_error;
-utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            i18n::get("app.init.graphics_failed"),
-            std::string("SDL_Init failed: ") + sdl_error);
-        utils::NativeMessageBox::ShowFatalError(
-            i18n::get("app.init.graphics_failed_long"),
-            std::string("SDL_Init error: ") + sdl_error);
-        return false;
-    }
-
-    const Uint32 window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_TRANSPARENT | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    window_ = SDL_CreateWindow("DQX Utility", 1024, 800, window_flags);
-    if (!window_)
-    {
-        std::string sdl_error = SDL_GetError();
-        PLOG_FATAL << "SDL_CreateWindow failed: " << sdl_error;
-utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            i18n::get("app.init.window_failed"),
-            std::string("SDL_CreateWindow failed: ") + sdl_error);
-        utils::NativeMessageBox::ShowFatalError(
-            i18n::get("app.init.window_failed_long"),
-            std::string("SDL_CreateWindow error: ") + sdl_error);
-        shutdown();
-        return false;
-    }
-
-    renderer_ = SDL_CreateRenderer(window_, nullptr);
-    if (!renderer_)
-    {
-        std::string sdl_error = SDL_GetError();
-        PLOG_FATAL << "SDL_CreateRenderer failed: " << sdl_error;
-utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            i18n::get("app.init.renderer_failed"),
-            std::string("SDL_CreateRenderer failed: ") + sdl_error);
-        utils::NativeMessageBox::ShowFatalError(
-            i18n::get("app.init.renderer_failed_long"),
-            std::string("SDL_CreateRenderer error: ") + sdl_error);
-        shutdown();
-        return false;
-    }
-
-    updateRendererScale();
-
-    SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
-
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    {
-        ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    }
-    ImGui::StyleColorsDark();
-    UITheme::applyDockingTheme();
-
-    if (!ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_))
-    {
-        PLOG_FATAL << "ImGui_ImplSDL3_InitForSDLRenderer failed";
-utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            i18n::get("app.init.ui_backend_failed"),
-            "ImGui_ImplSDL3_InitForSDLRenderer returned false");
-        utils::NativeMessageBox::ShowFatalError(
-            i18n::get("app.init.ui_failed_long"),
-            "ImGui SDL3 backend initialization failed");
-        shutdown();
-        return false;
-    }
-    if (!ImGui_ImplSDLRenderer3_Init(renderer_))
-    {
-        PLOG_FATAL << "ImGui_ImplSDLRenderer3_Init failed";
-utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization,
-            i18n::get("app.init.ui_renderer_failed"),
-            "ImGui_ImplSDLRenderer3_Init returned false");
-        utils::NativeMessageBox::ShowFatalError(
-            i18n::get("app.init.ui_renderer_failed_long"),
-            "ImGui SDL renderer backend initialization failed");
-        shutdown();
-        return false;
-    }
+    if (!initializeSDL()) return false;
+    if (!createWindow()) return false;
+    if (!createRenderer()) return false;
+    if (!initializeImGui()) return false;
 
     initialized_ = true;
     return true;
@@ -454,3 +377,76 @@ void AppContext::beginNativeResizeTopRight() { nativeNCClick(HTTOPRIGHT); }
 void AppContext::beginNativeResizeBottomLeft() { nativeNCClick(HTBOTTOMLEFT); }
 void AppContext::beginNativeResizeBottomRight() { nativeNCClick(HTBOTTOMRIGHT); }
 #endif
+
+bool AppContext::initializeSDL()
+{
+    if (!SDL_Init(SDL_INIT_VIDEO))
+    {
+        reportInitError("SDL", "app.init.graphics_failed", std::string("SDL_Init failed: ") + SDL_GetError());
+        return false;
+    }
+    return true;
+}
+
+bool AppContext::createWindow()
+{
+    const Uint32 window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_TRANSPARENT | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    window_ = SDL_CreateWindow("DQX Utility", 1024, 800, window_flags);
+    if (!window_)
+    {
+        reportInitError("Window", "app.init.window_failed", std::string("SDL_CreateWindow failed: ") + SDL_GetError());
+        shutdown();
+        return false;
+    }
+    return true;
+}
+
+bool AppContext::createRenderer()
+{
+    renderer_ = SDL_CreateRenderer(window_, nullptr);
+    if (!renderer_)
+    {
+        reportInitError("Renderer", "app.init.renderer_failed", std::string("SDL_CreateRenderer failed: ") + SDL_GetError());
+        shutdown();
+        return false;
+    }
+    
+    updateRendererScale();
+    SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
+    return true;
+}
+
+bool AppContext::initializeImGui()
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    }
+    ImGui::StyleColorsDark();
+    UITheme::applyDockingTheme();
+
+    if (!ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_))
+    {
+        reportInitError("ImGui SDL3 Backend", "app.init.ui_backend_failed", "ImGui_ImplSDL3_InitForSDLRenderer returned false");
+        shutdown();
+        return false;
+    }
+    
+    if (!ImGui_ImplSDLRenderer3_Init(renderer_))
+    {
+        reportInitError("ImGui Renderer Backend", "app.init.ui_renderer_failed", "ImGui_ImplSDLRenderer3_Init returned false");
+        shutdown();
+        return false;
+    }
+    
+    return true;
+}
+
+void AppContext::reportInitError(const char* phase, const std::string& i18n_key, const std::string& details)
+{
+    PLOG_FATAL << phase << " initialization failed: " << details;
+    utils::ErrorReporter::ReportFatal(utils::ErrorCategory::Initialization, i18n::get(i18n_key.c_str()), details);
+    utils::NativeMessageBox::ShowFatalError(i18n::get((i18n_key + "_long").c_str()), details);
+}

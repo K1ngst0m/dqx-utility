@@ -264,113 +264,11 @@ bool DialogHook::WriteDetourCode() {
 std::vector<uint8_t> DialogHook::CreateDetourBytecode() {
     std::vector<uint8_t> code;
 
-    // Save registers
-    code.insert(code.end(), {0xA3});
-    uint32_t backup_eax = static_cast<uint32_t>(m_backup_address);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_eax), 
-                reinterpret_cast<uint8_t*>(&backup_eax) + 4);
-    code.push_back(0x90); // nop
-    
-    // mov [backup+4], ebx
-    code.insert(code.end(), {0x89, 0x1D});
-    uint32_t backup_ebx = static_cast<uint32_t>(m_backup_address + 4);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebx), 
-                reinterpret_cast<uint8_t*>(&backup_ebx) + 4);
-    
-    // mov [backup+8], ecx
-    code.insert(code.end(), {0x89, 0x0D});
-    uint32_t backup_ecx = static_cast<uint32_t>(m_backup_address + 8);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ecx), 
-                reinterpret_cast<uint8_t*>(&backup_ecx) + 4);
-    
-    // mov [backup+12], edx
-    code.insert(code.end(), {0x89, 0x15});
-    uint32_t backup_edx = static_cast<uint32_t>(m_backup_address + 12);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edx), 
-                reinterpret_cast<uint8_t*>(&backup_edx) + 4);
-    
-    // mov [backup+16], esi  (this is the dialog text pointer!)
-    code.insert(code.end(), {0x89, 0x35});
-    uint32_t backup_esi = static_cast<uint32_t>(m_backup_address + 16);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esi), 
-                reinterpret_cast<uint8_t*>(&backup_esi) + 4);
-    
-    // mov [backup+20], edi
-    code.insert(code.end(), {0x89, 0x3D});
-    uint32_t backup_edi = static_cast<uint32_t>(m_backup_address + 20);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edi), 
-                reinterpret_cast<uint8_t*>(&backup_edi) + 4);
-    
-    // mov [backup+24], ebp
-    code.insert(code.end(), {0x89, 0x2D});
-    uint32_t backup_ebp = static_cast<uint32_t>(m_backup_address + 24);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebp), 
-                reinterpret_cast<uint8_t*>(&backup_ebp) + 4);
-    
-    // mov [backup+28], esp  (this is the NPC pointer!)
-    code.insert(code.end(), {0x89, 0x25});
-    uint32_t backup_esp = static_cast<uint32_t>(m_backup_address + 28);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esp), 
-                reinterpret_cast<uint8_t*>(&backup_esp) + 4);
-    
-    // New data flag
-    code.insert(code.end(), {0xC6, 0x05});
-    uint32_t flag_addr = static_cast<uint32_t>(m_backup_address + 32);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&flag_addr), 
-                reinterpret_cast<uint8_t*>(&flag_addr) + 4);
-    code.push_back(0x01);
-    
-    // Restore registers
-    code.insert(code.end(), {0xA1});
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_eax), 
-                reinterpret_cast<uint8_t*>(&backup_eax) + 4);
-    code.push_back(0x90); // nop
-    
-    // mov ebx, [backup+4]
-    code.insert(code.end(), {0x8B, 0x1D});
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebx), 
-                reinterpret_cast<uint8_t*>(&backup_ebx) + 4);
-    
-    // mov ecx, [backup+8]
-    code.insert(code.end(), {0x8B, 0x0D});
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ecx), 
-                reinterpret_cast<uint8_t*>(&backup_ecx) + 4);
-    
-    // mov edx, [backup+12]
-    code.insert(code.end(), {0x8B, 0x15});
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edx), 
-                reinterpret_cast<uint8_t*>(&backup_edx) + 4);
-    
-    // mov esi, [backup+16]
-    code.insert(code.end(), {0x8B, 0x35});
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esi), 
-                reinterpret_cast<uint8_t*>(&backup_esi) + 4);
-    
-    // mov edi, [backup+20]
-    code.insert(code.end(), {0x8B, 0x3D});
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edi), 
-                reinterpret_cast<uint8_t*>(&backup_edi) + 4);
-    
-    // mov ebp, [backup+24]
-    code.insert(code.end(), {0x8B, 0x2D});
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebp), 
-                reinterpret_cast<uint8_t*>(&backup_ebp) + 4);
-    
-    // mov esp, [backup+28]
-    code.insert(code.end(), {0x8B, 0x25});
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esp), 
-                reinterpret_cast<uint8_t*>(&backup_esp) + 4);
-    
-    // Execute original stolen bytes
-    code.insert(code.end(), m_original_bytes.begin(), m_original_bytes.end());
-    
-    // Jump back to original function after the stolen bytes
-    code.push_back(0xE9);
-    uintptr_t return_addr = m_hook_address + m_original_bytes.size();
-    uintptr_t jmp_from = m_detour_address + (code.size() - 1);
-    uint32_t jump_offset = Rel32From(jmp_from, return_addr);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&jump_offset), 
-                reinterpret_cast<uint8_t*>(&jump_offset) + 4);
+    EmitRegisterBackup(code);
+    EmitNewDataFlag(code);
+    EmitRegisterRestore(code);
+    EmitStolenInstructions(code);
+    EmitReturnJump(code);
     
     return code;
 }
@@ -594,6 +492,118 @@ bool DialogHook::PollDialogData() {
         // Silently ignore errors to avoid crashes
         return false;
     }
+}
+
+void DialogHook::EmitRegisterBackup(std::vector<uint8_t>& code)
+{
+    code.insert(code.end(), {0xA3});
+    uint32_t backup_eax = static_cast<uint32_t>(m_backup_address);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_eax), 
+                reinterpret_cast<uint8_t*>(&backup_eax) + 4);
+    code.push_back(0x90);
+    
+    code.insert(code.end(), {0x89, 0x1D});
+    uint32_t backup_ebx = static_cast<uint32_t>(m_backup_address + 4);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebx), 
+                reinterpret_cast<uint8_t*>(&backup_ebx) + 4);
+    
+    code.insert(code.end(), {0x89, 0x0D});
+    uint32_t backup_ecx = static_cast<uint32_t>(m_backup_address + 8);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ecx), 
+                reinterpret_cast<uint8_t*>(&backup_ecx) + 4);
+    
+    code.insert(code.end(), {0x89, 0x15});
+    uint32_t backup_edx = static_cast<uint32_t>(m_backup_address + 12);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edx), 
+                reinterpret_cast<uint8_t*>(&backup_edx) + 4);
+    
+    code.insert(code.end(), {0x89, 0x35});
+    uint32_t backup_esi = static_cast<uint32_t>(m_backup_address + 16);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esi), 
+                reinterpret_cast<uint8_t*>(&backup_esi) + 4);
+    
+    code.insert(code.end(), {0x89, 0x3D});
+    uint32_t backup_edi = static_cast<uint32_t>(m_backup_address + 20);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edi), 
+                reinterpret_cast<uint8_t*>(&backup_edi) + 4);
+    
+    code.insert(code.end(), {0x89, 0x2D});
+    uint32_t backup_ebp = static_cast<uint32_t>(m_backup_address + 24);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebp), 
+                reinterpret_cast<uint8_t*>(&backup_ebp) + 4);
+    
+    code.insert(code.end(), {0x89, 0x25});
+    uint32_t backup_esp = static_cast<uint32_t>(m_backup_address + 28);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esp), 
+                reinterpret_cast<uint8_t*>(&backup_esp) + 4);
+}
+
+void DialogHook::EmitRegisterRestore(std::vector<uint8_t>& code)
+{
+    code.insert(code.end(), {0xA1});
+    uint32_t backup_eax = static_cast<uint32_t>(m_backup_address);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_eax), 
+                reinterpret_cast<uint8_t*>(&backup_eax) + 4);
+    code.push_back(0x90);
+    
+    code.insert(code.end(), {0x8B, 0x1D});
+    uint32_t backup_ebx = static_cast<uint32_t>(m_backup_address + 4);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebx), 
+                reinterpret_cast<uint8_t*>(&backup_ebx) + 4);
+    
+    code.insert(code.end(), {0x8B, 0x0D});
+    uint32_t backup_ecx = static_cast<uint32_t>(m_backup_address + 8);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ecx), 
+                reinterpret_cast<uint8_t*>(&backup_ecx) + 4);
+    
+    code.insert(code.end(), {0x8B, 0x15});
+    uint32_t backup_edx = static_cast<uint32_t>(m_backup_address + 12);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edx), 
+                reinterpret_cast<uint8_t*>(&backup_edx) + 4);
+    
+    code.insert(code.end(), {0x8B, 0x35});
+    uint32_t backup_esi = static_cast<uint32_t>(m_backup_address + 16);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esi), 
+                reinterpret_cast<uint8_t*>(&backup_esi) + 4);
+    
+    code.insert(code.end(), {0x8B, 0x3D});
+    uint32_t backup_edi = static_cast<uint32_t>(m_backup_address + 20);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edi), 
+                reinterpret_cast<uint8_t*>(&backup_edi) + 4);
+    
+    code.insert(code.end(), {0x8B, 0x2D});
+    uint32_t backup_ebp = static_cast<uint32_t>(m_backup_address + 24);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebp), 
+                reinterpret_cast<uint8_t*>(&backup_ebp) + 4);
+    
+    code.insert(code.end(), {0x8B, 0x25});
+    uint32_t backup_esp = static_cast<uint32_t>(m_backup_address + 28);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esp), 
+                reinterpret_cast<uint8_t*>(&backup_esp) + 4);
+}
+
+void DialogHook::EmitNewDataFlag(std::vector<uint8_t>& code)
+{
+    code.insert(code.end(), {0xC6, 0x05});
+    uint32_t flag_addr = static_cast<uint32_t>(m_backup_address + 32);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&flag_addr), 
+                reinterpret_cast<uint8_t*>(&flag_addr) + 4);
+    code.push_back(0x01);
+}
+
+void DialogHook::EmitStolenInstructions(std::vector<uint8_t>& code)
+{
+    code.insert(code.end(), m_original_bytes.begin(), m_original_bytes.end());
+}
+
+void DialogHook::EmitReturnJump(std::vector<uint8_t>& code)
+{
+    code.push_back(0xE9);
+    uintptr_t return_addr = m_hook_address + m_original_bytes.size();
+    uintptr_t jmp_from = m_detour_address + (code.size() - 1);
+    uint32_t jump_offset = Rel32From(jmp_from, return_addr);
+    code.insert(code.end(), reinterpret_cast<uint8_t*>(&jump_offset), 
+                reinterpret_cast<uint8_t*>(&jump_offset) + 4);
 }
 
 } // namespace dqxclarity

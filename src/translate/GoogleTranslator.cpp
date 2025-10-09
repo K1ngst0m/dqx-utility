@@ -290,58 +290,10 @@ std::string GoogleTranslator::extractTranslationFromJSON(const std::string& body
     if (start >= body.size() || body[start] != '\"') return "";
     ++start;
     
-    size_t end = start;
-    bool escaped = false;
+    size_t end = findQuoteEnd(body, start);
+    if (end == std::string::npos) return "";
     
-    while (end < body.size())
-    {
-        if (escaped)
-        {
-            escaped = false;
-            ++end;
-            continue;
-        }
-        
-        char c = body[end];
-        if (c == '\\')
-        {
-            escaped = true;
-            ++end;
-        }
-        else if (c == '\"')
-        {
-            break;
-        }
-        else
-        {
-            ++end;
-        }
-    }
-    
-    if (end <= start) return "";
-    
-    std::string result = body.substr(start, end - start);
-    
-    std::string unescaped;
-    for (size_t i = 0; i < result.size(); ++i)
-    {
-        if (result[i] == '\\' && i + 1 < result.size())
-        {
-            char next = result[i + 1];
-            if (next == '\"') { unescaped += '\"'; ++i; }
-            else if (next == '\\') { unescaped += '\\'; ++i; }
-            else if (next == 'n') { unescaped += '\n'; ++i; }
-            else if (next == 'r') { unescaped += '\r'; ++i; }
-            else if (next == 't') { unescaped += '\t'; ++i; }
-            else unescaped += result[i];
-        }
-        else
-        {
-            unescaped += result[i];
-        }
-    }
-    
-    return unescaped;
+    return unescapeJSONString(body.substr(start, end - start));
 }
 
 std::string GoogleTranslator::extractTranslationFromFreeAPI(const std::string& body)
@@ -351,57 +303,66 @@ std::string GoogleTranslator::extractTranslationFromFreeAPI(const std::string& b
     if (start == std::string::npos) return "";
     
     start += pattern.length();
-    size_t end = start;
+    
+    size_t end = findQuoteEnd(body, start);
+    if (end == std::string::npos) return "";
+    
+    return unescapeJSONString(body.substr(start, end - start));
+}
+
+size_t GoogleTranslator::findQuoteEnd(const std::string& body, size_t start)
+{
+    size_t pos = start;
     bool escaped = false;
     
-    while (end < body.size())
+    while (pos < body.size())
     {
         if (escaped)
         {
             escaped = false;
-            ++end;
+            ++pos;
             continue;
         }
         
-        char c = body[end];
+        char c = body[pos];
         if (c == '\\')
         {
             escaped = true;
-            ++end;
+            ++pos;
         }
         else if (c == '\"')
         {
-            break;
+            return pos;
         }
         else
         {
-            ++end;
+            ++pos;
         }
     }
     
-    if (end <= start) return "";
-    
-    std::string result = body.substr(start, end - start);
-    
+    return std::string::npos;
+}
+
+std::string GoogleTranslator::unescapeJSONString(const std::string& escaped)
+{
     std::string unescaped;
-    for (size_t i = 0; i < result.size(); ++i)
+    for (size_t i = 0; i < escaped.size(); ++i)
     {
-        if (result[i] == '\\' && i + 1 < result.size())
+        if (escaped[i] == '\\' && i + 1 < escaped.size())
         {
-            char next = result[i + 1];
+            char next = escaped[i + 1];
             if (next == '\"') { unescaped += '\"'; ++i; }
             else if (next == '\\') { unescaped += '\\'; ++i; }
             else if (next == 'n') { unescaped += '\n'; ++i; }
             else if (next == 'r') { unescaped += '\r'; ++i; }
             else if (next == 't') { unescaped += '\t'; ++i; }
-            else unescaped += result[i];
+            else unescaped += escaped[i];
         }
         else
         {
-            unescaped += result[i];
+            unescaped += escaped[i];
         }
     }
-    
     return unescaped;
 }
 

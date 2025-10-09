@@ -44,6 +44,8 @@ namespace translate
         static std::string extractTranslationFromJSON(const std::string& body);
         static std::string extractTranslationFromFreeAPI(const std::string& body);
         static std::string normalizeLanguageCode(const std::string& lang_code);
+        static std::string unescapeJSONString(const std::string& escaped);
+        static size_t findQuoteEnd(const std::string& body, size_t start_pos);
 
         TranslatorConfig cfg_{};
         std::atomic<bool> running_{false};

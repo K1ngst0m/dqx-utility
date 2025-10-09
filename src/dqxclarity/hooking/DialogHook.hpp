@@ -83,6 +83,13 @@ private:
     uintptr_t CalculateRelativeAddress(uintptr_t from, uintptr_t to);
 
     size_t ComputeStolenLength();
+    
+    // Helper methods for CreateDetourBytecode
+    void EmitRegisterBackup(std::vector<uint8_t>& code);
+    void EmitRegisterRestore(std::vector<uint8_t>& code);
+    void EmitNewDataFlag(std::vector<uint8_t>& code);
+    void EmitStolenInstructions(std::vector<uint8_t>& code);
+    void EmitReturnJump(std::vector<uint8_t>& code);
 };
 
 } // namespace dqxclarity
