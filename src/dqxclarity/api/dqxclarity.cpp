@@ -7,7 +7,7 @@
 #include "../hooking/IntegrityDetour.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
 #include "dialog_message.hpp"
-#include "../util/spsc_ring.hpp"
+#include "../util/SPSCRing.hpp"
 
 #include <chrono>
 #include <thread>
