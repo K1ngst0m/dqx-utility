@@ -14,6 +14,7 @@
 #include "ui/DockState.hpp"
 #include "ui/UIEventHandler.hpp"
 #include "ui/MiniModeManager.hpp"
+#include "ui/AppModeManager.hpp"
 #include "services/DQXClarityService.hpp"
 #include "platform/PlatformSetup.hpp"
 
@@ -29,48 +30,6 @@
 #include <fstream>
 #include <cstring>
 #include <toml++/toml.h>
-
-// ============================================================================
-// App mode management
-// ============================================================================
-
-static void apply_app_mode_window_settings(AppContext& app, ConfigManager::AppMode mode)
-{
-    switch (mode)
-    {
-    case ConfigManager::AppMode::Mini:
-        app.setWindowBorderless(true);
-        app.restoreWindow();
-        app.setWindowSize(600, 800);
-        break;
-        
-    case ConfigManager::AppMode::Borderless:
-        app.setWindowBorderless(true);
-        app.maximizeWindow();
-        break;
-        
-    case ConfigManager::AppMode::Normal:
-        app.setWindowBorderless(false);
-        app.restoreWindow();
-        app.setWindowSize(1024, 800);
-        break;
-    }
-}
-
-static void handle_app_mode_change(AppContext& app, WindowRegistry& registry, 
-                                   ConfigManager::AppMode old_mode, ConfigManager::AppMode new_mode)
-{
-    apply_app_mode_window_settings(app, new_mode);
-    
-    // When leaving Mini mode, restore dialog positions
-    if (old_mode == ConfigManager::AppMode::Mini && new_mode != ConfigManager::AppMode::Mini)
-    {
-        ui::MiniModeManager mini_manager(app, registry);
-        mini_manager.RestoreDialogsFromMiniMode();
-    }
-    
-    DockState::RequestReDock();
-}
 
 
 // ============================================================================
@@ -156,6 +115,7 @@ int main(int argc, char** argv)
     // UI utility managers
     ui::UIEventHandler event_handler(app, registry);
     ui::MiniModeManager mini_manager(app, registry);
+    ui::AppModeManager mode_manager(app, registry, mini_manager);
     
     // Application state
     bool show_manager = true;
@@ -163,10 +123,9 @@ int main(int argc, char** argv)
     bool running = true;
     Uint64 last_time = SDL_GetTicks();
     
-    // Start in Normal mode for consistent layout
     cfg_mgr.setAppMode(ConfigManager::AppMode::Normal);
-    apply_app_mode_window_settings(app, ConfigManager::AppMode::Normal);
-    ConfigManager::AppMode last_app_mode = ConfigManager::AppMode::Normal;
+    mode_manager.ApplyModeSettings(ConfigManager::AppMode::Normal);
+    mode_manager.SetCurrentMode(ConfigManager::AppMode::Normal);
 
     // ========================================================================
     // Main loop
@@ -191,12 +150,10 @@ int main(int argc, char** argv)
         
         app.updateVignette(delta_time);
         
-        // Handle app mode changes
         ConfigManager::AppMode current_mode = cfg_mgr.getAppMode();
-        if (current_mode != last_app_mode)
+        if (current_mode != mode_manager.GetCurrentMode())
         {
-            handle_app_mode_change(app, registry, last_app_mode, current_mode);
-            last_app_mode = current_mode;
+            mode_manager.HandleModeChange(mode_manager.GetCurrentMode(), current_mode);
         }
         
         // Begin ImGui frame

@@ -49,6 +49,7 @@ add_executable(dqx_utility
   src/ui/WindowRegistry.cpp
   src/ui/UIEventHandler.cpp
   src/ui/MiniModeManager.cpp
+  src/ui/AppModeManager.cpp
   src/ui/dialog/DialogWaitAnimation.cpp
   src/ui/dialog/DialogSettingsView.cpp
   src/ui/dialog/AppearanceSettingsPanel.cpp
