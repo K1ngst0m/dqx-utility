@@ -47,6 +47,8 @@ add_executable(dqx_utility
   src/ui/FontManager.cpp
   src/ui/GlobalSettingsPanel.cpp
   src/ui/WindowRegistry.cpp
+  src/ui/UIEventHandler.cpp
+  src/ui/MiniModeManager.cpp
   src/ui/dialog/DialogWaitAnimation.cpp
   src/ui/dialog/DialogSettingsView.cpp
   src/ui/dialog/AppearanceSettingsPanel.cpp
@@ -55,6 +57,7 @@ add_executable(dqx_utility
   src/platform/ProcessDetector.cpp
   src/platform/ProcessLocaleChecker.cpp
   src/platform/WineDetector.cpp
+  src/platform/PlatformSetup.cpp
   src/services/DQXClarityLauncher.cpp
   src/services/DQXClarityService.cpp
   src/ui/UITheme.cpp
