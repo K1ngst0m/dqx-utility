@@ -4,6 +4,9 @@
 #include "FontManager.hpp"
 #include "WindowRegistry.hpp"
 #include "translate/TranslateSession.hpp"
+#include "DialogWaitAnimation.hpp"
+#include "utils/PendingQueue.hpp"
+#include "DialogSettingsView.hpp"
 
 #include <string>
 #include <mutex>
@@ -67,8 +70,7 @@ private:
     bool should_be_removed_ = false;
 
     // In-process messaging: pending messages and last seen seq
-    std::mutex pending_mutex_;
-    std::vector<PendingMsg> pending_;
+    PendingQueue<PendingMsg> pending_;
     std::uint64_t last_applied_seq_ = 0;
     bool appended_since_last_frame_ = false;
 
@@ -86,6 +88,7 @@ private:
     // Apply success hint (auto-clears after 5 seconds)
     std::string apply_hint_;
     float apply_hint_timer_ = 0.0f;
+    DialogSettingsView settings_view_;
 
     // Smooth scroll animation (content-growth driven)
     bool  scroll_animating_   = false;
@@ -98,7 +101,6 @@ private:
     std::unordered_set<int> failed_segments_;
     std::unordered_map<int, std::string> failed_original_text_;
     std::unordered_map<int, std::string> failed_error_messages_;
-    float waiting_anim_accum_ = 0.0f;
-    int waiting_anim_phase_ = 0; // 0:".", 1:"..", 2:"...", 3:".."
+    DialogWaitAnimation wait_anim_;
 
 };

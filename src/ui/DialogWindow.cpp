@@ -21,6 +21,7 @@
 #include "DQXClarityLauncher.hpp"
 #include "dqxclarity/api/dialog_message.hpp"
 #include "ui/Localization.hpp"
+#include "DialogWaitAnimation.hpp"
 
 namespace
 {
@@ -112,6 +113,7 @@ namespace
 
 DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_id, const std::string& name)
     : font_manager_(font_manager)
+    , settings_view_(state_, font_manager_, session_)
 {
     (void)io;
 
@@ -123,10 +125,8 @@ DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_
     
     label_processor_ = std::make_unique<LabelProcessor>();
 
-    // Initialize all state to defaults
     state_.applyDefaults();
 
-    // Register with font manager for UI rendering
     font_manager_.registerDialog(state_.ui_state());
 }
 
@@ -156,17 +156,14 @@ void DialogWindow::applyPending()
         std::vector<dqxclarity::DialogMessage> msgs;
         if (launcher->copyDialogsSince(last_applied_seq_, msgs))
         {
-            std::lock_guard<std::mutex> lock(pending_mutex_);
             for (auto& m : msgs)
             {
-                // Accept messages with text OR valid NPC names
                 bool hasValidText = !m.text.empty() && !is_blank(m.text);
                 bool hasValidSpeaker = !m.speaker.empty() && m.speaker != "No_NPC";
-                
                 if (hasValidText || hasValidSpeaker)
                 {
                     PendingMsg pm; pm.text = std::move(m.text); pm.lang = std::move(m.lang); pm.speaker = std::move(m.speaker); pm.seq = m.seq;
-                    pending_.push_back(std::move(pm));
+                    pending_.push(std::move(pm));
                 }
             }
         }
@@ -174,8 +171,7 @@ void DialogWindow::applyPending()
 
     std::vector<PendingMsg> local;
     {
-        std::lock_guard<std::mutex> lock(pending_mutex_);
-        local.swap(pending_);
+        pending_.drain(local);
     }
     if (local.empty())
         return;
@@ -508,15 +504,9 @@ void DialogWindow::renderDialog(ImGuiIO& io)
         // Update 'Waiting...' placeholder animation for in-flight translations
         if (!pending_segment_by_job_.empty())
         {
-            waiting_anim_accum_ += io.DeltaTime;
-            const float step = 0.35f; // seconds per phase
-            while (waiting_anim_accum_ >= step)
-            {
-                waiting_anim_accum_ -= step;
-                waiting_anim_phase_ = (waiting_anim_phase_ + 1) % 4; // ., .., ..., ..
-            }
+            wait_anim_.advance(io.DeltaTime);
             std::string base = waiting_text_for_lang(state_.translation_config().target_lang_enum);
-            std::string suffix = " "; suffix += dots_for_phase(waiting_anim_phase_);
+            std::string suffix = std::string(" ") + wait_anim_.suffix();
             for (const auto& kv : pending_segment_by_job_)
             {
                 int idx = kv.second;
@@ -839,574 +829,18 @@ void DialogWindow::initTranslatorIfEnabled()
 
 void DialogWindow::renderSettingsPanel(ImGuiIO& io)
 {
-    ImGui::Spacing();
-
-    const float max_dialog_width  = std::max(200.0f, io.DisplaySize.x - 40.0f);
-    const float max_dialog_height = std::max(120.0f, io.DisplaySize.y - 40.0f);
-
-    auto set_slider_width = []() {
-        const float label_reserve = 140.0f;
-        float avail = ImGui::GetContentRegionAvail().x;
-        ImGui::SetNextItemWidth(std::max(140.0f, avail - label_reserve));
-    };
-
-    bool width_changed   = false;
-    bool height_changed  = false;
-    bool alpha_changed   = false;
-    bool font_changed    = false;
-
-    // Config save button at the top
-    if (ImGui::Button(i18n::get("dialog.settings.save_config")))
-    {
-        extern bool ConfigManager_SaveAll();
-        bool ok = ConfigManager_SaveAll();
-        if (!ok)
-        {
-            ImGui::SameLine();
-            ImGui::TextColored(UITheme::warningColor(), "%s", i18n::get("dialog.settings.save_config_failed"));
-        }
-    }
-    ImGui::Spacing();
-
-    // APPEARANCE SECTION
-    if (ImGui::CollapsingHeader(i18n::get("dialog.appearance.title")))
-    {
-        ImGui::Indent();
-        
-        ImGui::Checkbox(i18n::get("dialog.appearance.auto_scroll"), &state_.ui_state().auto_scroll_to_new);
-        ImGui::Spacing();
-        
-        ImGui::TextUnformatted(i18n::get("dialog.appearance.width"));
-        set_slider_width();
-        width_changed = ImGui::SliderFloat("##dialog_width_slider", &state_.ui_state().width, 200.0f, max_dialog_width);
-        ImGui::Spacing();
-
-        ImGui::TextUnformatted(i18n::get("dialog.appearance.height"));
-        set_slider_width();
-        height_changed = ImGui::SliderFloat("##dialog_height_slider", &state_.ui_state().height, 80.0f, max_dialog_height);
-        ImGui::Spacing();
-
-        ImGui::TextUnformatted(i18n::get("dialog.appearance.padding_xy"));
-        set_slider_width();
-        ImGui::SliderFloat2("##dialog_padding_slider", &state_.ui_state().padding.x, 4.0f, 80.0f);
-        ImGui::Spacing();
-
-        ImGui::TextUnformatted(i18n::get("dialog.appearance.corner_rounding"));
-        set_slider_width();
-        ImGui::SliderFloat("##dialog_rounding_slider", &state_.ui_state().rounding, 0.0f, 32.0f);
-        ImGui::Spacing();
-
-        ImGui::Checkbox(i18n::get("dialog.appearance.border_enabled"), &state_.ui_state().border_enabled);
-        ImGui::Spacing();
-        
-        if (state_.ui_state().border_enabled)
-        {
-            ImGui::TextUnformatted(i18n::get("dialog.appearance.border_thickness"));
-            set_slider_width();
-            ImGui::SliderFloat("##dialog_border_slider", &state_.ui_state().border_thickness, 0.5f, 6.0f);
-            ImGui::Spacing();
-        }
-
-        ImGui::TextUnformatted(i18n::get("dialog.appearance.dark_border_size"));
-        set_slider_width();
-        ImGui::SliderFloat("##dialog_vignette_thickness", &state_.ui_state().vignette_thickness, 0.0f, 100.0f);
-        ImGui::Spacing();
-
-        ImGui::TextUnformatted(i18n::get("dialog.appearance.background_opacity"));
-        set_slider_width();
-        alpha_changed = ImGui::SliderFloat("##dialog_bg_alpha_slider", &state_.ui_state().background_alpha, 0.0f, 1.0f);
-        ImGui::Spacing();
-
-        ImGui::TextUnformatted(i18n::get("dialog.appearance.font_size"));
-        set_slider_width();
-        float min_font = std::max(8.0f, state_.ui_state().font_base_size * 0.5f);
-        float max_font = state_.ui_state().font_base_size * 2.5f;
-        font_changed = ImGui::SliderFloat("##dialog_font_size_slider", &state_.ui_state().font_size, min_font, max_font);
-        ImGui::Spacing();
-        
-        // Auto-fade settings
-        ImGui::Separator();
-        ImGui::Spacing();
-        ImGui::TextUnformatted(i18n::get("dialog.appearance.fade.label"));
-        ImGui::Checkbox(i18n::get("dialog.appearance.fade.enabled"), &state_.ui_state().fade_enabled);
-        
-        if (state_.ui_state().fade_enabled)
-        {
-            ImGui::TextUnformatted(i18n::get("dialog.appearance.fade.timeout"));
-            set_slider_width();
-            ImGui::SliderFloat("##fade_timeout_slider", &state_.ui_state().fade_timeout, 5.0f, 120.0f, "%.0fs");
-            ImGui::TextColored(UITheme::disabledColor(), "%s", i18n::get("dialog.appearance.fade.hint"));
-        }
-        
-        ImGui::Unindent();
-        ImGui::Spacing();
-    }
-
-    // TRANSLATE SECTION
-    if (ImGui::CollapsingHeader(i18n::get("dialog.translate.title"), ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        ImGui::Indent();
-        
-        bool enable_changed = ImGui::Checkbox(i18n::get("dialog.translate.enable"), &state_.translation_config().translate_enabled);
-        bool auto_apply_changed = ImGui::Checkbox(i18n::get("dialog.translate.auto_apply"), &state_.translation_config().auto_apply_changes);
-        ImGui::Spacing();
-        
-        ImGui::TextUnformatted(i18n::get("dialog.translate.backend.label"));
-        const char* backend_items[] = {
-            i18n::get("dialog.translate.backend.items.openai_compat"),
-            i18n::get("dialog.translate.backend.items.google"),
-            i18n::get("dialog.translate.backend.items.glm4_zhipu"),
-            i18n::get("dialog.translate.backend.items.qwen_mt"),
-            i18n::get("dialog.translate.backend.items.niutrans")
-        };
-        int current_backend = static_cast<int>(state_.translation_config().translation_backend);
-        ImGui::SetNextItemWidth(220.0f);
-        bool backend_changed = ImGui::Combo("##translation_backend", &current_backend, backend_items, IM_ARRAYSIZE(backend_items));
-        if (backend_changed)
-        {
-            state_.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(current_backend);
-        }
-        
-        ImGui::TextUnformatted(i18n::get("dialog.settings.target_language"));
-        const char* lang_items[] = {
-            i18n::get("dialog.settings.target_lang.en_us"),
-            i18n::get("dialog.settings.target_lang.zh_cn"),
-            i18n::get("dialog.settings.target_lang.zh_tw")
-        };
-        int current_lang = static_cast<int>(state_.translation_config().target_lang_enum);
-        ImGui::SetNextItemWidth(220.0f);
-        bool lang_changed = ImGui::Combo("##target_lang", &current_lang, lang_items, IM_ARRAYSIZE(lang_items));
-        if (lang_changed)
-        {
-            state_.translation_config().target_lang_enum = static_cast<TranslationConfig::TargetLang>(current_lang);
-        }
-
-        // Show backend-specific configuration
-        bool base_url_changed = false;
-        bool model_changed = false;
-        bool openai_key_changed = false;
-        bool google_key_changed = false;
-        bool zhipu_key_changed = false;
-        bool qwen_key_changed = false;
-        bool niutrans_key_changed = false;
-        
-        if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
-        {
-            ImGui::TextUnformatted(i18n::get("dialog.settings.base_url"));
-            ImGui::SetNextItemWidth(300.0f);
-            base_url_changed = ImGui::InputText("##openai_base", state_.translation_config().openai_base_url.data(), state_.translation_config().openai_base_url.size());
-
-            ImGui::TextUnformatted(i18n::get("dialog.settings.model"));
-            ImGui::SetNextItemWidth(300.0f);
-            model_changed = ImGui::InputText("##openai_model", state_.translation_config().openai_model.data(), state_.translation_config().openai_model.size());
-
-            ImGui::TextUnformatted(i18n::get("dialog.settings.api_key"));
-            ImGui::SetNextItemWidth(300.0f);
-            openai_key_changed = ImGui::InputText("##openai_key", state_.translation_config().openai_api_key.data(), state_.translation_config().openai_api_key.size(), ImGuiInputTextFlags_Password);
-        }
-        else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Google)
-        {
-            ImGui::TextUnformatted(i18n::get("dialog.settings.api_key_optional"));
-            ImGui::SetNextItemWidth(300.0f);
-            google_key_changed = ImGui::InputText("##google_key", state_.translation_config().google_api_key.data(), state_.translation_config().google_api_key.size(), ImGuiInputTextFlags_Password);
-            ImGui::TextDisabled("%s", i18n::get("dialog.settings.google_note"));
-        }
-        else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
-        {
-            ImGui::TextUnformatted(i18n::get("dialog.settings.api_key"));
-            ImGui::SetNextItemWidth(300.0f);
-            zhipu_key_changed = ImGui::InputText("##zhipu_key", state_.translation_config().zhipu_api_key.data(), state_.translation_config().zhipu_api_key.size(), ImGuiInputTextFlags_Password);
-        }
-        else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::QwenMT)
-        {
-            ImGui::TextUnformatted(i18n::get("dialog.settings.model"));
-            ImGui::SetNextItemWidth(300.0f);
-            int qidx = 1; // default turbo
-            if (std::string(state_.translation_config().qwen_model.data()).find("qwen-mt-plus") == 0) qidx = 0;
-            const char* qwen_models[] = { "qwen-mt-plus", "qwen-mt-turbo" };
-            if (ImGui::Combo("##qwen_model", &qidx, qwen_models, IM_ARRAYSIZE(qwen_models)))
-            {
-                const char* sel = qwen_models[qidx];
-                std::snprintf(state_.translation_config().qwen_model.data(), state_.translation_config().qwen_model.size(), "%s", sel);
-                model_changed = true;
-            }
-
-            ImGui::TextUnformatted(i18n::get("dialog.settings.api_key"));
-            ImGui::SetNextItemWidth(300.0f);
-            qwen_key_changed = ImGui::InputText("##qwen_key", state_.translation_config().qwen_api_key.data(), state_.translation_config().qwen_api_key.size(), ImGuiInputTextFlags_Password);
-        }
-        else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Niutrans)
-        {
-            ImGui::TextUnformatted(i18n::get("dialog.settings.api_key"));
-            ImGui::SetNextItemWidth(300.0f);
-            niutrans_key_changed = ImGui::InputText("##niutrans_key", state_.translation_config().niutrans_api_key.data(), state_.translation_config().niutrans_api_key.size(), ImGuiInputTextFlags_Password);
-        }
-        
-        // Check if any config field changed
-        bool any_field_changed = enable_changed || auto_apply_changed || backend_changed || lang_changed || 
-                                 base_url_changed || model_changed || openai_key_changed || google_key_changed || zhipu_key_changed || qwen_key_changed || niutrans_key_changed;
-        
-        // Auto-clear test result when config changes
-        if (any_field_changed && !test_result_.empty())
-        {
-            test_result_.clear();
-            test_timestamp_.clear();
-        }
-        
-        // Auto-apply changes if enabled
-        if (state_.translation_config().auto_apply_changes && any_field_changed)
-        {
-            initTranslatorIfEnabled();
-            apply_hint_ = i18n::get("dialog.settings.apply_hint");
-            apply_hint_timer_ = 5.0f;
-        }
-        
-        ImGui::Spacing();
-        
-        // Manual Apply button (only shown if auto-apply is off)
-        if (!state_.translation_config().auto_apply_changes)
-        {
-            if (ImGui::Button(i18n::get("common.apply")))
-            {
-                initTranslatorIfEnabled();
-                apply_hint_ = i18n::get("dialog.settings.apply_hint");
-                apply_hint_timer_ = 5.0f;
-            }
-            ImGui::SameLine();
-        }
-        
-        // Test button
-        if (ImGui::Button(i18n::get("dialog.settings.test")) && !testing_connection_)
-        {
-            testing_connection_ = true;
-            test_result_ = i18n::get("dialog.settings.testing");
-            
-            // Create temporary translator for testing
-            translate::TranslatorConfig test_cfg;
-            test_cfg.backend = static_cast<translate::Backend>(state_.translation_config().translation_backend);
-            switch (state_.translation_config().target_lang_enum)
-            {
-            case TranslationConfig::TargetLang::EN_US: test_cfg.target_lang = "en-us"; break;
-            case TranslationConfig::TargetLang::ZH_CN: test_cfg.target_lang = "zh-cn"; break;
-            case TranslationConfig::TargetLang::ZH_TW: test_cfg.target_lang = "zh-tw"; break;
-            }
-            if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
-            {
-                test_cfg.base_url = state_.translation_config().openai_base_url.data();
-                test_cfg.model = state_.translation_config().openai_model.data();
-                test_cfg.api_key = state_.translation_config().openai_api_key.data();
-            }
-            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Google)
-            {
-                test_cfg.base_url.clear();
-                test_cfg.model.clear();
-                test_cfg.api_key = state_.translation_config().google_api_key.data();
-            }
-            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
-            {
-                test_cfg.base_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
-                test_cfg.model = "glm-4-flash";
-                test_cfg.api_key = state_.translation_config().zhipu_api_key.data();
-            }
-            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::QwenMT)
-            {
-                test_cfg.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-                const char* qm = state_.translation_config().qwen_model.data();
-                test_cfg.model = (qm && qm[0]) ? qm : "qwen-mt-turbo";
-                test_cfg.api_key = state_.translation_config().qwen_api_key.data();
-            }
-            else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Niutrans)
-            {
-                test_cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
-                test_cfg.model.clear();
-                test_cfg.api_key = state_.translation_config().niutrans_api_key.data();
-            }
-            
-            auto temp_translator = translate::createTranslator(test_cfg.backend);
-            if (temp_translator && temp_translator->init(test_cfg))
-            {
-                test_result_ = temp_translator->testConnection();
-            }
-            else
-            {
-                test_result_ = "Error: Failed to initialize translator for testing";
-            }
-            if (temp_translator) temp_translator->shutdown();
-            
-            // Capture timestamp
-            std::time_t now = std::time(nullptr);
-            std::tm tm_buf;
-#ifdef _WIN32
-            localtime_s(&tm_buf, &now);
-#else
-            localtime_r(&now, &tm_buf);
-#endif
-            char time_str[16];
-            std::strftime(time_str, sizeof(time_str), "%H:%M:%S", &tm_buf);
-            test_timestamp_ = time_str;
-            
-            testing_connection_ = false;
-        }
-        
-        // Status indicator
-        const char* status = (translator_ && translator_->isReady()) ? i18n::get("dialog.settings.ready") : i18n::get("dialog.settings.not_ready");
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s %s", i18n::get("dialog.settings.status_label"), status);
-
-        // Apply success hint (auto-clears after 5 seconds)
-        if (apply_hint_timer_ > 0.0f)
-        {
-            apply_hint_timer_ -= io.DeltaTime;
-            if (apply_hint_timer_ <= 0.0f)
-            {
-                apply_hint_.clear();
-                apply_hint_timer_ = 0.0f;
-            }
-        }
-        if (!apply_hint_.empty())
-        {
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%s", apply_hint_.c_str());
-        }
-        
-        if (translator_)
-        {
-            const char* err = translator_->lastError();
-            if (err && err[0]) ImGui::TextColored(UITheme::warningColor(), "%s", err);
-        }
-        
-        // Show test results if available
-        if (!test_result_.empty())
-        {
-            ImVec4 color;
-            if (test_result_.find("Success:") == 0)
-                color = ImVec4(0.0f, 0.8f, 0.0f, 1.0f);  // Green for success
-            else if (test_result_.find("Warning:") == 0)
-                color = ImVec4(1.0f, 0.8f, 0.0f, 1.0f);  // Yellow for warning
-            else if (test_result_.find("Error:") == 0 || test_result_.find("Testing") == 0)
-                color = ImVec4(0.9f, 0.2f, 0.2f, 1.0f);  // Red for error/testing
-            else
-                color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);  // Grey for other
-            
-            // Display with inline timestamp if available
-            if (!test_timestamp_.empty())
-            {
-                std::string line = i18n::format("dialog.settings.test_result", {{"time", test_timestamp_}, {"text", test_result_}});
-                ImGui::TextColored(color, "%s", line.c_str());
-            }
-            else
-            {
-                std::string line = i18n::format("dialog.settings.test_result_no_time", {{"text", test_result_}});
-                ImGui::TextColored(color, "%s", line.c_str());
-            }
-        }
-        
-        ImGui::Unindent();
-        ImGui::Spacing();
-    }
-
-    // DEBUG SECTION
-    if (ImGui::CollapsingHeader(i18n::get("dialog.debug.title")))
-    {
-        ImGui::Indent();
-        ImGui::PushID(settings_id_suffix_.c_str());
-        
-        // IPC Section
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        // Font Section
-        ImGui::TextUnformatted(i18n::get("dialog.settings.font_path"));
-        {
-            const ImGuiStyle& style = ImGui::GetStyle();
-            float avail = ImGui::GetContentRegionAvail().x;
-            float btn_w = ImGui::CalcTextSize(i18n::get("dialog.settings.reload_font")).x + style.FramePadding.x * 2.0f;
-            ImGui::SetNextItemWidth(std::max(220.0f, avail - btn_w - style.ItemSpacing.x));
-            ImGui::InputText("##font_path", state_.ui_state().font_path.data(), state_.ui_state().font_path.size());
-            ImGui::SameLine();
-            if (ImGui::Button(i18n::get("dialog.settings.reload_font")))
-            {
-                bool loaded = font_manager_.reloadFont(state_.ui_state().font_path.data());
-                state_.ui_state().has_custom_font = loaded;
-            }
-            ImGui::TextDisabled("%s %s", i18n::get("dialog.settings.font_active_label"), state_.ui_state().has_custom_font ? i18n::get("dialog.settings.font_active_custom") : i18n::get("dialog.settings.font_active_default"));
-            if (!state_.ui_state().has_custom_font)
-                ImGui::TextColored(UITheme::warningColor(), "%s", i18n::get("dialog.settings.font_warning_no_cjk"));
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        // Cache Stats Section
-        ImGui::TextUnformatted(i18n::get("dialog.settings.translation_cache"));
-        {
-            std::string t = i18n::format("dialog.settings.cache_entries", {{"cur", std::to_string(session_.cacheEntries())}, {"cap", std::to_string(session_.cacheCapacity())}});
-            ImGui::TextUnformatted(t.c_str());
-        }
-        {
-            std::string t = i18n::format("dialog.settings.cache_hits", {{"n", std::to_string(static_cast<unsigned long long>(session_.cacheHits()))}});
-            ImGui::TextUnformatted(t.c_str());
-        }
-        {
-            std::string t = i18n::format("dialog.settings.cache_misses", {{"n", std::to_string(static_cast<unsigned long long>(session_.cacheMisses()))}});
-            ImGui::TextUnformatted(t.c_str());
-        }
-        
-        bool cache_enabled = session_.isCacheEnabled();
-        if (ImGui::Checkbox(i18n::get("dialog.settings.enable_cache"), &cache_enabled))
-        {
-            session_.enableCache(cache_enabled);
-        }
-        
-        if (ImGui::Button(i18n::get("dialog.settings.clear_cache")))
-        {
-            session_.clear();
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        // Dialog Texts Section
-        ImGui::TextUnformatted(i18n::get("dialog.settings.appended_texts"));
-        // Wrap list in a child region to ensure proper clipping
-        if (ImGui::BeginChild("SegmentsChild", ImVec2(0, 220.0f), ImGuiChildFlags_Border))
-        {
-            int to_delete = -1;
-            for (int i = 0; i < static_cast<int>(state_.content_state().segments.size()); ++i)
-            {
-                ImGui::PushID(i);
-                const ImGuiStyle& style = ImGui::GetStyle();
-                float row_avail = ImGui::GetContentRegionAvail().x;
-                // Reserve space for Edit and Delete buttons
-                float edit_w = ImGui::CalcTextSize(i18n::get("dialog.append.edit")).x + style.FramePadding.x * 2.0f;
-                float del_w  = ImGui::CalcTextSize(i18n::get("dialog.append.delete")).x + style.FramePadding.x * 2.0f;
-                float text_w = std::max(220.0f, row_avail - edit_w - del_w - style.ItemSpacing.x * 2.0f);
-
-                // Render single-line with ellipsis trimming
-                {
-                    ImGui::BeginGroup();
-                    ImVec2 start = ImGui::GetCursorScreenPos();
-                    ImVec2 line_size(text_w, ImGui::GetTextLineHeight() + style.FramePadding.y * 2.0f);
-                    ImGui::InvisibleButton("##line", line_size);
-                    ImVec2 clip_min = start;
-                    ImVec2 clip_max = ImVec2(start.x + text_w, start.y + line_size.y);
-                    ImGui::PushClipRect(clip_min, clip_max, true);
-
-                    const char* full = state_.content_state().segments[i].data();
-                    std::string display = full;
-                    ImVec2 full_sz = ImGui::CalcTextSize(display.c_str());
-                    if (full_sz.x > text_w)
-                    {
-                        std::string ell = display;
-                        const char* ellipsis = "...";
-                        // Trim until it fits
-                        while (!ell.empty())
-                        {
-                            ImVec2 sz = ImGui::CalcTextSize((ell + ellipsis).c_str());
-                            if (sz.x <= text_w)
-                            {
-                                display = ell + ellipsis;
-                                break;
-                            }
-                            ell.pop_back();
-                        }
-                        if (ell.empty())
-                            display = ellipsis; // fallback
-                    }
-                    ImGui::SetCursorScreenPos(ImVec2(start.x + style.FramePadding.x, start.y + style.FramePadding.y));
-                    ImGui::TextUnformatted(display.c_str());
-                    ImGui::PopClipRect();
-                    ImGui::EndGroup();
-                }
-
-                ImGui::SameLine();
-                if (ImGui::SmallButton(i18n::get("dialog.append.edit")))
-                {
-                    state_.content_state().editing_index = i;
-                    std::snprintf(state_.content_state().edit_buffer.data(), state_.content_state().edit_buffer.size(), "%s", state_.content_state().segments[i].data());
-                }
-                ImGui::SameLine();
-                if (ImGui::SmallButton(i18n::get("dialog.append.delete")))
-                    to_delete = i;
-                ImGui::PopID();
-            }
-            if (to_delete >= 0 && to_delete < static_cast<int>(state_.content_state().segments.size()))
-            {
-                state_.content_state().segments.erase(state_.content_state().segments.begin() + to_delete);
-                if (to_delete < static_cast<int>(state_.content_state().speakers.size()))
-                    state_.content_state().speakers.erase(state_.content_state().speakers.begin() + to_delete);
-            }
-        }
-        ImGui::EndChild();
-
-        // Full editor for selected entry
-        if (state_.content_state().editing_index >= 0 && state_.content_state().editing_index < static_cast<int>(state_.content_state().segments.size()))
-        {
-            ImGui::Spacing();
-            {
-                std::string t = i18n::format("dialog.append.editing_entry", {{"index", std::to_string(state_.content_state().editing_index)}});
-                ImGui::TextDisabled("%s", t.c_str());
-            }
-            ImVec2 box(0, 160.0f);
-            ImGui::InputTextMultiline("##full_editor", state_.content_state().edit_buffer.data(), state_.content_state().edit_buffer.size(), box);
-            if (ImGui::Button(i18n::get("common.save")))
-            {
-                // Save back to segment (truncate to buffer size)
-                safe_copy_utf8(state_.content_state().segments[state_.content_state().editing_index].data(), state_.content_state().segments[state_.content_state().editing_index].size(), state_.content_state().edit_buffer.data());
-                state_.content_state().editing_index = -1;
-                state_.content_state().edit_buffer[0] = '\0';
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(i18n::get("common.cancel")))
-            {
-                state_.content_state().editing_index = -1;
-                state_.content_state().edit_buffer[0] = '\0';
-            }
-        }
-
-        ImGui::Spacing();
-        ImGui::TextUnformatted(i18n::get("dialog.append.new_text"));
-        {
-            const ImGuiStyle& style = ImGui::GetStyle();
-            float append_avail = ImGui::GetContentRegionAvail().x;
-            float btn_w = ImGui::CalcTextSize(i18n::get("dialog.append.append_button")).x + style.FramePadding.x * 2.0f;
-            ImGui::SetNextItemWidth(std::max(220.0f, append_avail - btn_w - style.ItemSpacing.x));
-            ImGui::InputText("##append", state_.content_state().append_buffer.data(), state_.content_state().append_buffer.size());
-            ImGui::SameLine();
-            if (ImGui::Button(i18n::get("dialog.append.append_button")))
-            {
-                if (state_.content_state().append_buffer[0] != '\0')
-                {
-                    state_.content_state().segments.emplace_back();
-                    state_.content_state().speakers.emplace_back();  // No speaker for manual appends
-                    safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), state_.content_state().append_buffer.data());
-                    state_.content_state().append_buffer[0] = '\0';
-                }
-            }
-        }
-        
-        ImGui::PopID();
-        ImGui::Unindent();
-        ImGui::Spacing();
-    }
-
-    if (width_changed)
-    {
-        state_.ui_state().window_size.x   = state_.ui_state().width;
-        state_.ui_state().pending_resize  = true;
-    }
-    if (height_changed)
-    {
-        state_.ui_state().window_size.y   = state_.ui_state().height;
-        state_.ui_state().pending_resize  = true;
-    }
-    if (alpha_changed || font_changed)
-        state_.ui_state().pending_resize = state_.ui_state().pending_resize;
+    (void)io;
+    settings_view_.render(
+        translator_.get(),
+        apply_hint_,
+        apply_hint_timer_,
+        testing_connection_,
+        test_result_,
+        test_timestamp_,
+        settings_id_suffix_,
+        [this]() { this->initTranslatorIfEnabled(); }
+    );
 }
-
 // Handle right-click context menu for dialog window
 void DialogWindow::renderDialogContextMenu()
 {
