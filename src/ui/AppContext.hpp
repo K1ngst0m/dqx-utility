@@ -1,8 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
-
-struct ImGuiIO;
+#include <string>
 
 class AppContext
 {
@@ -19,7 +18,6 @@ public:
 
     SDL_Window* window() const { return window_; }
     SDL_Renderer* renderer() const { return renderer_; }
-    ImGuiIO& imguiIO();
 
     void triggerVignette(float x, float y);
     void updateVignette(float delta_time);

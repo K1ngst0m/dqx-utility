@@ -45,7 +45,7 @@ bool Application::initialize(int argc, char** argv)
 
 void Application::setupManagers()
 {
-    auto& io = context_->imguiIO();
+    auto& io = ImGui::GetIO();
     font_manager_ = std::make_unique<FontManager>(io);
     registry_ = std::make_unique<WindowRegistry>(*font_manager_, io);
 
@@ -126,10 +126,12 @@ void Application::renderFrame()
         dockspace_id = mini_manager_->SetupDockspace();
     DockState::SetDockspace(dockspace_id);
     
+    auto& io = ImGui::GetIO();
+    
     for (auto& window : registry_->windows())
     {
         if (window)
-            window->render(context_->imguiIO());
+            window->render(io);
     }
     
     registry_->processRemovals();
@@ -137,8 +139,8 @@ void Application::renderFrame()
     if (current_mode == ConfigManager::AppMode::Mini)
         mini_manager_->HandleAltDrag();
 
-    event_handler_->HandleTransparentAreaClick(context_->imguiIO());
-    event_handler_->RenderGlobalContextMenu(context_->imguiIO(), show_settings_, quit_requested_);
+    event_handler_->HandleTransparentAreaClick(io);
+    event_handler_->RenderGlobalContextMenu(io, show_settings_, quit_requested_);
     
     if (config_->isGlobalSettingsRequested())
     {

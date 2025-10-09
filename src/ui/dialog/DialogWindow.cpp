@@ -21,7 +21,7 @@
 #include "../../services/DQXClarityLauncher.hpp"
 #include "../../dqxclarity/api/dialog_message.hpp"
 #include "../Localization.hpp"
-#include "DialogWaitAnimation.hpp"
+#include "DialogAnimator.hpp"
 
 namespace
 {
@@ -449,41 +449,13 @@ void DialogWindow::renderDialog(ImGuiIO& io)
             state_.ui_state().current_alpha_multiplier = 1.0f;
         }
         
-        // Soft vignette inside the dialog with rounded corners, no overlaps
-        {
-            float thickness = std::max(0.0f, state_.ui_state().vignette_thickness);
-            if (thickness > 0.0f)
-            {
-                ImDrawList* dl = ImGui::GetWindowDrawList();
-                ImVec2 win_pos = ImGui::GetWindowPos();
-                ImVec2 win_size = ImGui::GetWindowSize();
-                float rounding0 = std::max(0.0f, state_.ui_state().rounding);
-
-                // Feather steps scale with thickness (capped for perf)
-                int steps = static_cast<int>(std::ceil(thickness * 3.0f));
-                steps = std::clamp(steps, 1, 256);
-
-                // Increase overall darkness as size grows
-                float max_alpha = std::clamp(0.30f + 0.006f * thickness, 0.30f, 0.65f);
-
-                for (int i = 0; i < steps; ++i)
-                {
-                    float t = (steps <= 1) ? 0.0f : (static_cast<float>(i) / (steps - 1));
-                    float inset = t * thickness;
-                    ImVec2 pmin(win_pos.x + inset, win_pos.y + inset);
-                    ImVec2 pmax(win_pos.x + win_size.x - inset, win_pos.y + win_size.y - inset);
-                    float r = std::max(0.0f, rounding0 - inset);
-                    // Smooth fade curve (ease-out), slightly stronger
-                    float a = max_alpha * (1.0f - t);
-                    a = a * a; // quadratic ease-out
-                    // Apply fade multiplier to vignette
-                    a *= state_.ui_state().current_alpha_multiplier;
-                    if (a <= 0.0f) continue;
-                    ImU32 col = IM_COL32(0, 0, 0, (int)(a * 255.0f));
-                    dl->AddRect(pmin, pmax, col, r, 0, 1.0f);
-                }
-            }
-        }
+        renderVignette(
+            ImGui::GetWindowPos(),
+            ImGui::GetWindowSize(),
+            state_.ui_state().vignette_thickness,
+            state_.ui_state().rounding,
+            state_.ui_state().current_alpha_multiplier
+        );
 
         ImFont* active_font = state_.ui_state().font;
         float font_scale = 1.0f;
@@ -548,102 +520,25 @@ void DialogWindow::renderDialog(ImGuiIO& io)
                 
             }
             
-            // Draw separator (either with NPC name or plain line)
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            ImVec2 win_pos = ImGui::GetWindowPos();
             ImVec2 cr_min = ImGui::GetWindowContentRegionMin();
             ImVec2 cr_max = ImGui::GetWindowContentRegionMax();
             float content_width = cr_max.x - cr_min.x;
-            float x1 = win_pos.x + cr_min.x;
-            float x2 = win_pos.x + cr_max.x;
             
-            ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing()));
-            float y = ImGui::GetCursorScreenPos().y;
+            renderSeparator(hasValidNpc, currentSpeaker, content_width, state_.ui_state().current_alpha_multiplier);
             
-            if (hasValidNpc) {
-                // Draw NPC name separator
-                const std::string& speaker = currentSpeaker;
-                
-                // Calculate text width for centering
-                ImVec2 text_size = ImGui::CalcTextSize(speaker.c_str());
-                float padding = 10.0f;
-                float text_area_width = text_size.x + padding * 2.0f;
-                float line_width = (content_width - text_area_width) * 0.5f;
-                
-                // Only draw separator lines if there's enough space
-                if (line_width > 5.0f)
-                {
-                    float line_y = y + text_size.y * 0.5f;
-                    // Apply fade multiplier to separator color
-                    ImVec4 sep_color = UITheme::dialogSeparatorColor();
-                    sep_color.w *= state_.ui_state().current_alpha_multiplier;
-                    ImU32 sep_col_u32 = ImGui::ColorConvertFloat4ToU32(sep_color);
-                    
-                    // Left line
-                    draw_list->AddRectFilled(
-                        ImVec2(x1, line_y), 
-                        ImVec2(x1 + line_width, line_y + UITheme::dialogSeparatorThickness()), 
-                        sep_col_u32
-                    );
-                    // Right line
-                    draw_list->AddRectFilled(
-                        ImVec2(x2 - line_width, line_y), 
-                        ImVec2(x2, line_y + UITheme::dialogSeparatorThickness()), 
-                        sep_col_u32
-                    );
-                }
-                
-                // Draw centered NPC name text with fade
-                ImVec4 sep_text_color = UITheme::dialogSeparatorColor();
-                sep_text_color.w *= state_.ui_state().current_alpha_multiplier;
-                ImVec2 text_pos((x1 + x2 - text_size.x) * 0.5f, y);
-                draw_list->AddText(text_pos, ImGui::ColorConvertFloat4ToU32(sep_text_color), speaker.c_str());
-                
-                ImGui::Dummy(ImVec2(0.0f, text_size.y + UITheme::dialogSeparatorSpacing()));
-            } else {
-                // Draw plain separator line for No_NPC or corrupted names with fade
-                float line_y = y;
-                ImVec4 sep_color = UITheme::dialogSeparatorColor();
-                sep_color.w *= state_.ui_state().current_alpha_multiplier;
-                draw_list->AddRectFilled(
-                    ImVec2(x1, line_y), 
-                    ImVec2(x2, line_y + UITheme::dialogSeparatorThickness()), 
-                    ImGui::ColorConvertFloat4ToU32(sep_color)
-                );
-                ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing() + UITheme::dialogSeparatorThickness()));
-            }
-            
-            // Draw outlined text: render 8 shadow passes around the text, then the main text on top.
-            ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 pos = ImGui::GetCursorScreenPos();
-            ImFont* font_to_use = ImGui::GetFont();
-            float font_size_px = ImGui::GetFontSize();
             const char* txt = state_.content_state().segments[i].data();
-            float wrap_w = wrap_width;
+            
+            renderOutlinedText(
+                txt,
+                pos,
+                ImGui::GetFont(),
+                ImGui::GetFontSize(),
+                wrap_width,
+                state_.ui_state().current_alpha_multiplier
+            );
 
-            // Colors (apply fade multiplier)
-            ImVec4 text_col_v4 = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-            text_col_v4.w *= state_.ui_state().current_alpha_multiplier;
-            ImU32 text_col = ImGui::ColorConvertFloat4ToU32(text_col_v4);
-            ImU32 outline_col = IM_COL32(0, 0, 0, (int)(text_col_v4.w * 255.0f));
-
-            // Outline thickness scales slightly with font size (clamped)
-            float thickness = std::clamp(std::round(font_size_px * 0.06f), 1.0f, 3.0f);
-
-            // 8-directional outline
-            for (int ox = -1; ox <= 1; ++ox)
-            {
-                for (int oy = -1; oy <= 1; ++oy)
-                {
-                    if (ox == 0 && oy == 0) continue;
-                    dl->AddText(font_to_use, font_size_px, ImVec2(pos.x + ox * thickness, pos.y + oy * thickness), outline_col, txt, nullptr, wrap_w);
-                }
-            }
-            // Main text fill
-            dl->AddText(font_to_use, font_size_px, pos, text_col, txt, nullptr, wrap_w);
-
-            // Advance layout by the wrapped text height
-            ImVec2 text_sz = ImGui::CalcTextSize(txt, nullptr, false, wrap_w);
+            ImVec2 text_sz = ImGui::CalcTextSize(txt, nullptr, false, wrap_width);
             ImGui::Dummy(ImVec2(0.0f, text_sz.y));
             
             // Show copy/retry buttons for failed translations
@@ -986,4 +881,132 @@ void DialogWindow::rename(const char* new_name)
     name_ = new_name;
     window_label_ = name_ + "###" + id_suffix_;
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
+}
+
+void DialogWindow::renderVignette(
+    const ImVec2& win_pos,
+    const ImVec2& win_size,
+    float thickness,
+    float rounding,
+    float alpha_multiplier
+)
+{
+    thickness = std::max(0.0f, thickness);
+    if (thickness <= 0.0f) return;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    float rounding0 = std::max(0.0f, rounding);
+
+    int steps = static_cast<int>(std::ceil(thickness * 3.0f));
+    steps = std::clamp(steps, 1, 256);
+
+    float max_alpha = std::clamp(0.30f + 0.006f * thickness, 0.30f, 0.65f);
+
+    for (int i = 0; i < steps; ++i)
+    {
+        float t = (steps <= 1) ? 0.0f : (static_cast<float>(i) / (steps - 1));
+        float inset = t * thickness;
+        ImVec2 pmin(win_pos.x + inset, win_pos.y + inset);
+        ImVec2 pmax(win_pos.x + win_size.x - inset, win_pos.y + win_size.y - inset);
+        float r = std::max(0.0f, rounding0 - inset);
+        float a = max_alpha * (1.0f - t);
+        a = a * a;
+        a *= alpha_multiplier;
+        if (a <= 0.0f) continue;
+        ImU32 col = IM_COL32(0, 0, 0, (int)(a * 255.0f));
+        dl->AddRect(pmin, pmax, col, r, 0, 1.0f);
+    }
+}
+
+void DialogWindow::renderSeparator(
+    bool hasNPC,
+    const std::string& speaker,
+    float content_width,
+    float alpha_multiplier
+)
+{
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImVec2 win_pos = ImGui::GetWindowPos();
+    ImVec2 cr_min = ImGui::GetWindowContentRegionMin();
+    ImVec2 cr_max = ImGui::GetWindowContentRegionMax();
+    float x1 = win_pos.x + cr_min.x;
+    float x2 = win_pos.x + cr_max.x;
+
+    ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing()));
+    float y = ImGui::GetCursorScreenPos().y;
+
+    if (hasNPC)
+    {
+        ImVec2 text_size = ImGui::CalcTextSize(speaker.c_str());
+        float padding = 10.0f;
+        float text_area_width = text_size.x + padding * 2.0f;
+        float line_width = (content_width - text_area_width) * 0.5f;
+
+        if (line_width > 5.0f)
+        {
+            float line_y = y + text_size.y * 0.5f;
+            ImVec4 sep_color = UITheme::dialogSeparatorColor();
+            sep_color.w *= alpha_multiplier;
+            ImU32 sep_col_u32 = ImGui::ColorConvertFloat4ToU32(sep_color);
+
+            draw_list->AddRectFilled(
+                ImVec2(x1, line_y),
+                ImVec2(x1 + line_width, line_y + UITheme::dialogSeparatorThickness()),
+                sep_col_u32
+            );
+            draw_list->AddRectFilled(
+                ImVec2(x2 - line_width, line_y),
+                ImVec2(x2, line_y + UITheme::dialogSeparatorThickness()),
+                sep_col_u32
+            );
+        }
+
+        ImVec4 sep_text_color = UITheme::dialogSeparatorColor();
+        sep_text_color.w *= alpha_multiplier;
+        ImVec2 text_pos((x1 + x2 - text_size.x) * 0.5f, y);
+        draw_list->AddText(text_pos, ImGui::ColorConvertFloat4ToU32(sep_text_color), speaker.c_str());
+
+        ImGui::Dummy(ImVec2(0.0f, text_size.y + UITheme::dialogSeparatorSpacing()));
+    }
+    else
+    {
+        float line_y = y;
+        ImVec4 sep_color = UITheme::dialogSeparatorColor();
+        sep_color.w *= alpha_multiplier;
+        draw_list->AddRectFilled(
+            ImVec2(x1, line_y),
+            ImVec2(x2, line_y + UITheme::dialogSeparatorThickness()),
+            ImGui::ColorConvertFloat4ToU32(sep_color)
+        );
+        ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing() + UITheme::dialogSeparatorThickness()));
+    }
+}
+
+void DialogWindow::renderOutlinedText(
+    const char* text,
+    const ImVec2& position,
+    ImFont* font,
+    float font_size_px,
+    float wrap_width,
+    float alpha_multiplier
+)
+{
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    ImVec4 text_col_v4 = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    text_col_v4.w *= alpha_multiplier;
+    ImU32 text_col = ImGui::ColorConvertFloat4ToU32(text_col_v4);
+    ImU32 outline_col = IM_COL32(0, 0, 0, (int)(text_col_v4.w * 255.0f));
+
+    float thickness = std::clamp(std::round(font_size_px * 0.06f), 1.0f, 3.0f);
+
+    for (int ox = -1; ox <= 1; ++ox)
+    {
+        for (int oy = -1; oy <= 1; ++oy)
+        {
+            if (ox == 0 && oy == 0) continue;
+            dl->AddText(font, font_size_px, ImVec2(position.x + ox * thickness, position.y + oy * thickness), outline_col, text, nullptr, wrap_width);
+        }
+    }
+    dl->AddText(font, font_size_px, position, text_col, text, nullptr, wrap_width);
 }

@@ -4,7 +4,7 @@
 #include "../FontManager.hpp"
 #include "../WindowRegistry.hpp"
 #include "../../translate/TranslateSession.hpp"
-#include "DialogWaitAnimation.hpp"
+#include "DialogAnimator.hpp"
 #include "../../utils/PendingQueue.hpp"
 #include "DialogSettingsView.hpp"
 
@@ -53,6 +53,9 @@ private:
     void renderSettingsWindow(ImGuiIO& io);
     void renderDialogContextMenu();
 
+    void renderVignette(const ImVec2& win_pos, const ImVec2& win_size, float thickness, float rounding, float alpha_multiplier);
+    void renderSeparator(bool hasNPC, const std::string& speaker, float content_width, float alpha_multiplier);
+    void renderOutlinedText(const char* text, const ImVec2& position, ImFont* font, float font_size_px, float wrap_width, float alpha_multiplier);
 
     void renderAppearanceSection();
     void renderTranslateSection();
@@ -101,6 +104,6 @@ private:
     std::unordered_set<int> failed_segments_;
     std::unordered_map<int, std::string> failed_original_text_;
     std::unordered_map<int, std::string> failed_error_messages_;
-    DialogWaitAnimation wait_anim_;
+    DialogAnimator wait_anim_;
 
 };

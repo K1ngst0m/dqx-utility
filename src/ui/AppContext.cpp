@@ -118,10 +118,6 @@ void AppContext::endFrame()
 }
 
 // Grants mutable access to ImGui IO state.
-ImGuiIO& AppContext::imguiIO()
-{
-    return ImGui::GetIO();
-}
 
 void AppContext::updateRendererScale()
 {
