@@ -496,99 +496,43 @@ bool DialogHook::PollDialogData() {
 
 void DialogHook::EmitRegisterBackup(std::vector<uint8_t>& code)
 {
-    code.insert(code.end(), {0xA3});
-    uint32_t backup_eax = static_cast<uint32_t>(m_backup_address);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_eax), 
-                reinterpret_cast<uint8_t*>(&backup_eax) + 4);
-    code.push_back(0x90);
+    X86CodeBuilder builder;
+    builder.movToMem(X86CodeBuilder::Register::EAX, static_cast<uint32_t>(m_backup_address));
+    builder.movToMem(X86CodeBuilder::Register::EBX, static_cast<uint32_t>(m_backup_address + 4));
+    builder.movToMem(X86CodeBuilder::Register::ECX, static_cast<uint32_t>(m_backup_address + 8));
+    builder.movToMem(X86CodeBuilder::Register::EDX, static_cast<uint32_t>(m_backup_address + 12));
+    builder.movToMem(X86CodeBuilder::Register::ESI, static_cast<uint32_t>(m_backup_address + 16));
+    builder.movToMem(X86CodeBuilder::Register::EDI, static_cast<uint32_t>(m_backup_address + 20));
+    builder.movToMem(X86CodeBuilder::Register::EBP, static_cast<uint32_t>(m_backup_address + 24));
+    builder.movToMem(X86CodeBuilder::Register::ESP, static_cast<uint32_t>(m_backup_address + 28));
     
-    code.insert(code.end(), {0x89, 0x1D});
-    uint32_t backup_ebx = static_cast<uint32_t>(m_backup_address + 4);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebx), 
-                reinterpret_cast<uint8_t*>(&backup_ebx) + 4);
-    
-    code.insert(code.end(), {0x89, 0x0D});
-    uint32_t backup_ecx = static_cast<uint32_t>(m_backup_address + 8);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ecx), 
-                reinterpret_cast<uint8_t*>(&backup_ecx) + 4);
-    
-    code.insert(code.end(), {0x89, 0x15});
-    uint32_t backup_edx = static_cast<uint32_t>(m_backup_address + 12);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edx), 
-                reinterpret_cast<uint8_t*>(&backup_edx) + 4);
-    
-    code.insert(code.end(), {0x89, 0x35});
-    uint32_t backup_esi = static_cast<uint32_t>(m_backup_address + 16);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esi), 
-                reinterpret_cast<uint8_t*>(&backup_esi) + 4);
-    
-    code.insert(code.end(), {0x89, 0x3D});
-    uint32_t backup_edi = static_cast<uint32_t>(m_backup_address + 20);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edi), 
-                reinterpret_cast<uint8_t*>(&backup_edi) + 4);
-    
-    code.insert(code.end(), {0x89, 0x2D});
-    uint32_t backup_ebp = static_cast<uint32_t>(m_backup_address + 24);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebp), 
-                reinterpret_cast<uint8_t*>(&backup_ebp) + 4);
-    
-    code.insert(code.end(), {0x89, 0x25});
-    uint32_t backup_esp = static_cast<uint32_t>(m_backup_address + 28);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esp), 
-                reinterpret_cast<uint8_t*>(&backup_esp) + 4);
+    const auto& generated = builder.code();
+    code.insert(code.end(), generated.begin(), generated.end());
 }
 
 void DialogHook::EmitRegisterRestore(std::vector<uint8_t>& code)
 {
-    code.insert(code.end(), {0xA1});
-    uint32_t backup_eax = static_cast<uint32_t>(m_backup_address);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_eax), 
-                reinterpret_cast<uint8_t*>(&backup_eax) + 4);
-    code.push_back(0x90);
+    X86CodeBuilder builder;
+    builder.movFromMem(X86CodeBuilder::Register::EAX, static_cast<uint32_t>(m_backup_address));
+    builder.movFromMem(X86CodeBuilder::Register::EBX, static_cast<uint32_t>(m_backup_address + 4));
+    builder.movFromMem(X86CodeBuilder::Register::ECX, static_cast<uint32_t>(m_backup_address + 8));
+    builder.movFromMem(X86CodeBuilder::Register::EDX, static_cast<uint32_t>(m_backup_address + 12));
+    builder.movFromMem(X86CodeBuilder::Register::ESI, static_cast<uint32_t>(m_backup_address + 16));
+    builder.movFromMem(X86CodeBuilder::Register::EDI, static_cast<uint32_t>(m_backup_address + 20));
+    builder.movFromMem(X86CodeBuilder::Register::EBP, static_cast<uint32_t>(m_backup_address + 24));
+    builder.movFromMem(X86CodeBuilder::Register::ESP, static_cast<uint32_t>(m_backup_address + 28));
     
-    code.insert(code.end(), {0x8B, 0x1D});
-    uint32_t backup_ebx = static_cast<uint32_t>(m_backup_address + 4);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebx), 
-                reinterpret_cast<uint8_t*>(&backup_ebx) + 4);
-    
-    code.insert(code.end(), {0x8B, 0x0D});
-    uint32_t backup_ecx = static_cast<uint32_t>(m_backup_address + 8);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ecx), 
-                reinterpret_cast<uint8_t*>(&backup_ecx) + 4);
-    
-    code.insert(code.end(), {0x8B, 0x15});
-    uint32_t backup_edx = static_cast<uint32_t>(m_backup_address + 12);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edx), 
-                reinterpret_cast<uint8_t*>(&backup_edx) + 4);
-    
-    code.insert(code.end(), {0x8B, 0x35});
-    uint32_t backup_esi = static_cast<uint32_t>(m_backup_address + 16);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esi), 
-                reinterpret_cast<uint8_t*>(&backup_esi) + 4);
-    
-    code.insert(code.end(), {0x8B, 0x3D});
-    uint32_t backup_edi = static_cast<uint32_t>(m_backup_address + 20);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_edi), 
-                reinterpret_cast<uint8_t*>(&backup_edi) + 4);
-    
-    code.insert(code.end(), {0x8B, 0x2D});
-    uint32_t backup_ebp = static_cast<uint32_t>(m_backup_address + 24);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_ebp), 
-                reinterpret_cast<uint8_t*>(&backup_ebp) + 4);
-    
-    code.insert(code.end(), {0x8B, 0x25});
-    uint32_t backup_esp = static_cast<uint32_t>(m_backup_address + 28);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&backup_esp), 
-                reinterpret_cast<uint8_t*>(&backup_esp) + 4);
+    const auto& generated = builder.code();
+    code.insert(code.end(), generated.begin(), generated.end());
 }
 
 void DialogHook::EmitNewDataFlag(std::vector<uint8_t>& code)
 {
-    code.insert(code.end(), {0xC6, 0x05});
-    uint32_t flag_addr = static_cast<uint32_t>(m_backup_address + 32);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&flag_addr), 
-                reinterpret_cast<uint8_t*>(&flag_addr) + 4);
-    code.push_back(0x01);
+    X86CodeBuilder builder;
+    builder.setByteAtMem(static_cast<uint32_t>(m_backup_address + 32), 0x01);
+    
+    const auto& generated = builder.code();
+    code.insert(code.end(), generated.begin(), generated.end());
 }
 
 void DialogHook::EmitStolenInstructions(std::vector<uint8_t>& code)
@@ -598,12 +542,13 @@ void DialogHook::EmitStolenInstructions(std::vector<uint8_t>& code)
 
 void DialogHook::EmitReturnJump(std::vector<uint8_t>& code)
 {
-    code.push_back(0xE9);
+    X86CodeBuilder builder;
     uintptr_t return_addr = m_hook_address + m_original_bytes.size();
-    uintptr_t jmp_from = m_detour_address + (code.size() - 1);
-    uint32_t jump_offset = Rel32From(jmp_from, return_addr);
-    code.insert(code.end(), reinterpret_cast<uint8_t*>(&jump_offset), 
-                reinterpret_cast<uint8_t*>(&jump_offset) + 4);
+    uintptr_t jmp_from = m_detour_address + code.size();
+    builder.jmpRel32(jmp_from, return_addr);
+    
+    const auto& generated = builder.code();
+    code.insert(code.end(), generated.begin(), generated.end());
 }
 
 } // namespace dqxclarity
