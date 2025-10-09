@@ -45,9 +45,8 @@ bool Application::initialize(int argc, char** argv)
 
 void Application::setupManagers()
 {
-    auto& io = ImGui::GetIO();
-    font_manager_ = std::make_unique<FontManager>(io);
-    registry_ = std::make_unique<WindowRegistry>(*font_manager_, io);
+    font_manager_ = std::make_unique<FontManager>();
+    registry_ = std::make_unique<WindowRegistry>(*font_manager_);
 
     config_ = std::make_unique<ConfigManager>();
     ConfigManager_Set(config_.get());
@@ -131,7 +130,7 @@ void Application::renderFrame()
     for (auto& window : registry_->windows())
     {
         if (window)
-            window->render(io);
+            window->render();
     }
     
     registry_->processRemovals();
@@ -139,8 +138,8 @@ void Application::renderFrame()
     if (current_mode == ConfigManager::AppMode::Mini)
         mini_manager_->HandleAltDrag();
 
-    event_handler_->HandleTransparentAreaClick(io);
-    event_handler_->RenderGlobalContextMenu(io, show_settings_, quit_requested_);
+    event_handler_->HandleTransparentAreaClick();
+    event_handler_->RenderGlobalContextMenu(show_settings_, quit_requested_);
     
     if (config_->isGlobalSettingsRequested())
     {

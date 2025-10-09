@@ -9,7 +9,6 @@ enum class UIWindowType
     Dialog = 0
 };
 
-struct ImGuiIO;
 class DialogWindow;
 class FontManager;
 
@@ -22,15 +21,15 @@ public:
     virtual const char* displayName() const = 0;
     virtual const char* windowLabel() const = 0;
     virtual void rename(const char* new_name) = 0;
-    virtual void render(ImGuiIO& io) = 0;
-    virtual void renderSettings(ImGuiIO& io) = 0;
+    virtual void render() = 0;
+    virtual void renderSettings() = 0;
 };
 
 // WindowRegistry tracks all UI windows and their creation helpers.
 class WindowRegistry
 {
 public:
-    WindowRegistry(FontManager& font_manager, ImGuiIO& io);
+    WindowRegistry(FontManager& font_manager);
 
     DialogWindow& createDialogWindow();
     void removeWindow(UIWindow* window);
@@ -43,7 +42,6 @@ private:
     std::string makeDialogName();
 
     FontManager& font_manager_;
-    ImGuiIO& io_;
     std::vector<std::unique_ptr<UIWindow>> windows_;
     int dialog_counter_ = 0;
 };

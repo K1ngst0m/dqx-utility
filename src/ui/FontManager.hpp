@@ -4,14 +4,11 @@
 
 #include <vector>
 
-struct SDL_Renderer;
-struct ImGuiIO;
-
 // FontManager manages a shared ImGui font atlas and propagates changes to dialog states.
 class FontManager
 {
 public:
-    FontManager(ImGuiIO& io);
+    FontManager();
 
     void registerDialog(UIState& state);
     void unregisterDialog(UIState& state);
@@ -27,7 +24,6 @@ private:
     ImFont* loadFontFromPath(const char* path, bool& custom_loaded);
     ImFont* loadFallbackFont(bool& custom_loaded);
 
-    ImGuiIO& io_;
     std::vector<UIState*> dialogs_;
     ImFont* current_font_ = nullptr;
     bool has_custom_font_ = false;

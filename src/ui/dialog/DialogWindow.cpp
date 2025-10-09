@@ -111,11 +111,10 @@ namespace
 }
 
 
-DialogWindow::DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_id, const std::string& name)
+DialogWindow::DialogWindow(FontManager& font_manager, int instance_id, const std::string& name)
     : font_manager_(font_manager)
     , settings_view_(state_, font_manager_, session_)
 {
-    (void)io;
 
     name_ = name;
     id_suffix_ = "dialog_window_" + std::to_string(instance_id);
@@ -246,7 +245,7 @@ void DialogWindow::applyPending()
 }
 
 
-void DialogWindow::render(ImGuiIO& io)
+void DialogWindow::render()
 {
     appended_since_last_frame_ = false;
     applyPending();
@@ -313,13 +312,13 @@ void DialogWindow::render(ImGuiIO& io)
         }
     }
 
-    renderDialog(io);
+    renderDialog();
     renderDialogContextMenu();
-    renderSettingsWindow(io);
+    renderSettingsWindow();
 }
 
 // Renders the per-instance settings UI.
-void DialogWindow::renderSettings(ImGuiIO& io)
+void DialogWindow::renderSettings()
 {
     // If config manager recently reported a parse error from manual edits, surface it here
     if (auto* cm = ConfigManager_Get())
@@ -329,11 +328,12 @@ void DialogWindow::renderSettings(ImGuiIO& io)
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "%s", err);
         }
     }
-    renderSettingsPanel(io);
+    renderSettingsPanel();
 }
 
-void DialogWindow::renderDialog(ImGuiIO& io)
+void DialogWindow::renderDialog()
 {
+    ImGuiIO& io = ImGui::GetIO();
     const float max_dialog_width  = std::max(200.0f, io.DisplaySize.x - 40.0f);
     const float max_dialog_height = std::max(120.0f, io.DisplaySize.y - 40.0f);
 
@@ -722,9 +722,8 @@ void DialogWindow::initTranslatorIfEnabled()
 }
 
 
-void DialogWindow::renderSettingsPanel(ImGuiIO& io)
+void DialogWindow::renderSettingsPanel()
 {
-    (void)io;
     settings_view_.render(
         translator_.get(),
         apply_hint_,
@@ -844,7 +843,7 @@ void DialogWindow::renderDialogContextMenu()
     }
 }
 
-void DialogWindow::renderSettingsWindow(ImGuiIO& io)
+void DialogWindow::renderSettingsWindow()
 {
     if (!show_settings_window_)
         return;
@@ -867,7 +866,7 @@ void DialogWindow::renderSettingsWindow(ImGuiIO& io)
 
     if (ImGui::Begin(settings_title.c_str(), &show_settings_window_))
     {
-        renderSettingsPanel(io);
+        renderSettingsPanel();
     }
     ImGui::End();
 }

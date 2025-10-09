@@ -13,8 +13,9 @@ UIEventHandler::UIEventHandler(AppContext& app_context, WindowRegistry& registry
 {
 }
 
-bool UIEventHandler::IsMouseOutsideDialogs(ImGuiIO& io) const
+bool UIEventHandler::IsMouseOutsideDialogs() const
 {
+    ImGuiIO& io = ImGui::GetIO();
     if (!ImGui::IsMousePosValid(&io.MousePos))
         return false;
 
@@ -37,23 +38,24 @@ bool UIEventHandler::IsMouseOutsideDialogs(ImGuiIO& io) const
     return true;
 }
 
-void UIEventHandler::HandleTransparentAreaClick(ImGuiIO& io)
+void UIEventHandler::HandleTransparentAreaClick()
 {
+    ImGuiIO& io = ImGui::GetIO();
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left))
         return;
-    
+
     if (io.WantCaptureMouse)
         return;
-    
-    if (!IsMouseOutsideDialogs(io))
+
+    if (!IsMouseOutsideDialogs())
         return;
-    
+
     app_context_.triggerVignette(io.MousePos.x, io.MousePos.y);
 }
 
-void UIEventHandler::RenderGlobalContextMenu(ImGuiIO& io, bool& show_manager, bool& quit_requested)
+void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requested)
 {
-    if (IsMouseOutsideDialogs(io) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+    if (IsMouseOutsideDialogs() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
     {
         ImGui::OpenPopup("GlobalContextMenu");
     }
@@ -81,7 +83,7 @@ void UIEventHandler::RenderGlobalContextMenu(ImGuiIO& io, bool& show_manager, bo
         ImGui::Separator();
         if (ImGui::MenuItem(i18n::get("menu.quit")))
             quit_requested = true;
-        
+
         ImGui::EndPopup();
     }
 }

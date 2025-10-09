@@ -8,15 +8,15 @@
 #include <algorithm>
 
 // Prepares a registry capable of creating window instances.
-WindowRegistry::WindowRegistry(FontManager& font_manager, ImGuiIO& io)
-    : font_manager_(font_manager), io_(io)
+WindowRegistry::WindowRegistry(FontManager& font_manager)
+    : font_manager_(font_manager)
 {
 }
 
 // Registers and returns a new dialog window instance.
 DialogWindow& WindowRegistry::createDialogWindow()
 {
-    auto dialog = std::make_unique<DialogWindow>(font_manager_, io_, dialog_counter_, makeDialogName());
+    auto dialog = std::make_unique<DialogWindow>(font_manager_, dialog_counter_, makeDialogName());
     DialogWindow& ref = *dialog;
     windows_.push_back(std::move(dialog));
     ++dialog_counter_;

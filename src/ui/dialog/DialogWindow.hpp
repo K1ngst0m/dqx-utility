@@ -18,15 +18,13 @@
 #include <unordered_set>
 #include <functional>
 
-struct ImGuiIO;
-
 namespace translate { class ITranslator; }
 class LabelProcessor;
 
 class DialogWindow : public UIWindow
 {
 public:
-    DialogWindow(FontManager& font_manager, ImGuiIO& io, int instance_id, const std::string& name);
+    DialogWindow(FontManager& font_manager, int instance_id, const std::string& name);
     ~DialogWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Dialog; }
@@ -34,8 +32,8 @@ public:
     const char* windowLabel() const override { return window_label_.c_str(); }
     void rename(const char* new_name) override;
 
-    void render(ImGuiIO& io) override;
-    void renderSettings(ImGuiIO& io) override;
+    void render() override;
+    void renderSettings() override;
 
 
     DialogStateManager& state() { return state_; }
@@ -48,9 +46,9 @@ private:
     struct PendingMsg { std::string text; std::string lang; std::string speaker; std::uint64_t seq = 0; };
 
 
-    void renderDialog(ImGuiIO& io);
-    void renderSettingsPanel(ImGuiIO& io);
-    void renderSettingsWindow(ImGuiIO& io);
+    void renderDialog();
+    void renderSettingsPanel();
+    void renderSettingsWindow();
     void renderDialogContextMenu();
 
     void renderVignette(const ImVec2& win_pos, const ImVec2& win_size, float thickness, float rounding, float alpha_multiplier);

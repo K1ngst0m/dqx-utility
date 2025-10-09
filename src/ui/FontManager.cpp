@@ -25,8 +25,7 @@ namespace
 }
 
 // Prepares font storage tied to the ImGui IO context.
-FontManager::FontManager(ImGuiIO& io)
-    : io_(io)
+FontManager::FontManager()
 {
 }
 
@@ -71,7 +70,7 @@ bool FontManager::reloadFont(const char* path)
 {
     utils::CrashHandler::SetContext("FontManager::reloadFont");
     ImGui_ImplSDLRenderer3_DestroyDeviceObjects();
-    io_.Fonts->ClearFonts();
+    ImGui::GetIO().Fonts->ClearFonts();
 
     bool custom_loaded = false;
     current_font_ = loadFontFromPath(path, custom_loaded);
@@ -125,20 +124,21 @@ ImFont* FontManager::loadFontFromPath(const char* path, bool& custom_loaded)
     config.OversampleV = 2;
     config.PixelSnapH  = false;
 
+    ImGuiIO& io = ImGui::GetIO();
     ImFontGlyphRangesBuilder builder;
-    builder.AddRanges(io_.Fonts->GetGlyphRangesDefault());
-    builder.AddRanges(io_.Fonts->GetGlyphRangesJapanese());
-    builder.AddRanges(io_.Fonts->GetGlyphRangesKorean());
-    builder.AddRanges(io_.Fonts->GetGlyphRangesChineseFull());
-    builder.AddRanges(io_.Fonts->GetGlyphRangesCyrillic());
+    builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+    builder.AddRanges(io.Fonts->GetGlyphRangesJapanese());
+    builder.AddRanges(io.Fonts->GetGlyphRangesKorean());
+    builder.AddRanges(io.Fonts->GetGlyphRangesChineseFull());
+    builder.AddRanges(io.Fonts->GetGlyphRangesCyrillic());
     ImVector<ImWchar> ranges;
     builder.BuildRanges(&ranges);
 
-    ImFont* font = io_.Fonts->AddFontFromFileTTF(path, kDialogFontSize, &config, ranges.Data);
+    ImFont* font = io.Fonts->AddFontFromFileTTF(path, kDialogFontSize, &config, ranges.Data);
     if (font)
     {
         custom_loaded = true;
-        io_.Fonts->Build();
+        io.Fonts->Build();
         PLOG_INFO << "Loaded dialog font: " << path;
     }
     else
@@ -160,8 +160,9 @@ ImFont* FontManager::loadFallbackFont(bool& custom_loaded)
     }
 
     PLOG_WARNING << "Using ImGui default font; CJK glyphs may be missing.";
-    ImFont* font = io_.Fonts->AddFontDefault();
-    io_.Fonts->Build();
+    ImGuiIO& io = ImGui::GetIO();
+    ImFont* font = io.Fonts->AddFontDefault();
+    io.Fonts->Build();
     custom_loaded = false;
     return font;
 }
