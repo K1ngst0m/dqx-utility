@@ -2,7 +2,7 @@
 
 #include <imgui.h>
 #include <plog/Log.h>
-#include "ui/DockState.hpp"
+#include "../DockState.hpp"
 
 #include <algorithm>
 #include <cfloat>
@@ -13,14 +13,14 @@
 #include <sstream>
 #include <iomanip>
 
-#include "translate/ITranslator.hpp"
-#include "translate/LabelProcessor.hpp"
-#include "config/ConfigManager.hpp"
-#include "UITheme.hpp"
-#include "DQXClarityService.hpp"
-#include "DQXClarityLauncher.hpp"
-#include "dqxclarity/api/dialog_message.hpp"
-#include "ui/Localization.hpp"
+#include "../../translate/ITranslator.hpp"
+#include "../../translate/LabelProcessor.hpp"
+#include "../../config/ConfigManager.hpp"
+#include "../UITheme.hpp"
+#include "../../services/DQXClarityService.hpp"
+#include "../../services/DQXClarityLauncher.hpp"
+#include "../../dqxclarity/api/dialog_message.hpp"
+#include "../Localization.hpp"
 #include "DialogWaitAnimation.hpp"
 
 namespace

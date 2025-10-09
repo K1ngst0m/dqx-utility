@@ -1,13 +1,13 @@
 #include "DialogSettingsView.hpp"
 
 #include <imgui.h>
-#include "UITheme.hpp"
-#include "ui/Localization.hpp"
-#include "state/DialogStateManager.hpp"
-#include "FontManager.hpp"
-#include "config/ConfigManager.hpp"
-#include "translate/ITranslator.hpp"
-#include "translate/TranslateSession.hpp"
+#include "../UITheme.hpp"
+#include "../Localization.hpp"
+#include "../../state/DialogStateManager.hpp"
+#include "../FontManager.hpp"
+#include "../../config/ConfigManager.hpp"
+#include "../../translate/ITranslator.hpp"
+#include "../../translate/TranslateSession.hpp"
 
 DialogSettingsView::DialogSettingsView(
     DialogStateManager& state,

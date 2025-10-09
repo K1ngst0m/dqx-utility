@@ -2,11 +2,11 @@
 
 #include <cstring>
 #include <imgui.h>
-#include "state/DialogStateManager.hpp"
-#include "FontManager.hpp"
-#include "translate/TranslateSession.hpp"
-#include "ui/Localization.hpp"
-#include "UITheme.hpp"
+#include "../../state/DialogStateManager.hpp"
+#include "../FontManager.hpp"
+#include "../../translate/TranslateSession.hpp"
+#include "../Localization.hpp"
+#include "../UITheme.hpp"
 
 DebugSettingsPanel::DebugSettingsPanel(
     DialogStateManager& state,

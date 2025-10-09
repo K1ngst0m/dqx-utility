@@ -1,6 +1,6 @@
 #include "WindowRegistry.hpp"
 
-#include "DialogWindow.hpp"
+#include "dialog/DialogWindow.hpp"
 #include "FontManager.hpp"
 #include "ui/Localization.hpp"
 

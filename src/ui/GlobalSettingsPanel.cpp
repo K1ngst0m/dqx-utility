@@ -1,6 +1,6 @@
-#include "SettingsPanel.hpp"
+#include "GlobalSettingsPanel.hpp"
 
-#include "DialogWindow.hpp"
+#include "dialog/DialogWindow.hpp"
 #include "ProcessDetector.hpp"
 #include "ProcessLocaleChecker.hpp"
 #include "DQXClarityLauncher.hpp"
@@ -32,7 +32,7 @@ namespace
 }
 
 // Builds a settings panel tied to the window registry.
-SettingsPanel::SettingsPanel(WindowRegistry& registry)
+GlobalSettingsPanel::GlobalSettingsPanel(WindowRegistry& registry)
     : registry_(registry)
     , dqxc_launcher_(std::make_unique<DQXClarityLauncher>())
 {
@@ -41,7 +41,7 @@ SettingsPanel::SettingsPanel(WindowRegistry& registry)
 }
 
 // Renders the settings window with type/instance selectors.
-void SettingsPanel::render(bool& open)
+void GlobalSettingsPanel::render(bool& open)
 {
     if (!open)
         return;
@@ -104,7 +104,7 @@ void SettingsPanel::render(bool& open)
 }
 
 // Provides a combo box for selecting the active window type.
-void SettingsPanel::renderTypeSelector()
+void GlobalSettingsPanel::renderTypeSelector()
 {
     int current_index = 0;
     for (int i = 0; i < static_cast<int>(std::size(kWindowTypes)); ++i)
@@ -136,7 +136,7 @@ void SettingsPanel::renderTypeSelector()
 }
 
 // Displays instance list and creation controls for the active type.
-void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows)
+void GlobalSettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows)
 {
     if (selected_type_ == UIWindowType::Dialog)
     {
@@ -237,7 +237,7 @@ void SettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows
     }
 }
 
-void SettingsPanel::renderDQXClaritySection()
+void GlobalSettingsPanel::renderDQXClaritySection()
 {
     if (!dqxc_launcher_)
         return;
@@ -282,7 +282,7 @@ void SettingsPanel::renderDQXClaritySection()
 #endif
 }
 
-void SettingsPanel::renderDebugSection()
+void GlobalSettingsPanel::renderDebugSection()
 {
     ImGui::TextUnformatted(i18n::get("settings.dqxc.debug_title"));
 
@@ -344,7 +344,7 @@ void SettingsPanel::renderDebugSection()
     
 }
 
-std::string SettingsPanel::readLogFile(const std::string& path, size_t max_lines)
+std::string GlobalSettingsPanel::readLogFile(const std::string& path, size_t max_lines)
 {
     std::ifstream file(path);
     if (!file.is_open())
@@ -380,7 +380,7 @@ return i18n::format("settings.log_viewer.not_found", {{"path", path}});
     return oss.str();
 }
 
-void SettingsPanel::renderStatusSection()
+void GlobalSettingsPanel::renderStatusSection()
 {
     if (ImGui::CollapsingHeader(i18n::get("settings.sections.status"), ImGuiTreeNodeFlags_DefaultOpen))
     {
@@ -432,7 +432,7 @@ void SettingsPanel::renderStatusSection()
     }
 }
 
-void SettingsPanel::renderWindowManagementSection()
+void GlobalSettingsPanel::renderWindowManagementSection()
 {
     if (ImGui::CollapsingHeader(i18n::get("settings.sections.window_management")))
     {
@@ -445,7 +445,7 @@ void SettingsPanel::renderWindowManagementSection()
     }
 }
 
-void SettingsPanel::renderAppearanceSection()
+void GlobalSettingsPanel::renderAppearanceSection()
 {
     if (ImGui::CollapsingHeader(i18n::get("settings.sections.appearance"), ImGuiTreeNodeFlags_DefaultOpen))
     {

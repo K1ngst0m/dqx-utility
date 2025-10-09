@@ -2,9 +2,9 @@
 
 #include <functional>
 #include <string>
-#include "settings/AppearanceSettingsPanel.hpp"
-#include "settings/TranslationSettingsPanel.hpp"
-#include "settings/DebugSettingsPanel.hpp"
+#include "AppearanceSettingsPanel.hpp"
+#include "TranslationSettingsPanel.hpp"
+#include "DebugSettingsPanel.hpp"
 
 class FontManager;
 namespace translate { class ITranslator; }

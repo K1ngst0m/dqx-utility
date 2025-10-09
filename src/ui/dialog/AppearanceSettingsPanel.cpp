@@ -1,9 +1,9 @@
 #include "AppearanceSettingsPanel.hpp"
 
 #include <imgui.h>
-#include "state/DialogStateManager.hpp"
-#include "ui/Localization.hpp"
-#include "UITheme.hpp"
+#include "../../state/DialogStateManager.hpp"
+#include "../Localization.hpp"
+#include "../UITheme.hpp"
 
 AppearanceSettingsPanel::AppearanceSettingsPanel(DialogStateManager& state)
     : state_(state)

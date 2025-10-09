@@ -43,15 +43,15 @@ endif()
 add_executable(dqx_utility
   src/main.cpp
   src/ui/AppContext.cpp
-  src/ui/DialogWindow.cpp
+  src/ui/dialog/DialogWindow.cpp
   src/ui/FontManager.cpp
-  src/ui/SettingsPanel.cpp
+  src/ui/GlobalSettingsPanel.cpp
   src/ui/WindowRegistry.cpp
-  src/ui/DialogWaitAnimation.cpp
-  src/ui/DialogSettingsView.cpp
-  src/ui/settings/AppearanceSettingsPanel.cpp
-  src/ui/settings/TranslationSettingsPanel.cpp
-  src/ui/settings/DebugSettingsPanel.cpp
+  src/ui/dialog/DialogWaitAnimation.cpp
+  src/ui/dialog/DialogSettingsView.cpp
+  src/ui/dialog/AppearanceSettingsPanel.cpp
+  src/ui/dialog/TranslationSettingsPanel.cpp
+  src/ui/dialog/DebugSettingsPanel.cpp
   src/platform/ProcessDetector.cpp
   src/platform/ProcessLocaleChecker.cpp
   src/platform/WineDetector.cpp

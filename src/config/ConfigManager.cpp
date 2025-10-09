@@ -1,7 +1,7 @@
 #include "ConfigManager.hpp"
 
 #include "../ui/WindowRegistry.hpp"
-#include "../ui/DialogWindow.hpp"
+#include "../ui/dialog/DialogWindow.hpp"
 #include "../state/DialogStateManager.hpp"
 #include "../utils/ErrorReporter.hpp"
 

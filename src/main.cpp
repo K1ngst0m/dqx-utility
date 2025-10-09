@@ -3,9 +3,9 @@
 
 #include "AppContext.hpp"
 #include "FontManager.hpp"
-#include "SettingsPanel.hpp"
+#include "GlobalSettingsPanel.hpp"
 #include "WindowRegistry.hpp"
-#include "DialogWindow.hpp"
+#include "dialog/DialogWindow.hpp"
 #include "config/ConfigManager.hpp"
 #include "utils/ErrorReporter.hpp"
 #include "utils/CrashHandler.hpp"
@@ -389,7 +389,7 @@ int main(int argc, char** argv)
         registry.createDialogWindow();
     
     // UI components
-    SettingsPanel settings_panel(registry);
+    GlobalSettingsPanel settings_panel(registry);
     ErrorDialog error_dialog;
     
     // Application state

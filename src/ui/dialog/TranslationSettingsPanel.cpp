@@ -3,11 +3,11 @@
 #include <cstdio>
 #include <ctime>
 #include <imgui.h>
-#include "state/DialogStateManager.hpp"
-#include "translate/TranslateSession.hpp"
-#include "translate/ITranslator.hpp"
-#include "ui/Localization.hpp"
-#include "UITheme.hpp"
+#include "../../state/DialogStateManager.hpp"
+#include "../../translate/TranslateSession.hpp"
+#include "../../translate/ITranslator.hpp"
+#include "../Localization.hpp"
+#include "../UITheme.hpp"
 
 TranslationSettingsPanel::TranslationSettingsPanel(
     DialogStateManager& state,

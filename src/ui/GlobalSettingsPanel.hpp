@@ -7,11 +7,11 @@
 #include <memory>
 #include <string>
 
-// SettingsPanel offers selection and configuration for available UI windows.
-class SettingsPanel
+// GlobalSettingsPanel offers application-wide settings and window management.
+class GlobalSettingsPanel
 {
 public:
-    SettingsPanel(WindowRegistry& registry);
+    GlobalSettingsPanel(WindowRegistry& registry);
 
     void render(bool& open);
 
