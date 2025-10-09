@@ -1,0 +1,52 @@
+#pragma once
+
+#include <memory>
+#include <SDL3/SDL.h>
+
+class AppContext;
+class FontManager;
+class WindowRegistry;
+class ConfigManager;
+class GlobalSettingsPanel;
+class ErrorDialog;
+
+namespace ui {
+class UIEventHandler;
+class MiniModeManager;
+class AppModeManager;
+}
+
+class Application
+{
+public:
+    Application();
+    ~Application();
+
+    bool initialize(int argc, char** argv);
+    int run();
+
+private:
+    void setupManagers();
+    void initializeConfig();
+    void mainLoop();
+    void handleModeChanges();
+    void renderFrame();
+    void handleQuitRequests();
+    void cleanup();
+
+    std::unique_ptr<AppContext> context_;
+    std::unique_ptr<FontManager> font_manager_;
+    std::unique_ptr<WindowRegistry> registry_;
+    std::unique_ptr<ConfigManager> config_;
+    std::unique_ptr<GlobalSettingsPanel> settings_panel_;
+    std::unique_ptr<ErrorDialog> error_dialog_;
+    
+    std::unique_ptr<ui::UIEventHandler> event_handler_;
+    std::unique_ptr<ui::MiniModeManager> mini_manager_;
+    std::unique_ptr<ui::AppModeManager> mode_manager_;
+    
+    bool show_settings_ = true;
+    bool quit_requested_ = false;
+    bool running_ = true;
+    Uint64 last_time_ = 0;
+};

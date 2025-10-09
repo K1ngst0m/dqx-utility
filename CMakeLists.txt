@@ -42,6 +42,7 @@ endif()
 
 add_executable(dqx_utility
   src/main.cpp
+  src/Application.cpp
   src/ui/AppContext.cpp
   src/ui/dialog/DialogWindow.cpp
   src/ui/FontManager.cpp
