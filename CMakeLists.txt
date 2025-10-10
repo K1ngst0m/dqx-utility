@@ -67,6 +67,10 @@ set(DQX_CORE_SOURCES
   ${MAIN_TRANSLATOR_SOURCES}
   src/translate/LabelProcessor.cpp
   src/translate/LabelProcessor.hpp
+  src/translate/TranslationRequestBuilder.cpp
+  src/translate/UnknownLabelRepository.cpp
+  src/processing/TextPipeline.cpp
+  src/processing/TextNormalizer.cpp
   src/config/ConfigManager.cpp
   src/config/ConfigManager.hpp
   src/utils/ErrorReporter.cpp
