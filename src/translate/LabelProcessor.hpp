@@ -3,18 +3,17 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include "UnknownLabelRepository.hpp"
 
 class LabelProcessor
 {
 public:
-    LabelProcessor();
+    explicit LabelProcessor(UnknownLabelRepository* repo = nullptr);
     ~LabelProcessor();
 
     std::string processText(const std::string& input);
     
-    void loadUnknownLabels();
-    void saveUnknownLabels();
-    
+    // Persistence is delegated to UnknownLabelRepository now.
     const std::unordered_set<std::string>& getUnknownLabels() const { return unknown_labels_; }
 
 private:
@@ -29,5 +28,5 @@ private:
     std::string processSelectSection(const std::string& content);
     
     std::unordered_set<std::string> unknown_labels_;
-    static constexpr const char* kUnknownLabelsFile = "unknown_labels.txt";
+    UnknownLabelRepository* repository_ = nullptr;
 };
