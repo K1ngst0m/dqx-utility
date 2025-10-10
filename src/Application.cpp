@@ -16,7 +16,54 @@
 #include "platform/PlatformSetup.hpp"
 
 #include <plog/Log.h>
+#include <plog/Init.h>
+#include <plog/Appenders/ConsoleAppender.h>
+#include <plog/Formatters/TxtFormatter.h>
+#include <plog/Initializers/RollingFileInitializer.h>
 #include <filesystem>
+#include <fstream>
+#include <cstring>
+#include <toml++/toml.h>
+
+namespace {
+
+static bool initialize_logging(int argc, char** argv)
+{
+    std::filesystem::create_directories("logs");
+
+    bool append_logs = true;
+    try {
+        std::ifstream ifs("config.toml");
+        if (ifs) {
+            toml::table cfg = toml::parse(ifs);
+            if (auto* global = cfg["global"].as_table()) {
+                if (auto value = (*global)["append_logs"].value<bool>()) {
+                    append_logs = *value;
+                }
+            }
+        }
+    } catch (...) {
+        // Ignore parse errors during early init
+    }
+
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--append-logs") == 0) {
+            append_logs = true;
+        }
+    }
+
+    static plog::RollingFileAppender<plog::TxtFormatter> file_appender("logs/run.log", 1024 * 1024 * 10, 3);
+    static plog::ConsoleAppender<plog::TxtFormatter> console_appender;
+    plog::init(plog::info, &file_appender);
+    if (auto logger = plog::get())
+        logger->addAppender(&console_appender);
+
+    (void)append_logs;
+
+    return true;
+}
+
+} // namespace
 
 Application::Application() = default;
 Application::~Application() { cleanup(); }
@@ -25,7 +72,8 @@ bool Application::initialize(int argc, char** argv)
 {
     utils::CrashHandler::Initialize();
 
-    std::filesystem::create_directories("logs");
+    if (!initialize_logging(argc, argv))
+        return false;
     
     platform::PlatformSetup::InitializeConsole();
 
