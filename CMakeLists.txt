@@ -40,8 +40,7 @@ else()
   set(APP_ICON_RC)
 endif()
 
-add_executable(dqx_utility
-  src/main.cpp
+set(DQX_CORE_SOURCES
   src/Application.cpp
   src/ui/AppContext.cpp
   src/ui/dialog/DialogWindow.cpp
@@ -78,20 +77,31 @@ add_executable(dqx_utility
   src/utils/CrashHandler.hpp
   src/ui/ErrorDialog.cpp
   src/ui/ErrorDialog.hpp
+)
+
+add_library(dqx_core STATIC ${DQX_CORE_SOURCES})
+target_include_directories(dqx_core PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/services
+)
+set_project_warnings(dqx_core)
+configure_target_properties(dqx_core)
+
+target_link_libraries(dqx_core PUBLIC SDL3::SDL3 imgui cpr::cpr)
+target_include_directories(dqx_core PUBLIC ${tomlplusplus_SOURCE_DIR}/include ${plog_SOURCE_DIR}/include)
+
+add_executable(dqx_utility
+  src/main.cpp
   ${APP_ICON_RC}
 )
 
 set_project_warnings(dqx_utility)
 configure_target_properties(dqx_utility)
 
-target_include_directories(dqx_utility PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/src
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/services
-)
-
 target_link_libraries(dqx_utility PRIVATE 
+  dqx_core
   SDL3::SDL3 
   imgui 
   dqxclarity::dqxclarity

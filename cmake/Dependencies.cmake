@@ -116,13 +116,41 @@ CPMAddPackage(
   DOWNLOAD_ONLY YES
 )
 
-# Catch2 - Testing framework (optional)
+
 if(BUILD_TESTS)
   CPMAddPackage(
     NAME Catch2
     GITHUB_REPOSITORY catchorg/Catch2
     GIT_TAG v3.7.1
   )
+
+  if(NOT Catch2_ADDED)
+    find_package(Catch2 COMPONENTS Main QUIET)
+    if(NOT Catch2_FOUND)
+      message(WARNING "Catch2 was not added via CPM and not found by find_package(). Tests may fail to configure. \
+To fix, ensure network access during configure, enable CPM local cache, or install Catch2 on the system.")
+    endif()
+  endif()
+endif()
+
+if(NOT SDL3_ADDED)
+  message(FATAL_ERROR "Required dependency SDL3 was not acquired.")
+endif()
+
+if(NOT imgui_ADDED)
+  message(FATAL_ERROR "Required dependency imgui was not acquired.")
+endif()
+
+if(NOT plog_ADDED)
+  message(FATAL_ERROR "Required dependency plog was not acquired.")
+endif()
+
+if(NOT cpr_ADDED)
+  message(FATAL_ERROR "Required dependency cpr was not acquired.")
+endif()
+
+if(NOT tomlplusplus_ADDED AND NOT tomlplusplus_SOURCE_DIR)
+  message(FATAL_ERROR "Required dependency tomlplusplus was not acquired.")
 endif()
 
 # Setup ImGui library target

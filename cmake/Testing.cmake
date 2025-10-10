@@ -7,46 +7,36 @@ endif()
 
 enable_testing()
 
-set(TEST_DQXCLARITY_SOURCES
-  src/dqxclarity/memory/MemoryFactory.cpp
-  src/dqxclarity/pattern/Pattern.cpp
-  src/dqxclarity/pattern/PatternScanner.cpp
-  src/dqxclarity/signatures/Signatures.cpp
-  src/dqxclarity/process/ProcessFinder.cpp
-)
-
-if(WIN32)
-  list(APPEND TEST_DQXCLARITY_SOURCES
-    src/dqxclarity/memory/win/ProcessMemory.cpp
-    src/dqxclarity/pattern/win/MemoryRegion.cpp
-    src/dqxclarity/process/win/ProcessFinder.cpp
-  )
-else()
-  list(APPEND TEST_DQXCLARITY_SOURCES
-    src/dqxclarity/memory/linux/ProcessMemory.cpp
-    src/dqxclarity/pattern/linux/MemoryRegion.cpp
-    src/dqxclarity/process/linux/ProcessFinder.cpp
-  )
-endif()
-
-add_executable(dqx_utility_tests
+# Test source files (only tests; production code should be provided by library targets)
+set(TEST_SOURCES
   tests/test_main.cpp
   tests/test_text_processing.cpp
   tests/dqxclarity/test_memory.cpp
   tests/dqxclarity/test_pattern_scanner.cpp
   tests/dqxclarity/test_process_finder.cpp
-  ${TEST_DQXCLARITY_SOURCES}
+)
+
+add_executable(dqx_utility_tests
+  ${TEST_SOURCES}
 )
 
 target_include_directories(dqx_utility_tests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(dqx_utility_tests PRIVATE Catch2::Catch2WithMain)
+# Link the test executable against Catch2 and the production libraries (do not duplicate sources)
+target_link_libraries(dqx_utility_tests PRIVATE Catch2::Catch2WithMain dqx_core dqxclarity::dqxclarity)
 
 if(WIN32)
   target_link_libraries(dqx_utility_tests PRIVATE psapi)
 endif()
+
+# Provide a 'check' target that runs the tests via CTest
+add_custom_target(check
+  COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+  DEPENDS dqx_utility_tests
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 
 include(CTest)
 if(Catch2_SOURCE_DIR)
