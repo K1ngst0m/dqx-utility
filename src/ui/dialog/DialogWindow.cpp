@@ -14,7 +14,8 @@
 #include <iomanip>
 
 #include "../../translate/ITranslator.hpp"
-#include "../../translate/LabelProcessor.hpp"
+#include "../../processing/TextPipeline.hpp"
+#include "../../processing/TextNormalizer.hpp"
 #include "../../config/ConfigManager.hpp"
 #include "../UITheme.hpp"
 #include "../../services/DQXClarityService.hpp"
@@ -71,43 +72,6 @@ namespace
         return ".";
     }
     
-    // Collapses consecutive newlines to at most 2 (limiting empty space in dialog)
-    std::string collapse_newlines(const std::string& text)
-    {
-        if (text.empty()) return text;
-        
-        std::string result;
-        result.reserve(text.size());
-        
-        int consecutive_newlines = 0;
-        for (size_t i = 0; i < text.size(); ++i)
-        {
-            char c = text[i];
-            if (c == '\n' || c == '\r')
-            {
-                // Handle both \n and \r\n
-                if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
-                {
-                    // Skip the \r, we'll process \n next
-                    continue;
-                }
-                
-                consecutive_newlines++;
-                // Only allow up to 2 consecutive newlines (1 empty line)
-                if (consecutive_newlines <= 2)
-                {
-                    result += '\n';
-                }
-            }
-            else
-            {
-                consecutive_newlines = 0;
-                result += c;
-            }
-        }
-        
-        return result;
-    }
 }
 
 
@@ -122,7 +86,7 @@ DialogWindow::DialogWindow(FontManager& font_manager, int instance_id, const std
     window_label_ = name_ + "###" + id_suffix_;
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
     
-    label_processor_ = std::make_unique<LabelProcessor>();
+    text_pipeline_ = std::make_unique<processing::TextPipeline>();
 
     state_.applyDefaults();
 
@@ -182,8 +146,7 @@ void DialogWindow::applyPending()
             // Handle empty text for NPC-only messages
             std::string text_to_process = m.text.empty() ? " " : m.text;
             
-            std::string processed_text = label_processor_->processText(text_to_process);
-            processed_text = collapse_newlines(processed_text);
+            std::string processed_text = text_pipeline_->process(text_to_process);
 
             auto submit = session_.submit(
                 processed_text,
@@ -195,7 +158,7 @@ void DialogWindow::applyPending()
             {
                 state_.content_state().segments.emplace_back();
                 state_.content_state().speakers.push_back(m.speaker);
-                std::string collapsed_text = collapse_newlines(submit.text);
+                std::string collapsed_text = processing::collapse_newlines(submit.text);
                 safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), collapsed_text);
                 if (m.seq > 0) last_applied_seq_ = m.seq;
                 continue;
@@ -233,7 +196,7 @@ void DialogWindow::applyPending()
             state_.content_state().segments.emplace_back();
             state_.content_state().speakers.push_back(m.speaker);
             std::string text_to_copy = m.text.empty() ? " " : m.text;
-            std::string collapsed_text = collapse_newlines(text_to_copy);
+            std::string collapsed_text = processing::collapse_newlines(text_to_copy);
             safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), collapsed_text);
         }
         if (m.seq > 0)
@@ -280,7 +243,7 @@ void DialogWindow::render()
                         }
                         else
                         {
-                            std::string collapsed_text = collapse_newlines(ev.text);
+                            std::string collapsed_text = processing::collapse_newlines(ev.text);
                             safe_copy_utf8(state_.content_state().segments[idx].data(), state_.content_state().segments[idx].size(), collapsed_text);
                             failed_segments_.erase(idx);
                             failed_original_text_.erase(idx);
@@ -304,7 +267,7 @@ void DialogWindow::render()
                     }
                     else
                     {
-                        std::string collapsed_text = collapse_newlines(ev.text);
+                        std::string collapsed_text = processing::collapse_newlines(ev.text);
                         safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), collapsed_text);
                     }
                 }
@@ -575,7 +538,7 @@ void DialogWindow::renderDialog()
                     if (it != failed_original_text_.end() && translator_ && translator_->isReady())
                     {
                         std::string text_to_retry = it->second;
-                        std::string processed_text = label_processor_->processText(text_to_retry);
+                        std::string processed_text = text_pipeline_->process(text_to_retry);
                         auto submit = session_.submit(
                             processed_text,
                             state_.translation_config().translation_backend,

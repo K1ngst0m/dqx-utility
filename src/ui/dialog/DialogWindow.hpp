@@ -19,7 +19,7 @@
 #include <functional>
 
 namespace translate { class ITranslator; }
-class LabelProcessor;
+namespace processing { class TextPipeline; }
 
 class DialogWindow : public UIWindow
 {
@@ -77,7 +77,7 @@ private:
 
     std::unique_ptr<translate::ITranslator> translator_;
     std::uint64_t last_job_id_ = 0;
-    std::unique_ptr<LabelProcessor> label_processor_;
+    std::unique_ptr<processing::TextPipeline> text_pipeline_;
     
     TranslateSession session_;
 

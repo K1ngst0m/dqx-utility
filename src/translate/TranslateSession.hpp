@@ -9,6 +9,7 @@
 
 #include "state/TranslationConfig.hpp"
 #include "translate/ITranslator.hpp"
+#include "translate/TranslationRequestBuilder.hpp"
 
 class TranslateSession {
 public:
@@ -51,22 +52,15 @@ public:
 
         if (cache_.size() >= capacity_) cache_.clear();
 
-        // Mask corner quotes with tags preserved by OpenAI prompt
-        static constexpr const char* kOpenQuote  = "\xE3\x80\x8C"; // U+300C
-        static constexpr const char* kCloseQuote = "\xE3\x80\x8D"; // U+300D
-        static constexpr const char* kTagOpen    = "<dqxlq/>";
-        static constexpr const char* kTagClose   = "<dqxrq/>";
-
-        std::string to_translate = processed_text;
-        replaceAllInPlace(to_translate, kOpenQuote,  kTagOpen);
-        replaceAllInPlace(to_translate, kCloseQuote, kTagClose);
+        // Build a translation request (centralized masking/escaping)
+        auto req = translate::build_translation_request(processed_text, "auto", target_code, static_cast<int>(backend));
 
         if (!translator || !translator->isReady()) {
             return SubmitResult{SubmitKind::DroppedNotReady, 0, {}};
         }
 
         std::uint64_t jid = 0;
-        bool ok = translator->translate(to_translate, "auto", target_code, jid);
+        bool ok = translator->translate(req.translatable_text, req.source_lang, req.target_lang, jid);
         if (!ok || jid == 0) {
             return SubmitResult{SubmitKind::DroppedNotReady, 0, {}};
         }

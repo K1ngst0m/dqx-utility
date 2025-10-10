@@ -1,5 +1,6 @@
 #include "LabelProcessor.hpp"
 #include "LabelPatterns.hpp"
+#include "../processing/StageRunner.hpp"
 
 #include <algorithm>
 #include <regex>
@@ -20,11 +21,31 @@ LabelProcessor::~LabelProcessor()
 
 std::string LabelProcessor::processText(const std::string& input)
 {
-    std::string result = input;
-    result = processKnownLabels(result);
-    result = processIgnoredLabels(result);
-    result = trackUnknownLabels(result);
-    return result;
+    // Stage 1: known label processing
+    auto known_stage = processing::run_stage<std::string>("label_known", [&]() {
+        return this->processKnownLabels(input);
+    });
+    if (!known_stage.succeeded) {
+        return input; // fallback to original on failure
+    }
+
+    // Stage 2: ignored label removal
+    auto ignored_stage = processing::run_stage<std::string>("label_ignored", [&]() {
+        return this->processIgnoredLabels(known_stage.result);
+    });
+    if (!ignored_stage.succeeded) {
+        return known_stage.result;
+    }
+
+    // Stage 3: unknown label tracking & removal
+    auto unknown_stage = processing::run_stage<std::string>("label_unknowns", [&]() {
+        return this->trackUnknownLabels(ignored_stage.result);
+    });
+    if (!unknown_stage.succeeded) {
+        return ignored_stage.result;
+    }
+
+    return unknown_stage.result;
 }
 
 std::string LabelProcessor::processKnownLabels(const std::string& input)
