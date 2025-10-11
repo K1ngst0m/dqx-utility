@@ -3,6 +3,7 @@
 #include "StageRunner.hpp"
 #include "../processing/TextNormalizer.hpp"
 #include "Diagnostics.hpp"
+#include "../utils/Profile.hpp"
 
 #include <memory>
 #include <plog/Log.h>
@@ -27,6 +28,8 @@ TextPipeline::~TextPipeline() = default;
 
 std::string TextPipeline::process(const std::string& input)
 {
+    PROFILE_SCOPE_CUSTOM("TextPipeline::process");
+
     const bool verbose = Diagnostics::IsVerbose();
     if (verbose) {
         PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] stage=input raw=" << Diagnostics::Preview(input);

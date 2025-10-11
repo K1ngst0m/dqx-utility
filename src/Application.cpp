@@ -14,6 +14,7 @@
 #include "utils/ErrorReporter.hpp"
 #include "services/DQXClarityService.hpp"
 #include "processing/Diagnostics.hpp"
+#include "utils/Profile.hpp"
 
 #include <plog/Log.h>
 #include <plog/Init.h>
@@ -61,6 +62,8 @@ Application::~Application() { cleanup(); }
 
 bool Application::initialize()
 {
+    PROFILE_SCOPE_FUNCTION();
+
     utils::CrashHandler::Initialize();
 
     if (!initializeLogging())
@@ -84,6 +87,8 @@ bool Application::initialize()
 
 bool Application::initializeLogging()
 {
+    PROFILE_SCOPE_FUNCTION();
+
     std::filesystem::create_directories("logs");
     processing::Diagnostics::InitializeLogger();
 
@@ -149,6 +154,8 @@ void Application::setupSDLLogging()
 
 void Application::setupManagers()
 {
+    PROFILE_SCOPE_FUNCTION();
+
     font_manager_ = std::make_unique<FontManager>();
     registry_ = std::make_unique<WindowRegistry>(*font_manager_);
 
@@ -165,6 +172,8 @@ void Application::setupManagers()
 
 void Application::initializeConfig()
 {
+    PROFILE_SCOPE_FUNCTION();
+
     config_->setRegistry(registry_.get());
     config_->setForceVerboseLogging(force_verbose_pipeline_);
     config_->loadAtStartup();
@@ -181,14 +190,20 @@ void Application::initializeConfig()
 
 int Application::run()
 {
+    PROFILE_THREAD_NAME("MainThread");
+
     mainLoop();
     return 0;
 }
 
 void Application::mainLoop()
 {
+    PROFILE_SCOPE_FUNCTION();
+
     while (running_)
     {
+        PROFILE_SCOPE_CUSTOM("MainLoopTick");
+
         Uint64 current_time = SDL_GetTicks();
         float delta_time = (current_time - last_time_) / 1000.0f;
         last_time_ = current_time;
@@ -213,6 +228,8 @@ void Application::mainLoop()
 
 void Application::handleModeChanges()
 {
+    PROFILE_SCOPE_FUNCTION();
+
     auto current_mode = config_->getAppMode();
     if (current_mode != mode_manager_->GetCurrentMode())
     {
@@ -222,6 +239,8 @@ void Application::handleModeChanges()
 
 void Application::renderFrame()
 {
+    PROFILE_SCOPE_FUNCTION();
+
     context_->beginFrame();
 
     ImGuiID dockspace_id = 0;
@@ -271,10 +290,14 @@ void Application::renderFrame()
     context_->renderVignette();
     context_->endFrame();
     SDL_Delay(16);
+
+    PROFILE_FRAME_MARK();
 }
 
 void Application::handleQuitRequests()
 {
+    PROFILE_SCOPE_FUNCTION();
+
     if (quit_requested_)
     {
         if (auto* dqxc = DQXClarityService_Get())

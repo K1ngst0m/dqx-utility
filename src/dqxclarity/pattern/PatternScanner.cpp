@@ -1,5 +1,7 @@
 #include "PatternScanner.hpp"
 
+#include "../../utils/Profile.hpp"
+
 namespace dqxclarity {
 
 PatternScanner::PatternScanner(std::shared_ptr<IProcessMemory> memory)
@@ -82,19 +84,27 @@ std::optional<uintptr_t> PatternScanner::ScanRegion(
     const MemoryRegion& region,
     const Pattern& pattern)
 {
+    PROFILE_SCOPE_FUNCTION();
     if (!pattern.IsValid() || region.Size() < pattern.Size()) {
         return std::nullopt;
     }
 
     std::vector<uint8_t> buffer(region.Size());
-    if (!m_memory->ReadMemory(region.start, buffer.data(), buffer.size())) {
-        return std::nullopt;
+    {
+        PROFILE_SCOPE_CUSTOM("ScanRegion.ReadMemory");
+        if (!m_memory->ReadMemory(region.start, buffer.data(), buffer.size())) {
+            return std::nullopt;
+        }
     }
 
-    // If pattern contains any wildcards, prefer a safe naive scan for correctness.
-    // The BM bad-character heuristic is not adapted for masked bytes here and can miss matches.
-    bool has_wildcards = std::find(pattern.mask.begin(), pattern.mask.end(), false) != pattern.mask.end();
+    bool has_wildcards = false;
+    {
+        PROFILE_SCOPE_CUSTOM("ScanRegion.CheckWildcards");
+        has_wildcards = std::find(pattern.mask.begin(), pattern.mask.end(), false) != pattern.mask.end();
+    }
+
     if (has_wildcards) {
+        PROFILE_SCOPE_CUSTOM("ScanRegion.NaiveScan");
         auto all = FindPatternInBufferAll(buffer.data(), buffer.size(), pattern);
         if (!all.empty()) {
             return region.start + all.front();
@@ -102,8 +112,17 @@ std::optional<uintptr_t> PatternScanner::ScanRegion(
         return std::nullopt;
     }
 
-    auto bad_char_table = BuildBadCharTable(pattern);
-    auto offset = FindPatternInBuffer(buffer.data(), buffer.size(), pattern, bad_char_table);
+    std::vector<size_t> bad_char_table;
+    {
+        PROFILE_SCOPE_CUSTOM("ScanRegion.BuildBadCharTable");
+        bad_char_table = BuildBadCharTable(pattern);
+    }
+
+    std::optional<size_t> offset;
+    {
+        PROFILE_SCOPE_CUSTOM("ScanRegion.BMHSearch");
+        offset = FindPatternInBuffer(buffer.data(), buffer.size(), pattern, bad_char_table);
+    }
 
     if (offset) {
         return region.start + *offset;
@@ -140,17 +159,23 @@ std::optional<uintptr_t> PatternScanner::ScanProcess(
     const Pattern& pattern,
     bool require_executable)
 {
+    PROFILE_SCOPE_FUNCTION();
     if (!m_memory->IsProcessAttached()) {
         return std::nullopt;
     }
 
-    auto regions = MemoryRegionParser::ParseMapsFiltered(
-        m_memory->GetAttachedPid(),
-        true,
-        require_executable
-    );
+    std::vector<MemoryRegion> regions;
+    {
+        PROFILE_SCOPE_CUSTOM("ScanProcess.ParseRegions");
+        regions = MemoryRegionParser::ParseMapsFiltered(
+            m_memory->GetAttachedPid(),
+            true,
+            require_executable
+        );
+    }
 
     for (const auto& region : regions) {
+        PROFILE_SCOPE_CUSTOM("ScanProcess.RegionScan");
         auto result = ScanRegion(region, pattern);
         if (result) {
             return result;
@@ -164,11 +189,16 @@ std::optional<uintptr_t> PatternScanner::ScanModule(
     const Pattern& pattern,
     const std::string& module_name)
 {
+    PROFILE_SCOPE_FUNCTION();
     if (!m_memory->IsProcessAttached()) {
         return std::nullopt;
     }
 
-    auto regions = MemoryRegionParser::ParseMaps(m_memory->GetAttachedPid());
+    std::vector<MemoryRegion> regions;
+    {
+        PROFILE_SCOPE_CUSTOM("ScanModule.ParseMaps");
+        regions = MemoryRegionParser::ParseMaps(m_memory->GetAttachedPid());
+    }
 
     for (const auto& region : regions) {
         if (region.pathname.find(module_name) == std::string::npos) {
@@ -179,7 +209,11 @@ std::optional<uintptr_t> PatternScanner::ScanModule(
             continue;
         }
 
-        auto result = ScanRegion(region, pattern);
+        std::optional<uintptr_t> result;
+        {
+            PROFILE_SCOPE_CUSTOM("ScanModule.ScanRegion");
+            result = ScanRegion(region, pattern);
+        }
         if (result) {
             return result;
         }

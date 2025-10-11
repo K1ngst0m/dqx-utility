@@ -134,6 +134,19 @@ CPMAddPackage(
     "CPPTRACE_STATIC_LIB ON"
 )
 
+# Tracy - Real-time profiler
+if(ENABLE_PROFILING)
+  CPMAddPackage(
+    NAME tracy
+    GITHUB_REPOSITORY wolfpld/tracy
+    GIT_TAG v0.12.2
+    OPTIONS
+      "TRACY_ENABLE ON"
+      "TRACY_ON_DEMAND ON"
+      "TRACY_NO_FRAME_IMAGE ON"
+  )
+endif()
+
 
 if(BUILD_TESTS)
   CPMAddPackage(
@@ -169,6 +182,12 @@ endif()
 
 if(NOT tomlplusplus_ADDED AND NOT tomlplusplus_SOURCE_DIR)
   message(FATAL_ERROR "Required dependency tomlplusplus was not acquired.")
+endif()
+
+if(ENABLE_PROFILING)
+  if(NOT tracy_ADDED)
+    message(FATAL_ERROR "Required dependency tracy was not acquired.")
+  endif()
 endif()
 
 # Setup ImGui library target

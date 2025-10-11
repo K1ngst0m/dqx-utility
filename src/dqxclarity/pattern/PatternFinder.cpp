@@ -2,21 +2,26 @@
 #include "PatternScanner.hpp"
 #include <vector>
 
+#include "../../utils/Profile.hpp"
+
 namespace dqxclarity {
 
 std::optional<uintptr_t> PatternFinder::FindInModule(const Pattern& pattern, const std::string& module_name) {
+    PROFILE_SCOPE_FUNCTION();
     if (!memory_ || !memory_->IsProcessAttached()) return std::nullopt;
     PatternScanner scanner(memory_);
     return scanner.ScanModule(pattern, module_name);
 }
 
 std::optional<uintptr_t> PatternFinder::FindInProcessExec(const Pattern& pattern) {
+    PROFILE_SCOPE_FUNCTION();
     if (!memory_ || !memory_->IsProcessAttached()) return std::nullopt;
     PatternScanner scanner(memory_);
     return scanner.ScanProcess(pattern, /*require_executable=*/true);
 }
 
 std::optional<uintptr_t> PatternFinder::FindWithFallback(const Pattern& pattern, const std::string& module_name, size_t scan_size_bytes) {
+    PROFILE_SCOPE_FUNCTION();
     if (auto m = FindInModule(pattern, module_name)) return m;
     if (auto e = FindInProcessExec(pattern)) return e;
 
@@ -25,7 +30,11 @@ std::optional<uintptr_t> PatternFinder::FindWithFallback(const Pattern& pattern,
     uintptr_t base = memory_->GetModuleBaseAddress(module_name);
     if (base == 0) return std::nullopt;
 
-    auto regions = MemoryRegionParser::ParseMapsFiltered(memory_->GetAttachedPid(), /*require_readable=*/true, /*require_executable=*/false);
+    std::vector<MemoryRegion> regions;
+    {
+        PROFILE_SCOPE_CUSTOM("PatternFinder::Fallback.ParseRegions");
+        regions = MemoryRegionParser::ParseMapsFiltered(memory_->GetAttachedPid(), /*require_readable=*/true, /*require_executable=*/false);
+    }
     for (const auto& region : regions) {
         // Restrict to the address window relative to the module base
         if (region.end <= base || region.start >= base + scan_size_bytes) continue;

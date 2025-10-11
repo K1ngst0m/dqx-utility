@@ -6,6 +6,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(CompilerFlags)
 
+option(ENABLE_PROFILING "Enable profiling instrumentation" ON)
 option(BUILD_DQXCLARITY_CLI "Build DQXClarity C++ CLI executable" OFF)
 add_subdirectory(src/dqxclarity)
 
@@ -94,6 +95,10 @@ set_project_warnings(dqx_core)
 configure_target_properties(dqx_core)
 
 target_link_libraries(dqx_core PUBLIC SDL3::SDL3 imgui cpr::cpr cpptrace::cpptrace)
+if(ENABLE_PROFILING)
+  target_link_libraries(dqx_core PUBLIC Tracy::TracyClient)
+  target_compile_definitions(dqx_core PUBLIC DQX_ENABLE_PROFILING)
+endif()
 target_include_directories(dqx_core PUBLIC ${tomlplusplus_SOURCE_DIR}/include ${plog_SOURCE_DIR}/include)
 target_compile_definitions(dqx_core PRIVATE PLOG_CHAR_IS_UTF8=1)
 

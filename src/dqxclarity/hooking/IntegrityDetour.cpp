@@ -5,6 +5,7 @@
 #include "../signatures/Signatures.hpp"
 #include "Codegen.hpp"
 #include "../memory/MemoryPatch.hpp"
+#include "../../utils/Profile.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -32,6 +33,8 @@ IntegrityDetour::~IntegrityDetour() {
 }
 
 bool IntegrityDetour::FindIntegrityAddress(uintptr_t& out_addr) {
+    PROFILE_SCOPE_FUNCTION();
+
     auto pat = Signatures::GetIntegrityCheck();
 
     // Diagnostics: dump pattern and environment (only when diagnostics enabled or verbose)
@@ -77,7 +80,9 @@ bool IntegrityDetour::FindIntegrityAddress(uintptr_t& out_addr) {
     PatternFinder finder(m_memory);
 
     if (m_diag && m_log.info) m_log.info("Integrity scan step: module scan DQXGame.exe");
-    if (auto a = finder.FindInModule(pat, "DQXGame.exe")) {
+    {
+        PROFILE_SCOPE_CUSTOM("IntegrityScan.Module");
+        if (auto a = finder.FindInModule(pat, "DQXGame.exe")) {
         out_addr = *a;
         if (m_diag && m_log.info) {
             std::ostringstream oss; oss << "Integrity scan: FOUND in module @0x" << std::hex << out_addr << std::dec; m_log.info(oss.str());
@@ -86,9 +91,12 @@ bool IntegrityDetour::FindIntegrityAddress(uintptr_t& out_addr) {
     } else {
         if (m_diag && m_log.info) m_log.info("Integrity scan: module scan result: not found");
     }
+    }
 
     if (m_diag && m_log.info) m_log.info("Integrity scan step: process exec regions");
-    if (auto b = finder.FindInProcessExec(pat)) {
+    {
+        PROFILE_SCOPE_CUSTOM("IntegrityScan.ExecRegions");
+        if (auto b = finder.FindInProcessExec(pat)) {
         out_addr = *b;
         if (m_diag && m_log.info) {
             std::ostringstream oss; oss << "Integrity scan: FOUND in exec regions @0x" << std::hex << out_addr << std::dec; m_log.info(oss.str());
@@ -97,9 +105,12 @@ bool IntegrityDetour::FindIntegrityAddress(uintptr_t& out_addr) {
     } else {
         if (m_diag && m_log.info) m_log.info("Integrity scan: exec regions result: not found");
     }
+    }
 
     if (m_diag && m_log.info) m_log.info("Integrity scan step: chunked fallback from module base");
-    if (auto c = finder.FindWithFallback(pat, "DQXGame.exe", 80u * 1024u * 1024u)) {
+    {
+        PROFILE_SCOPE_CUSTOM("IntegrityScan.Fallback");
+        if (auto c = finder.FindWithFallback(pat, "DQXGame.exe", 80u * 1024u * 1024u)) {
         out_addr = *c;
         if (m_diag && m_log.info) {
             std::ostringstream oss; oss << "Integrity scan: FOUND via fallback @0x" << std::hex << out_addr << std::dec; m_log.info(oss.str());
@@ -107,6 +118,7 @@ bool IntegrityDetour::FindIntegrityAddress(uintptr_t& out_addr) {
         return true;
     } else {
         if (m_diag && m_log.info) m_log.info("Integrity scan: fallback result: not found");
+    }
     }
 
     // Deep diagnostics (anchor, histograms, naive parity) only if enabled
@@ -287,6 +299,8 @@ void IntegrityDetour::LogBytes(const char* label, uintptr_t addr, size_t count) 
 }
 
 bool IntegrityDetour::BuildAndWriteTrampoline() {
+    PROFILE_SCOPE_FUNCTION();
+
     // Allocate state (1 byte) and trampoline code
     m_state_addr = m_memory->AllocateMemory(8, /*executable=*/false);
     if (m_state_addr == 0) return false;
@@ -374,6 +388,8 @@ bool IntegrityDetour::BuildAndWriteTrampoline() {
 }
 
 bool IntegrityDetour::PatchIntegrityFunction() {
+    PROFILE_SCOPE_FUNCTION();
+
     // Write 5-byte JMP rel32 at E9 patch site
     std::vector<uint8_t> patch;
     patch.push_back(0xE9);
@@ -399,6 +415,8 @@ bool IntegrityDetour::PatchIntegrityFunction() {
 }
 
 bool IntegrityDetour::Install() {
+    PROFILE_SCOPE_FUNCTION();
+
     if (m_installed) return true;
     if (!m_memory || !m_memory->IsProcessAttached()) return false;
 

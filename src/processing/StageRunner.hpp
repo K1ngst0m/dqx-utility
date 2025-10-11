@@ -8,6 +8,8 @@
 #include <utility>
 #include <exception>
 
+#include "../utils/Profile.hpp"
+
 namespace processing {
 
 // Utility to run a stage (callable returning T) and produce text_processing::StageResult<T>
@@ -15,6 +17,8 @@ namespace processing {
 template<typename T, typename Fn>
 text_processing::StageResult<T> run_stage(const std::string& stage_name, Fn&& fn)
 {
+    PROFILE_SCOPE_CUSTOM(stage_name);
+
     using namespace std::chrono;
     auto start = high_resolution_clock::now();
     try
