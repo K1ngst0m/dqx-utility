@@ -4,7 +4,7 @@
 #include <string>
 
 namespace translate { class ITranslator; }
-class DialogStateManager;
+struct DialogStateManager;
 class TranslateSession;
 
 class TranslationSettingsPanel {

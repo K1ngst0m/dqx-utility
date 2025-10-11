@@ -2,7 +2,7 @@
 
 #include <string>
 
-class DialogStateManager;
+struct DialogStateManager;
 class FontManager;
 class TranslateSession;
 

@@ -1,6 +1,6 @@
 #pragma once
 
-class DialogStateManager;
+struct DialogStateManager;
 
 class AppearanceSettingsPanel {
 public:

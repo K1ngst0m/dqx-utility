@@ -9,7 +9,7 @@
 class FontManager;
 namespace translate { class ITranslator; }
 class TranslateSession;
-class DialogStateManager;
+struct DialogStateManager;
 
 class DialogSettingsView {
 public:
