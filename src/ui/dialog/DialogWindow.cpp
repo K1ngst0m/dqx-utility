@@ -23,6 +23,7 @@
 #include "../../dqxclarity/api/dialog_message.hpp"
 #include "../Localization.hpp"
 #include "DialogAnimator.hpp"
+#include "../../dqxclarity/api/dqxclarity.hpp"
 
 namespace
 {
@@ -71,13 +72,163 @@ namespace
         }
         return ".";
     }
+
+    std::string strip_waiting_suffix(std::string text)
+    {
+        auto ends_with = [](const std::string& value, const std::string& suffix) {
+            return value.size() >= suffix.size() && value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+        };
+
+        const std::string ellipsis = "\xE2\x80\xA6";        // …
+        const std::string full_stop = "\xE3\x80\x82";       // 。
+        const std::string fullwidth_period = "\xEF\xBC\x8E"; // ．
+
+        while (!text.empty())
+        {
+            bool stripped = false;
+            if (!text.empty() && text.back() == '.')
+            {
+                text.pop_back();
+                stripped = true;
+            }
+            else if (ends_with(text, ellipsis))
+            {
+                text.erase(text.size() - ellipsis.size());
+                stripped = true;
+            }
+            else if (ends_with(text, full_stop))
+            {
+                text.erase(text.size() - full_stop.size());
+                stripped = true;
+            }
+            else if (ends_with(text, fullwidth_period))
+            {
+                text.erase(text.size() - fullwidth_period.size());
+                stripped = true;
+            }
+
+            while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())))
+            {
+                text.pop_back();
+                stripped = true;
+            }
+
+            if (!stripped)
+                break;
+        }
+        return text;
+    }
+
+    std::string localized_or_fallback(const char* key, const char* fallback)
+    {
+        const std::string& value = i18n::get_str(key);
+        if (value.empty() || value == key)
+            return std::string(fallback);
+        return value;
+    }
     
+}
+
+
+void DialogWindow::ensurePlaceholderEntry()
+{
+    if (state_.content_state().segments.empty()) {
+        state_.content_state().segments.emplace_back();
+        state_.content_state().segments.back().fill('\0');
+    }
+    if (state_.content_state().speakers.size() < state_.content_state().segments.size()) {
+        state_.content_state().speakers.resize(state_.content_state().segments.size());
+    }
+}
+
+void DialogWindow::setPlaceholderText(const std::string& text, PlaceholderState state)
+{
+    ensurePlaceholderEntry();
+    auto& buf = state_.content_state().segments[0];
+    buf.fill('\0');
+    safe_copy_utf8(buf.data(), buf.size(), text);
+    if (!state_.content_state().speakers.empty()) {
+        state_.content_state().speakers[0].clear();
+    }
+    placeholder_active_ = true;
+    placeholder_state_ = state;
+    placeholder_base_text_ = text;
+    if (state == PlaceholderState::Waiting) {
+        wait_anim_.reset();
+    }
+}
+
+void DialogWindow::reinitializePlaceholder()
+{
+    resetPlaceholder();
+}
+
+void DialogWindow::resetPlaceholder()
+{
+    setPlaceholderText(i18n::get("dialog.placeholder.waiting"), PlaceholderState::Waiting);
+}
+
+void DialogWindow::refreshPlaceholderStatus()
+{
+    if (!placeholder_active_) {
+        return;
+    }
+
+    const std::string waiting = localized_or_fallback("dialog.placeholder.waiting", "Initializing dialog system...");
+    const std::string ready = localized_or_fallback("dialog.placeholder.ready", "Dialog system ready.");
+    const std::string failed = localized_or_fallback("dialog.placeholder.failed", "Dialog system failed to initialize. Check hook status and logs.");
+
+    ensurePlaceholderEntry();
+
+    auto set_if_changed = [&](const std::string& text, PlaceholderState state) {
+        if (placeholder_state_ != state || placeholder_base_text_ != text) {
+            setPlaceholderText(text, state);
+        }
+    };
+
+    auto* launcher = DQXClarityService_Get();
+    if (!launcher) {
+        set_if_changed(waiting, PlaceholderState::Waiting);
+        return;
+    }
+
+    auto stage = launcher->getEngineStage();
+    if (stage == dqxclarity::Status::Hooked) {
+        set_if_changed(ready, PlaceholderState::Ready);
+    } else if (stage == dqxclarity::Status::Error) {
+        set_if_changed(failed, PlaceholderState::Error);
+    } else {
+        set_if_changed(waiting, PlaceholderState::Waiting);
+    }
+}
+
+int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::string& text)
+{
+    std::string collapsed_text = processing::collapse_newlines(text);
+    if (placeholder_active_) {
+        ensurePlaceholderEntry();
+        safe_copy_utf8(state_.content_state().segments[0].data(), state_.content_state().segments[0].size(), collapsed_text);
+        if (!state_.content_state().speakers.empty()) {
+            state_.content_state().speakers[0] = speaker;
+        }
+        placeholder_active_ = false;
+        placeholder_state_ = PlaceholderState::Ready;
+        placeholder_base_text_.clear();
+        return 0;
+    }
+
+    state_.content_state().segments.emplace_back();
+    state_.content_state().segments.back().fill('\0');
+    safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), collapsed_text);
+    state_.content_state().speakers.push_back(speaker);
+    return static_cast<int>(state_.content_state().segments.size()) - 1;
 }
 
 
 DialogWindow::DialogWindow(FontManager& font_manager, int instance_id, const std::string& name)
     : font_manager_(font_manager)
     , settings_view_(state_, font_manager_, session_)
+    , cached_backend_(translate::Backend::OpenAI)
 {
 
     name_ = name;
@@ -89,6 +240,8 @@ DialogWindow::DialogWindow(FontManager& font_manager, int instance_id, const std
     text_pipeline_ = std::make_unique<processing::TextPipeline>();
 
     state_.applyDefaults();
+
+    resetPlaceholder();
 
     font_manager_.registerDialog(state_.ui_state());
 }
@@ -173,10 +326,7 @@ void DialogWindow::applyPending()
 
             if (submit.kind == TranslateSession::SubmitKind::Cached)
             {
-                state_.content_state().segments.emplace_back();
-                state_.content_state().speakers.push_back(m.speaker);
-                std::string collapsed_text = processing::collapse_newlines(submit.text);
-                safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), collapsed_text);
+                appendSegmentInternal(m.speaker, submit.text);
                 if (m.seq > 0) last_applied_seq_ = m.seq;
                 continue;
             }
@@ -195,14 +345,12 @@ void DialogWindow::applyPending()
 
             if (show_placeholder)
             {
-                state_.content_state().segments.emplace_back();
-                state_.content_state().speakers.push_back(m.speaker);
-                auto& buf = state_.content_state().segments.back();
-                std::string placeholder = std::string(waiting_text_for_lang(state_.translation_config().target_lang_enum)) + " .";
-                safe_copy_utf8(buf.data(), buf.size(), placeholder);
+                std::string placeholder = waiting_text_for_lang(state_.translation_config().target_lang_enum);
+                placeholder += wait_anim_.suffix();
+                int idx = appendSegmentInternal(m.speaker, placeholder);
                 if (job_id != 0)
                 {
-                    pending_segment_by_job_[job_id] = static_cast<int>(state_.content_state().segments.size()) - 1;
+                    pending_segment_by_job_[job_id] = idx;
                 }
             }
 
@@ -210,11 +358,8 @@ void DialogWindow::applyPending()
         }
         else
         {
-            state_.content_state().segments.emplace_back();
-            state_.content_state().speakers.push_back(m.speaker);
             std::string text_to_copy = m.text.empty() ? " " : m.text;
-            std::string collapsed_text = processing::collapse_newlines(text_to_copy);
-            safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(), collapsed_text);
+            appendSegmentInternal(m.speaker, text_to_copy);
         }
         if (m.seq > 0)
         {
@@ -228,6 +373,7 @@ void DialogWindow::applyPending()
 void DialogWindow::render()
 {
     appended_since_last_frame_ = false;
+    refreshPlaceholderStatus();
     applyPending();
 
     if (auto* cm = ConfigManager_Get())
@@ -453,18 +599,43 @@ void DialogWindow::renderDialog()
         bool is_docked = ImGui::IsWindowDocked();
         state_.ui_state().is_docked = is_docked;
 
-        // Update 'Waiting...' placeholder animation for in-flight translations
-        if (!pending_segment_by_job_.empty())
+        bool animate_placeholder = placeholder_active_ && placeholder_state_ == PlaceholderState::Waiting;
+        bool animate_translations = !pending_segment_by_job_.empty();
+
+        if (animate_placeholder || animate_translations)
         {
             wait_anim_.advance(io.DeltaTime);
+        }
+
+        if (animate_placeholder)
+        {
+            ensurePlaceholderEntry();
+            std::string base = placeholder_base_text_;
+            if (base.empty()) {
+                base = localized_or_fallback("dialog.placeholder.waiting", "Initializing dialog system...");
+            }
+            std::string trimmed = strip_waiting_suffix(base);
+            const char* dots = wait_anim_.suffix();
+            std::string composed;
+            if (trimmed.empty())
+                composed = dots;
+            else
+                composed = trimmed + dots;
+            safe_copy_utf8(state_.content_state().segments[0].data(), state_.content_state().segments[0].size(), composed);
+        }
+
+        // Update 'Waiting...' placeholder animation for in-flight translations
+        if (animate_translations)
+        {
             std::string base = waiting_text_for_lang(state_.translation_config().target_lang_enum);
-            std::string suffix = std::string(" ") + wait_anim_.suffix();
+            const char* dots = wait_anim_.suffix();
             for (const auto& kv : pending_segment_by_job_)
             {
                 int idx = kv.second;
                 if (idx >= 0 && idx < static_cast<int>(state_.content_state().segments.size()))
                 {
-                    std::string composed = base + suffix;
+                    std::string composed = base;
+                    composed += dots;
                     safe_copy_utf8(state_.content_state().segments[idx].data(), state_.content_state().segments[idx].size(), composed);
                 }
             }
@@ -508,7 +679,15 @@ void DialogWindow::renderDialog()
             
             ImVec2 pos = ImGui::GetCursorScreenPos();
             const char* txt = state_.content_state().segments[i].data();
-            
+
+            bool placeholder_failed = (placeholder_active_ && placeholder_state_ == PlaceholderState::Error && i == 0);
+            if (placeholder_failed)
+            {
+                ImVec4 err_color(1.0f, 0.4f, 0.3f, 1.0f);
+                err_color.w *= state_.ui_state().current_alpha_multiplier;
+                ImGui::PushStyleColor(ImGuiCol_Text, err_color);
+            }
+
             renderOutlinedText(
                 txt,
                 pos,
@@ -517,6 +696,11 @@ void DialogWindow::renderDialog()
                 wrap_width,
                 state_.ui_state().current_alpha_multiplier
             );
+
+            if (placeholder_failed)
+            {
+                ImGui::PopStyleColor();
+            }
 
             ImVec2 text_sz = ImGui::CalcTextSize(txt, nullptr, false, wrap_width);
             ImGui::Dummy(ImVec2(0.0f, text_sz.y));
@@ -653,6 +837,8 @@ void DialogWindow::initTranslatorIfEnabled()
     if (!state_.translation_config().translate_enabled)
     {
         if (translator_) { translator_->shutdown(); translator_.reset(); }
+        translator_initialized_ = false;
+        cached_translator_config_ = translate::TranslatorConfig{};
         return;
     }
     translate::TranslatorConfig cfg;
@@ -694,6 +880,23 @@ void DialogWindow::initTranslatorIfEnabled()
         cfg.model.clear();
         cfg.api_key = state_.translation_config().niutrans_api_key.data();
     }
+
+    bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
+    bool same_config = same_backend;
+    if (same_config) {
+        same_config = (cfg.base_url == cached_translator_config_.base_url &&
+                       cfg.model == cached_translator_config_.model &&
+                       cfg.api_key == cached_translator_config_.api_key &&
+                       cfg.target_lang == cached_translator_config_.target_lang);
+    }
+    if (same_config && translator_->isReady()) {
+        return;
+    }
+
+    if (translator_) {
+        translator_->shutdown();
+        translator_.reset();
+    }
     translator_ = translate::createTranslator(cfg.backend);
     if (!translator_ || !translator_->init(cfg))
     {
@@ -703,16 +906,21 @@ void DialogWindow::initTranslatorIfEnabled()
             PLOG_WARNING << "Translator factory returned null for backend " << static_cast<int>(cfg.backend);
         }
         translator_.reset();
+        translator_initialized_ = false;
         return;
     }
 
     if (!translator_->isReady())
     {
         PLOG_WARNING << "Translator not ready after init for backend " << static_cast<int>(cfg.backend);
+        translator_initialized_ = false;
     }
     else
     {
         PLOG_INFO << "Translator ready for backend " << static_cast<int>(cfg.backend);
+        cached_translator_config_ = cfg;
+        cached_backend_ = static_cast<translate::Backend>(state_.translation_config().translation_backend);
+        translator_initialized_ = true;
     }
 }
 

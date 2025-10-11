@@ -18,7 +18,11 @@
 #include <unordered_set>
 #include <functional>
 
-namespace translate { class ITranslator; }
+namespace translate {
+class ITranslator;
+struct TranslatorConfig;
+enum class Backend;
+}
 namespace processing { class TextPipeline; }
 
 class DialogWindow : public UIWindow
@@ -42,6 +46,7 @@ public:
     void initTranslatorIfEnabled();
     void refreshFontBinding();
     bool shouldBeRemoved() const { return should_be_removed_; }
+    void reinitializePlaceholder();
 private:
     struct PendingMsg { std::string text; std::string lang; std::string speaker; std::uint64_t seq = 0; };
 
@@ -50,6 +55,12 @@ private:
     void renderSettingsPanel();
     void renderSettingsWindow();
     void renderDialogContextMenu();
+    void ensurePlaceholderEntry();
+    enum class PlaceholderState { Waiting, Ready, Error };
+    void setPlaceholderText(const std::string& text, PlaceholderState state);
+    void refreshPlaceholderStatus();
+    int appendSegmentInternal(const std::string& speaker, const std::string& text);
+    void resetPlaceholder();
 
     void renderVignette(const ImVec2& win_pos, const ImVec2& win_size, float thickness, float rounding, float alpha_multiplier);
     void renderSeparator(bool hasNPC, const std::string& speaker, float content_width, float alpha_multiplier);
@@ -80,6 +91,12 @@ private:
     std::unique_ptr<processing::TextPipeline> text_pipeline_;
     
     TranslateSession session_;
+    translate::TranslatorConfig cached_translator_config_{};
+    translate::Backend cached_backend_;
+    bool translator_initialized_ = false;
+    bool placeholder_active_ = false;
+    PlaceholderState placeholder_state_ = PlaceholderState::Waiting;
+    std::string placeholder_base_text_;
 
     // Test connection state (translator)
     bool testing_connection_ = false;

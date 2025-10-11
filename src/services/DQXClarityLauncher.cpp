@@ -20,6 +20,7 @@ struct DQXClarityLauncher::Impl
     std::thread monitor;
     std::atomic<bool> stop_flag{false};
     std::atomic<bool> shutdown_called{false};
+    std::mutex engine_mutex;
     bool waiting_delay = false;
     std::chrono::steady_clock::time_point detect_tp{};
     int delay_ms = 5000; // default 5s; make configurable later
@@ -48,6 +49,18 @@ struct DQXClarityLauncher::Impl
     bool enable_post_login_heuristics = false;
     bool policy_skip_when_process_running = true;
     int notice_wait_timeout_ms = 0; // 0 = infinite
+
+    bool startHookLocked(dqxclarity::Engine::StartPolicy policy)
+    {
+        std::lock_guard<std::mutex> lock(engine_mutex);
+        return engine.start_hook(policy);
+    }
+
+    bool stopHookLocked()
+    {
+        std::lock_guard<std::mutex> lock(engine_mutex);
+        return engine.stop_hook();
+    }
 };
 
 DQXClarityLauncher::DQXClarityLauncher()
@@ -81,7 +94,7 @@ DQXClarityLauncher::DQXClarityLauncher()
                     if (pimpl_->process_running_at_start && !pimpl_->attempted_auto_start) {
                         if (pimpl_->policy_skip_when_process_running) {
                             PLOG_INFO << "Process already running at tool start; enabling immediately";
-                            (void)pimpl_->engine.start_hook(dqxclarity::Engine::StartPolicy::EnableImmediately);
+                            (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
                         } else {
                             // no immediate start; ensure wait workers below will be created
                         }
@@ -114,14 +127,14 @@ DQXClarityLauncher::DQXClarityLauncher()
                     // If either signal is observed, start accordingly
                     if (pimpl_->notice_found.load()) {
                         PLOG_INFO << "Important notice found; starting hook (defer until integrity)...";
-                        (void)pimpl_->engine.start_hook(dqxclarity::Engine::StartPolicy::DeferUntilIntegrity);
+                        (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::DeferUntilIntegrity);
                         pimpl_->notice_found.store(false);
                         // Cancel heuristic worker
                         if (pimpl_->post_login_worker.joinable()) { pimpl_->cancel_post_login.store(true); pimpl_->post_login_worker.join(); }
                         if (pimpl_->notice_worker.joinable()) { pimpl_->notice_worker.join(); }
                     } else if (pimpl_->post_login_found.load()) {
                         PLOG_INFO << "Post-login heuristic matched; enabling immediately...";
-                        (void)pimpl_->engine.start_hook(dqxclarity::Engine::StartPolicy::EnableImmediately);
+                        (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
                         pimpl_->post_login_found.store(false);
                         // Cancel notice worker
                         if (pimpl_->notice_worker.joinable()) { pimpl_->cancel_notice.store(true); pimpl_->notice_worker.join(); }
@@ -143,7 +156,7 @@ DQXClarityLauncher::DQXClarityLauncher()
                 if (pimpl_->waiting_delay) pimpl_->waiting_delay = false;
                 if (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting || st == dqxclarity::Status::Stopping) {
                     PLOG_INFO << "DQXGame.exe not running; ensuring hook is stopped";
-                    (void)pimpl_->engine.stop_hook();
+                    (void)pimpl_->stopHookLocked();
                 }
             }
 
@@ -201,7 +214,7 @@ bool DQXClarityLauncher::launch()
         pimpl_->cancel_post_login.store(true);
         pimpl_->post_login_worker.join();
     }
-    return pimpl_->engine.start_hook(dqxclarity::Engine::StartPolicy::EnableImmediately);
+    return pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
 }
 
 bool DQXClarityLauncher::stop()
@@ -216,7 +229,7 @@ bool DQXClarityLauncher::stop()
     if (pimpl_->post_login_worker.joinable()) {
         pimpl_->post_login_worker.join();
     }
-    return pimpl_->engine.stop_hook();
+    return pimpl_->stopHookLocked();
 }
 
 void DQXClarityLauncher::shutdown()

@@ -163,6 +163,11 @@ title = "翻译"
 enable = "启用翻译"
 auto_apply = "自动应用更改"
 
+[dialog.placeholder]
+waiting = "正在初始化对话系统……"
+ready = "对话系统已就绪。"
+failed = "对话系统初始化失败。请检查 Hook 状态和日志。"
+
 [dialog.translate.backend]
 label = "后端"
 

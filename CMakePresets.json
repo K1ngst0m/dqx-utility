@@ -62,20 +62,6 @@
       }
     },
     {
-      "name": "windows-msvc-app-release",
-      "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/out/${presetName}",
-      "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "BUILD_TESTS": "OFF"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    },
-    {
       "name": "windows-msvc-dev",
       "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/out/${presetName}",
@@ -106,11 +92,6 @@
       "configuration": "Release"
     },
     {
-      "name": "windows-msvc-app-release",
-      "configurePreset": "windows-msvc-app-release",
-      "configuration": "Release"
-    },
-    {
       "name": "windows-msvc-dev",
       "configurePreset": "windows-msvc-dev",
       "configuration": "Debug"
@@ -119,7 +100,7 @@
   "packagePresets": [
     {
       "name": "windows-portable",
-      "configurePreset": "windows-msvc-app-release",
+      "configurePreset": "windows-msvc-release",
       "generators": [
         "ZIP"
       ],

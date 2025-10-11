@@ -309,8 +309,8 @@ bool ConfigManager::loadAndApply()
                     if (!dw) continue;
                     dw->rename(dialog_configs[i].first.c_str());
                     
-                    // Apply loaded config (which already has defaults applied)
                     dw->state() = dialog_configs[i].second;
+                    dw->reinitializePlaceholder();
                     
                     // Restore runtime-only state not persisted in config
                     dw->state().ui_state().window_size = ImVec2(dw->state().ui_state().width, dw->state().ui_state().height);

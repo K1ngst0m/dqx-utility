@@ -19,11 +19,8 @@ struct ContentState
     void applyDefaults()
     {
         segments.clear();
-        segments.emplace_back();
-        segments.back().fill('\0');
         speakers.clear();
-        speakers.emplace_back();
-        
+
         append_buffer.fill('\0');
         editing_index = -1;
         edit_buffer.fill('\0');
