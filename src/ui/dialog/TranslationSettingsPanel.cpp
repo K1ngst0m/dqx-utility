@@ -25,7 +25,8 @@ void TranslationSettingsPanel::render(
     bool& testingConnection,
     std::string& testResult,
     std::string& testTimestamp,
-    const std::function<void()>& initTranslatorIfEnabledFn
+    const std::function<void()>& initTranslatorIfEnabledFn,
+    const std::function<translate::ITranslator*()>& currentTranslatorFn
 )
 {
     bool selector_changed = renderBackendSelector();
@@ -33,6 +34,7 @@ void TranslationSettingsPanel::render(
     
     bool any_field_changed = enable_changed_ || auto_apply_changed_ || backend_changed_ || 
                              lang_changed_ || config_changed || selector_changed;
+    bool translator_invalidated = false;
     
     if (any_field_changed && !testResult.empty())
     {
@@ -45,12 +47,33 @@ void TranslationSettingsPanel::render(
         initTranslatorIfEnabledFn();
         applyHint = i18n::get("dialog.settings.apply_hint");
         applyHintTimer = 5.0f;
+        translator_invalidated = true;
     }
     
     ImGui::Spacing();
     
-    renderApplyAndTestButtons(translator, applyHint, applyHintTimer, testingConnection, 
+    translator_invalidated |= renderApplyAndTestButtons(translator, applyHint, applyHintTimer, testingConnection, 
                               testResult, testTimestamp, initTranslatorIfEnabledFn, any_field_changed);
+
+    if (translator_invalidated)
+    {
+        skip_status_frame_ = true;
+        if (currentTranslatorFn)
+        {
+            translator = currentTranslatorFn();
+        }
+        else
+        {
+            translator = nullptr;
+        }
+    }
+
+    if (skip_status_frame_)
+    {
+        skip_status_frame_ = false;
+        return;
+    }
+
     renderStatusAndResults(translator, applyHint, applyHintTimer, testResult, testTimestamp);
 }
 
@@ -180,7 +203,7 @@ bool TranslationSettingsPanel::renderBackendSpecificConfig()
            zhipu_key_changed || qwen_key_changed || niutrans_key_changed;
 }
 
-void TranslationSettingsPanel::renderApplyAndTestButtons(
+bool TranslationSettingsPanel::renderApplyAndTestButtons(
     translate::ITranslator* translator,
     std::string& applyHint,
     float& applyHintTimer,
@@ -193,6 +216,7 @@ void TranslationSettingsPanel::renderApplyAndTestButtons(
 {
     (void)any_field_changed;
     (void)translator;
+    bool translator_invalidated = false;
     
     if (!state_.translation_config().auto_apply_changes)
     {
@@ -201,6 +225,7 @@ void TranslationSettingsPanel::renderApplyAndTestButtons(
             initTranslatorIfEnabledFn();
             applyHint = i18n::get("dialog.settings.apply_hint");
             applyHintTimer = 5.0f;
+            translator_invalidated = true;
         }
         ImGui::SameLine();
     }
@@ -274,6 +299,8 @@ void TranslationSettingsPanel::renderApplyAndTestButtons(
         
         testingConnection = false;
     }
+
+    return translator_invalidated;
 }
 
 void TranslationSettingsPanel::renderStatusAndResults(

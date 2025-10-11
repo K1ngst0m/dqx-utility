@@ -27,7 +27,8 @@ public:
         std::string& testResult,
         std::string& testTimestamp,
         const std::string& settingsIdSuffix,
-        const std::function<void()>& initTranslatorIfEnabledFn
+        const std::function<void()>& initTranslatorIfEnabledFn,
+        const std::function<translate::ITranslator*()>& currentTranslatorFn
     );
 
 private:

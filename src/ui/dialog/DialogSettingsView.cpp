@@ -31,7 +31,8 @@ void DialogSettingsView::render(
     std::string& testResult,
     std::string& testTimestamp,
     const std::string& settingsIdSuffix,
-    const std::function<void()>& initTranslatorIfEnabledFn
+    const std::function<void()>& initTranslatorIfEnabledFn,
+    const std::function<translate::ITranslator*()>& currentTranslatorFn
 )
 {
     ImGui::Spacing();
@@ -61,7 +62,7 @@ void DialogSettingsView::render(
     {
         ImGui::Indent();
         translationPanel_.render(translator, applyHint, applyHintTimer, testingConnection,
-                                testResult, testTimestamp, initTranslatorIfEnabledFn);
+                                testResult, testTimestamp, initTranslatorIfEnabledFn, currentTranslatorFn);
         ImGui::Unindent();
         ImGui::Spacing();
     }

@@ -695,7 +695,8 @@ void DialogWindow::renderSettingsPanel()
         test_result_,
         test_timestamp_,
         settings_id_suffix_,
-        [this]() { this->initTranslatorIfEnabled(); }
+        [this]() { this->initTranslatorIfEnabled(); },
+        [this]() -> translate::ITranslator* { return translator_.get(); }
     );
 }
 // Handle right-click context menu for dialog window

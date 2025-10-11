@@ -21,13 +21,14 @@ public:
         bool& testingConnection,
         std::string& testResult,
         std::string& testTimestamp,
-        const std::function<void()>& initTranslatorIfEnabledFn
+        const std::function<void()>& initTranslatorIfEnabledFn,
+        const std::function<translate::ITranslator*()>& currentTranslatorFn
     );
 
 private:
     bool renderBackendSelector();
     bool renderBackendSpecificConfig();
-    void renderApplyAndTestButtons(
+    bool renderApplyAndTestButtons(
         translate::ITranslator* translator,
         std::string& applyHint,
         float& applyHintTimer,
@@ -52,4 +53,5 @@ private:
     bool auto_apply_changed_ = false;
     bool backend_changed_ = false;
     bool lang_changed_ = false;
+    bool skip_status_frame_ = false;
 };
