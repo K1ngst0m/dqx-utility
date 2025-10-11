@@ -50,6 +50,8 @@ int main(int argc, char* argv[]) {
     std::cout << "DQXClarity C++ Dialog Extractor\n";
     std::cout << "================================\n\n";
 
+    processing::Diagnostics::InitializeLogger();
+
     bool opt_console = false;
     bool opt_verbose = false;
 

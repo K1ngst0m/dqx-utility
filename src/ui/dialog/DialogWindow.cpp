@@ -138,6 +138,13 @@ void DialogWindow::applyPending()
     }
     if (local.empty())
         return;
+
+    if (state_.translation_config().translate_enabled) {
+        if (!translator_ || !translator_->isReady()) {
+            initTranslatorIfEnabled();
+        }
+    }
+
     appended_since_last_frame_ = true;
     for (auto& m : local)
     {
@@ -148,11 +155,21 @@ void DialogWindow::applyPending()
             
             std::string processed_text = text_pipeline_->process(text_to_process);
 
+            auto backend_before = state_.translation_config().translation_backend;
             auto submit = session_.submit(
                 processed_text,
-                state_.translation_config().translation_backend,
+                backend_before,
                 state_.translation_config().target_lang_enum,
                 translator_.get());
+
+            if (submit.kind == TranslateSession::SubmitKind::Queued) {
+                PLOG_INFO << "Queued translation job " << submit.job_id;
+            } else if (submit.kind == TranslateSession::SubmitKind::DroppedNotReady) {
+                PLOG_WARNING << "Dropped translation request (translator not ready); backend="
+                             << static_cast<int>(backend_before);
+            } else if (submit.kind == TranslateSession::SubmitKind::Cached) {
+                PLOG_INFO << "Served translation from cache";
+            }
 
             if (submit.kind == TranslateSession::SubmitKind::Cached)
             {
@@ -680,7 +697,22 @@ void DialogWindow::initTranslatorIfEnabled()
     translator_ = translate::createTranslator(cfg.backend);
     if (!translator_ || !translator_->init(cfg))
     {
+        if (translator_) {
+            PLOG_WARNING << "Translator init failed for backend " << static_cast<int>(cfg.backend);
+        } else {
+            PLOG_WARNING << "Translator factory returned null for backend " << static_cast<int>(cfg.backend);
+        }
         translator_.reset();
+        return;
+    }
+
+    if (!translator_->isReady())
+    {
+        PLOG_WARNING << "Translator not ready after init for backend " << static_cast<int>(cfg.backend);
+    }
+    else
+    {
+        PLOG_INFO << "Translator ready for backend " << static_cast<int>(cfg.backend);
     }
 }
 

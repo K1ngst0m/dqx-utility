@@ -24,7 +24,7 @@ text_processing::StageResult<T> run_stage(const std::string& stage_name, Fn&& fn
         auto dur = duration_cast<std::chrono::microseconds>(end - start);
         auto sr = text_processing::StageResult<T>::success(std::move(res), dur, stage_name);
         if (Diagnostics::IsVerbose()) {
-            PLOG_INFO << "Stage '" << stage_name << "' succeeded in " << dur.count() << "us";
+            PLOG_INFO_(Diagnostics::kLogInstance) << "Stage '" << stage_name << "' succeeded in " << dur.count() << "us";
         }
         return sr;
     }
@@ -32,14 +32,14 @@ text_processing::StageResult<T> run_stage(const std::string& stage_name, Fn&& fn
     {
         auto end = high_resolution_clock::now();
         auto dur = duration_cast<std::chrono::microseconds>(end - start);
-        PLOG_ERROR << "Stage '" << stage_name << "' failed in " << dur.count() << "us: " << ex.what();
+        PLOG_ERROR_(Diagnostics::kLogInstance) << "Stage '" << stage_name << "' failed in " << dur.count() << "us: " << ex.what();
         return text_processing::StageResult<T>::failure(ex.what(), dur, stage_name);
     }
     catch (...)
     {
         auto end = high_resolution_clock::now();
         auto dur = duration_cast<std::chrono::microseconds>(end - start);
-        PLOG_ERROR << "Stage '" << stage_name << "' failed with unknown exception in " << dur.count() << "us";
+        PLOG_ERROR_(Diagnostics::kLogInstance) << "Stage '" << stage_name << "' failed with unknown exception in " << dur.count() << "us";
         return text_processing::StageResult<T>::failure("unknown exception", dur, stage_name);
     }
 }

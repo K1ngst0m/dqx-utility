@@ -29,7 +29,7 @@ std::string TextPipeline::process(const std::string& input)
 {
     const bool verbose = Diagnostics::IsVerbose();
     if (verbose) {
-        PLOG_INFO << "[TextPipeline] stage=input raw=" << Diagnostics::Preview(input);
+        PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] stage=input raw=" << Diagnostics::Preview(input);
     }
 
     // Normalizer stage (combine normalize_line_endings + collapse_newlines)
@@ -40,18 +40,18 @@ std::string TextPipeline::process(const std::string& input)
     });
     if (verbose) {
         if (norm_stage.succeeded) {
-            PLOG_INFO << "[TextPipeline] stage=normalizer status=ok duration="
+            PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] stage=normalizer status=ok duration="
                       << norm_stage.duration.count() << "us output="
                       << Diagnostics::Preview(norm_stage.result);
         } else {
-            PLOG_ERROR << "[TextPipeline] stage=normalizer status=error duration="
+            PLOG_ERROR_(Diagnostics::kLogInstance) << "[TextPipeline] stage=normalizer status=error duration="
                        << norm_stage.duration.count() << "us reason="
                        << (norm_stage.error ? *norm_stage.error : "unknown");
         }
     }
     if (!norm_stage.succeeded) {
         if (verbose) {
-            PLOG_WARNING << "[TextPipeline] fallback=original after normalizer failure";
+            PLOG_WARNING_(Diagnostics::kLogInstance) << "[TextPipeline] fallback=original after normalizer failure";
         }
         // On failure, return original input as a safe fallback
         return input;
@@ -63,12 +63,12 @@ std::string TextPipeline::process(const std::string& input)
     });
     if (verbose) {
         if (label_stage.succeeded) {
-            PLOG_INFO << "[TextPipeline] stage=label_processor status=ok duration="
+            PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] stage=label_processor status=ok duration="
                       << label_stage.duration.count() << "us input="
                       << Diagnostics::Preview(norm_stage.result) << " output="
                       << Diagnostics::Preview(label_stage.result);
         } else {
-            PLOG_ERROR << "[TextPipeline] stage=label_processor status=error duration="
+            PLOG_ERROR_(Diagnostics::kLogInstance) << "[TextPipeline] stage=label_processor status=error duration="
                        << label_stage.duration.count() << "us input="
                        << Diagnostics::Preview(norm_stage.result) << " reason="
                        << (label_stage.error ? *label_stage.error : "unknown");
@@ -76,7 +76,7 @@ std::string TextPipeline::process(const std::string& input)
     }
     if (!label_stage.succeeded) {
         if (verbose) {
-            PLOG_WARNING << "[TextPipeline] fallback=normalized after label_processor failure";
+            PLOG_WARNING_(Diagnostics::kLogInstance) << "[TextPipeline] fallback=normalized after label_processor failure";
         }
         // Fallback to normalized text if label processing failed
         return norm_stage.result;
@@ -88,12 +88,12 @@ std::string TextPipeline::process(const std::string& input)
     });
     if (verbose) {
         if (final_stage.succeeded) {
-            PLOG_INFO << "[TextPipeline] stage=final_collapse status=ok duration="
+            PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] stage=final_collapse status=ok duration="
                       << final_stage.duration.count() << "us input="
                       << Diagnostics::Preview(label_stage.result) << " output="
                       << Diagnostics::Preview(final_stage.result);
         } else {
-            PLOG_ERROR << "[TextPipeline] stage=final_collapse status=error duration="
+            PLOG_ERROR_(Diagnostics::kLogInstance) << "[TextPipeline] stage=final_collapse status=error duration="
                        << final_stage.duration.count() << "us input="
                        << Diagnostics::Preview(label_stage.result) << " reason="
                        << (final_stage.error ? *final_stage.error : "unknown");
@@ -101,13 +101,13 @@ std::string TextPipeline::process(const std::string& input)
     }
     if (!final_stage.succeeded) {
         if (verbose) {
-            PLOG_WARNING << "[TextPipeline] fallback=label_output after final_collapse failure";
+            PLOG_WARNING_(Diagnostics::kLogInstance) << "[TextPipeline] fallback=label_output after final_collapse failure";
         }
         return label_stage.result;
     }
 
     if (verbose) {
-        PLOG_INFO << "[TextPipeline] stage=complete output=" << Diagnostics::Preview(final_stage.result);
+        PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] stage=complete output=" << Diagnostics::Preview(final_stage.result);
     }
 
     return final_stage.result;

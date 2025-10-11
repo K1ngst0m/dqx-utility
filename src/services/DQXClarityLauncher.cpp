@@ -48,7 +48,6 @@ struct DQXClarityLauncher::Impl
     bool enable_post_login_heuristics = false;
     bool policy_skip_when_process_running = true;
     int notice_wait_timeout_ms = 0; // 0 = infinite
-
 };
 
 DQXClarityLauncher::DQXClarityLauncher()
@@ -76,7 +75,6 @@ DQXClarityLauncher::DQXClarityLauncher()
             }
             const bool game_running = isDQXGameRunning();
             auto st = pimpl_->engine.status();
-
             if (game_running) {
                 if (st == dqxclarity::Status::Stopped || st == dqxclarity::Status::Error) {
                     // If process was already running when tool started, enable immediately once.
@@ -195,10 +193,13 @@ bool DQXClarityLauncher::launch()
     }
     PLOG_INFO << "Start requested";
     pimpl_->waiting_delay = false; // cancel any pending delay and start now
-    // Cancel any notice wait worker
     if (pimpl_->notice_worker.joinable()) {
         pimpl_->cancel_notice.store(true);
         pimpl_->notice_worker.join();
+    }
+    if (pimpl_->post_login_worker.joinable()) {
+        pimpl_->cancel_post_login.store(true);
+        pimpl_->post_login_worker.join();
     }
     return pimpl_->engine.start_hook(dqxclarity::Engine::StartPolicy::EnableImmediately);
 }
@@ -210,6 +211,10 @@ bool DQXClarityLauncher::stop()
     pimpl_->cancel_notice.store(true);
     if (pimpl_->notice_worker.joinable()) {
         pimpl_->notice_worker.join();
+    }
+    pimpl_->cancel_post_login.store(true);
+    if (pimpl_->post_login_worker.joinable()) {
+        pimpl_->post_login_worker.join();
     }
     return pimpl_->engine.stop_hook();
 }

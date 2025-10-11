@@ -9,6 +9,9 @@ namespace processing {
 
 class Diagnostics {
 public:
+    static constexpr int kLogInstance = 1;
+
+    static void InitializeLogger();
     static void SetVerbose(bool enabled);
     static bool IsVerbose();
 
@@ -19,6 +22,7 @@ public:
 
 private:
     static void sanitize(std::string& text);
+    static void ensureLogger();
     static std::atomic<bool> verbose_;
     static std::atomic<std::size_t> max_preview_;
 };

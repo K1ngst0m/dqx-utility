@@ -13,6 +13,7 @@
 #include "ui/Localization.hpp"
 #include "utils/ErrorReporter.hpp"
 #include "services/DQXClarityService.hpp"
+#include "processing/Diagnostics.hpp"
 
 #include <plog/Log.h>
 #include <plog/Init.h>
@@ -84,6 +85,7 @@ bool Application::initialize()
 bool Application::initializeLogging()
 {
     std::filesystem::create_directories("logs");
+    processing::Diagnostics::InitializeLogger();
 
     bool append_logs = true;
     try {

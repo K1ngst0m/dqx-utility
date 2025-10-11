@@ -1,14 +1,38 @@
 #include "Diagnostics.hpp"
 
 #include <algorithm>
+#include <filesystem>
+#include <mutex>
+
+#include <plog/Appenders/RollingFileAppender.h>
+#include <plog/Formatters/TxtFormatter.h>
+#include <plog/Init.h>
 
 namespace processing {
 
 std::atomic<bool> Diagnostics::verbose_{false};
 std::atomic<std::size_t> Diagnostics::max_preview_{160};
 
+namespace {
+    std::once_flag g_logger_once;
+}
+
+void Diagnostics::InitializeLogger()
+{
+    std::call_once(g_logger_once, [] {
+        try {
+            std::filesystem::create_directories("logs");
+        } catch (...) {
+            // Ignore directory creation errors; plog will handle failure when opening file.
+        }
+        static plog::RollingFileAppender<plog::TxtFormatter> dialog_appender("logs/dialog.log", 1024 * 1024 * 10, 3);
+        plog::init<kLogInstance>(plog::info, &dialog_appender);
+    });
+}
+
 void Diagnostics::SetVerbose(bool enabled)
 {
+    ensureLogger();
     verbose_.store(enabled, std::memory_order_relaxed);
 }
 
@@ -68,6 +92,11 @@ void Diagnostics::sanitize(std::string& text)
         return c < 0x20 && c != '\n' && c != '\r' && c != '\t';
     };
     std::replace_if(text.begin(), text.end(), is_control, '?');
+}
+
+void Diagnostics::ensureLogger()
+{
+    InitializeLogger();
 }
 
 } // namespace processing

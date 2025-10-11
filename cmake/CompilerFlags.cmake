@@ -17,10 +17,19 @@ function(set_project_warnings target)
 endfunction()
 
 function(configure_target_properties target)
-  set_target_properties(${target} PROPERTIES OUTPUT_NAME "dqx-utility")
+  get_target_property(target_type ${target} TYPE)
+
+  if(NOT target_type)
+    message(FATAL_ERROR "Target ${target} has no TYPE property")
+  endif()
+
+  if(target_type STREQUAL "EXECUTABLE")
+    set_target_properties(${target} PROPERTIES OUTPUT_NAME "dqx-utility")
+  endif()
+
   target_compile_features(${target} PRIVATE cxx_std_20)
   
-  if(WIN32)
+  if(WIN32 AND target_type STREQUAL "EXECUTABLE")
     target_link_options(${target} PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
   endif()
 endfunction()
