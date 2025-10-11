@@ -52,6 +52,10 @@ target_include_directories(dqxclarity
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+if(WIN32)
+  target_compile_definitions(dqxclarity PRIVATE PLOG_CHAR_IS_UTF8=1)
+endif()
+
 target_compile_features(dqxclarity PRIVATE cxx_std_20)
 if(MSVC)
   target_compile_options(dqxclarity PRIVATE /W4 /permissive-)

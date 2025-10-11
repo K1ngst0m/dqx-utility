@@ -27,6 +27,9 @@ public:
     // Stop hook
     bool stop();
 
+    // Stop hook and terminate background monitoring (used during shutdown)
+    void shutdown();
+
     // Current status
     DQXClarityStatus getStatus() const;
 

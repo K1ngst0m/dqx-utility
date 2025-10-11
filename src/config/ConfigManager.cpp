@@ -4,6 +4,7 @@
 #include "../ui/dialog/DialogWindow.hpp"
 #include "../state/DialogStateManager.hpp"
 #include "../utils/ErrorReporter.hpp"
+#include "../processing/Diagnostics.hpp"
 
 #include <toml++/toml.h>
 #include <plog/Log.h>
@@ -143,6 +144,7 @@ ConfigManager::ConfigManager()
 {
     config_path_ = "config.toml";
     last_mtime_ = file_mtime_ms(config_path_);
+    applyVerboseSetting();
 }
 
 ConfigManager::~ConfigManager() = default;
@@ -186,6 +188,7 @@ bool ConfigManager::saveAll()
     global.insert("ui_language", ui_language_);
     global.insert("dialog_fade_enabled", dialog_fade_enabled_);
     global.insert("dialog_fade_timeout", dialog_fade_timeout_);
+    global.insert("verbose_logging", verbose_logging_);
     root.insert("global", std::move(global));
 
     auto windows = registry_->windowsByType(UIWindowType::Dialog);
@@ -257,7 +260,10 @@ bool ConfigManager::loadAndApply()
                 dialog_fade_enabled_ = *v;
             if (auto v = (*g)["dialog_fade_timeout"].value<double>())
                 dialog_fade_timeout_ = static_cast<float>(*v);
+            if (auto v = (*g)["verbose_logging"].value<bool>())
+                setVerboseLogging(*v);
         }
+        applyVerboseSetting();
 
         if (auto* arr = root["dialogs"].as_array())
         {
@@ -363,6 +369,23 @@ void ConfigManager::pollAndApply()
         last_error_.clear();
         PLOG_INFO << "Config reloaded from " << config_path_;
     }
+}
+
+void ConfigManager::setVerboseLogging(bool enabled)
+{
+    verbose_logging_ = enabled;
+    applyVerboseSetting();
+}
+
+void ConfigManager::setForceVerboseLogging(bool enabled)
+{
+    force_verbose_logging_ = enabled;
+    applyVerboseSetting();
+}
+
+void ConfigManager::applyVerboseSetting()
+{
+    processing::Diagnostics::SetVerbose(force_verbose_logging_ || verbose_logging_);
 }
 
 ConfigManager* ConfigManager_Get() { return g_cfg_mgr; }

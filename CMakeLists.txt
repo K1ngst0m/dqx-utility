@@ -69,6 +69,7 @@ set(DQX_CORE_SOURCES
   src/translate/TranslationRequestBuilder.cpp
   src/translate/UnknownLabelRepository.cpp
   src/processing/TextPipeline.cpp
+  src/processing/Diagnostics.cpp
   src/processing/TextNormalizer.cpp
   src/config/ConfigManager.cpp
   src/config/ConfigManager.hpp
@@ -94,6 +95,7 @@ configure_target_properties(dqx_core)
 
 target_link_libraries(dqx_core PUBLIC SDL3::SDL3 imgui cpr::cpr cpptrace::cpptrace)
 target_include_directories(dqx_core PUBLIC ${tomlplusplus_SOURCE_DIR}/include ${plog_SOURCE_DIR}/include)
+target_compile_definitions(dqx_core PRIVATE PLOG_CHAR_IS_UTF8=1)
 
 add_executable(dqx_utility
   src/main.cpp

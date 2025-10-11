@@ -56,4 +56,5 @@ private:
 
     int argc_ = 0;
     char** argv_ = nullptr;
+    bool force_verbose_pipeline_ = false;
 };

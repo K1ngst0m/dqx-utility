@@ -23,6 +23,11 @@ public:
     // Append logs option
     bool getAppendLogs() const { return append_logs_; }
 
+    bool getVerboseLogging() const { return verbose_logging_; }
+    void setVerboseLogging(bool enabled);
+    void setForceVerboseLogging(bool enabled);
+    bool isForceVerboseLogging() const { return force_verbose_logging_; }
+
     // Application mode
     AppMode getAppMode() const { return app_mode_; }
     void setAppMode(AppMode m) { app_mode_ = m; }
@@ -62,6 +67,7 @@ public:
 private:
     bool loadAndApply();
     bool applyDialogs(const struct DialogsSnapshot& snap); // fwd declen't exist, will implement inline
+    void applyVerboseSetting();
 
     std::string config_path_;
     std::string last_error_;
@@ -74,6 +80,8 @@ private:
     bool borderless_windows_ = false; // default to bordered (title bar visible)
     AppMode app_mode_ = AppMode::Normal;
     std::string ui_language_ = "en"; // GUI localization language code
+    bool verbose_logging_ = false;
+    bool force_verbose_logging_ = false;
     
     // Dialog fade settings
     bool dialog_fade_enabled_ = false;

@@ -19,6 +19,7 @@ struct DQXClarityLauncher::Impl
     dqxclarity::Engine engine;
     std::thread monitor;
     std::atomic<bool> stop_flag{false};
+    std::atomic<bool> shutdown_called{false};
     bool waiting_delay = false;
     std::chrono::steady_clock::time_point detect_tp{};
     int delay_ms = 5000; // default 5s; make configurable later
@@ -167,20 +168,7 @@ DQXClarityLauncher::DQXClarityLauncher()
 
 DQXClarityLauncher::~DQXClarityLauncher()
 {
-    if (pimpl_) {
-        pimpl_->stop_flag.store(true);
-        if (pimpl_->monitor.joinable()) {
-            pimpl_->monitor.join();
-        }
-        if (pimpl_->notice_worker.joinable()) {
-            pimpl_->cancel_notice.store(true);
-            pimpl_->notice_worker.join();
-        }
-        if (pimpl_->post_login_worker.joinable()) {
-            pimpl_->cancel_post_login.store(true);
-            pimpl_->post_login_worker.join();
-        }
-    }
+    shutdown();
 }
 
 bool DQXClarityLauncher::copyDialogsSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogMessage>& out) const
@@ -224,6 +212,32 @@ bool DQXClarityLauncher::stop()
         pimpl_->notice_worker.join();
     }
     return pimpl_->engine.stop_hook();
+}
+
+void DQXClarityLauncher::shutdown()
+{
+    if (!pimpl_) return;
+    bool expected = false;
+    if (!pimpl_->shutdown_called.compare_exchange_strong(expected, true)) {
+        return;
+    }
+
+    pimpl_->stop_flag.store(true);
+    (void)stop();
+
+    if (pimpl_->monitor.joinable()) {
+        pimpl_->monitor.join();
+    }
+
+    if (pimpl_->notice_worker.joinable()) {
+        pimpl_->cancel_notice.store(true);
+        pimpl_->notice_worker.join();
+    }
+
+    if (pimpl_->post_login_worker.joinable()) {
+        pimpl_->cancel_post_login.store(true);
+        pimpl_->post_login_worker.join();
+    }
 }
 
 DQXClarityStatus DQXClarityLauncher::getStatus() const

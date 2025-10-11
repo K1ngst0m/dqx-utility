@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../processing/TextProcessingTypes.hpp"
+#include "Diagnostics.hpp"
 #include <chrono>
 #include <string>
 #include <plog/Log.h>
@@ -22,7 +23,9 @@ text_processing::StageResult<T> run_stage(const std::string& stage_name, Fn&& fn
         auto end = high_resolution_clock::now();
         auto dur = duration_cast<std::chrono::microseconds>(end - start);
         auto sr = text_processing::StageResult<T>::success(std::move(res), dur, stage_name);
-        PLOG_INFO << "Stage '" << stage_name << "' succeeded in " << dur.count() << "us";
+        if (Diagnostics::IsVerbose()) {
+            PLOG_INFO << "Stage '" << stage_name << "' succeeded in " << dur.count() << "us";
+        }
         return sr;
     }
     catch (const std::exception& ex)

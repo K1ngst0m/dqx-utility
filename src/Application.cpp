@@ -103,6 +103,8 @@ bool Application::initializeLogging()
     for (int i = 1; i < argc_; ++i) {
         if (std::strcmp(argv_[i], "--append-logs") == 0) {
             append_logs = true;
+        } else if (std::strcmp(argv_[i], "--verbose") == 0) {
+            force_verbose_pipeline_ = true;
         }
     }
 
@@ -162,6 +164,7 @@ void Application::setupManagers()
 void Application::initializeConfig()
 {
     config_->setRegistry(registry_.get());
+    config_->setForceVerboseLogging(force_verbose_pipeline_);
     config_->loadAtStartup();
 
     i18n::init(config_->getUILanguageCode());
@@ -273,7 +276,10 @@ void Application::handleQuitRequests()
     if (quit_requested_)
     {
         if (auto* dqxc = DQXClarityService_Get())
-            dqxc->stop();
+        {
+            dqxc->shutdown();
+            DQXClarityService_Set(nullptr);
+        }
         config_->saveAll();
         running_ = false;
     }

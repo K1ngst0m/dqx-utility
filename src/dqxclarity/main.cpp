@@ -3,6 +3,7 @@
 #include "process/ProcessFinder.hpp"
 #include "hooking/DialogHook.hpp"
 #include "console/ConsoleFactory.hpp"
+#include "../processing/Diagnostics.hpp"
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -65,6 +66,8 @@ int main(int argc, char* argv[]) {
             opt_verbose = true;
         }
     }
+
+    processing::Diagnostics::SetVerbose(opt_verbose);
     
     // Set up signal handlers
     signal(SIGINT, signal_handler);
