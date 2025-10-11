@@ -13,7 +13,6 @@
 #include "ui/Localization.hpp"
 #include "utils/ErrorReporter.hpp"
 #include "services/DQXClarityService.hpp"
-#include "platform/PlatformSetup.hpp"
 
 #include <plog/Log.h>
 #include <plog/Init.h>
@@ -25,9 +24,64 @@
 #include <cstring>
 #include <toml++/toml.h>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <clocale>
+#endif
+
 namespace {
 
-static bool initialize_logging(int argc, char** argv)
+static void SDLCALL SDLLogBridge(void* userdata, int category, SDL_LogPriority priority, const char* message)
+{
+    (void)userdata;
+    switch (priority)
+    {
+    case SDL_LOG_PRIORITY_VERBOSE: PLOG_VERBOSE << "[SDL:" << category << "] " << message; break;
+    case SDL_LOG_PRIORITY_DEBUG:   PLOG_DEBUG   << "[SDL:" << category << "] " << message; break;
+    case SDL_LOG_PRIORITY_INFO:    PLOG_INFO    << "[SDL:" << category << "] " << message; break;
+    case SDL_LOG_PRIORITY_WARN:    PLOG_WARNING << "[SDL:" << category << "] " << message; break;
+    case SDL_LOG_PRIORITY_ERROR:   PLOG_ERROR   << "[SDL:" << category << "] " << message; break;
+    case SDL_LOG_PRIORITY_CRITICAL:PLOG_FATAL   << "[SDL:" << category << "] " << message; break;
+    default:                       PLOG_INFO    << "[SDL:" << category << "] " << message; break;
+    }
+}
+
+} // namespace
+
+Application::Application(int argc, char** argv)
+    : argc_(argc), argv_(argv)
+{
+}
+
+Application::~Application() { cleanup(); }
+
+bool Application::initialize()
+{
+    utils::CrashHandler::Initialize();
+
+    if (!initializeLogging())
+        return false;
+
+    initializeConsole();
+
+    context_ = std::make_unique<AppContext>();
+    if (!context_->initialize())
+        return false;
+
+    setupSDLLogging();
+    SDL_SetAppMetadata("DQX Utility", "0.1.0", "https://github.com/K1ngst0m/dqx-utility");
+
+    setupManagers();
+    initializeConfig();
+
+    last_time_ = SDL_GetTicks();
+    return true;
+}
+
+bool Application::initializeLogging()
 {
     std::filesystem::create_directories("logs");
 
@@ -46,8 +100,8 @@ static bool initialize_logging(int argc, char** argv)
         // Ignore parse errors during early init
     }
 
-    for (int i = 1; i < argc; ++i) {
-        if (std::strcmp(argv[i], "--append-logs") == 0) {
+    for (int i = 1; i < argc_; ++i) {
+        if (std::strcmp(argv_[i], "--append-logs") == 0) {
             append_logs = true;
         }
     }
@@ -59,36 +113,34 @@ static bool initialize_logging(int argc, char** argv)
         logger->addAppender(&console_appender);
 
     (void)append_logs;
-
     return true;
 }
 
-} // namespace
-
-Application::Application() = default;
-Application::~Application() { cleanup(); }
-
-bool Application::initialize(int argc, char** argv)
+void Application::initializeConsole()
 {
-    utils::CrashHandler::Initialize();
+#ifdef _WIN32
+    // Set Windows console to UTF-8 so non-ASCII text displays correctly
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
 
-    if (!initialize_logging(argc, argv))
-        return false;
-    
-    platform::PlatformSetup::InitializeConsole();
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut && hOut != INVALID_HANDLE_VALUE)
+    {
+        DWORD mode = 0;
+        if (GetConsoleMode(hOut, &mode))
+        {
+            SetConsoleMode(hOut, mode | ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT);
+        }
+    }
 
-    context_ = std::make_unique<AppContext>();
-    if (!context_->initialize())
-        return false;
+    std::setlocale(LC_ALL, ".UTF-8");
+#endif
+}
 
-    platform::PlatformSetup::SetupSDLLogging();
-    SDL_SetAppMetadata("DQX Utility", "0.1.0", "https://github.com/K1ngst0m/dqx-utility");
-
-    setupManagers();
-    initializeConfig();
-    
-    last_time_ = SDL_GetTicks();
-    return true;
+void Application::setupSDLLogging()
+{
+    SDL_SetLogOutputFunction(SDLLogBridge, nullptr);
+    SDL_SetLogPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
 }
 
 void Application::setupManagers()
@@ -98,11 +150,11 @@ void Application::setupManagers()
 
     config_ = std::make_unique<ConfigManager>();
     ConfigManager_Set(config_.get());
-    
+
     event_handler_ = std::make_unique<ui::UIEventHandler>(*context_, *registry_);
     mini_manager_ = std::make_unique<ui::MiniModeManager>(*context_, *registry_);
     mode_manager_ = std::make_unique<ui::AppModeManager>(*context_, *registry_, *mini_manager_);
-    
+
     settings_panel_ = std::make_unique<GlobalSettingsPanel>(*registry_);
     error_dialog_ = std::make_unique<ErrorDialog>();
 }
@@ -111,12 +163,12 @@ void Application::initializeConfig()
 {
     config_->setRegistry(registry_.get());
     config_->loadAtStartup();
-    
+
     i18n::init(config_->getUILanguageCode());
-    
+
     if (registry_->windowsByType(UIWindowType::Dialog).empty())
         registry_->createDialogWindow();
-    
+
     config_->setAppMode(ConfigManager::AppMode::Normal);
     mode_manager_->ApplyModeSettings(ConfigManager::AppMode::Normal);
     mode_manager_->SetCurrentMode(ConfigManager::AppMode::Normal);
@@ -135,19 +187,19 @@ void Application::mainLoop()
         Uint64 current_time = SDL_GetTicks();
         float delta_time = (current_time - last_time_) / 1000.0f;
         last_time_ = current_time;
-        
+
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
             if (context_->processEvent(event))
                 quit_requested_ = true;
         }
-        
+
         if (!running_)
             break;
-        
+
         context_->updateVignette(delta_time);
-        
+
         handleModeChanges();
         renderFrame();
         handleQuitRequests();
@@ -166,29 +218,29 @@ void Application::handleModeChanges()
 void Application::renderFrame()
 {
     context_->beginFrame();
-    
+
     ImGuiID dockspace_id = 0;
     auto current_mode = config_->getAppMode();
     if (current_mode == ConfigManager::AppMode::Mini)
         dockspace_id = mini_manager_->SetupDockspace();
     DockState::SetDockspace(dockspace_id);
-    
+
     auto& io = ImGui::GetIO();
-    
+
     for (auto& window : registry_->windows())
     {
         if (window)
             window->render();
     }
-    
+
     registry_->processRemovals();
-    
+
     if (current_mode == ConfigManager::AppMode::Mini)
         mini_manager_->HandleAltDrag();
 
     event_handler_->HandleTransparentAreaClick();
     event_handler_->RenderGlobalContextMenu(show_settings_, quit_requested_);
-    
+
     if (config_->isGlobalSettingsRequested())
     {
         show_settings_ = true;
@@ -199,19 +251,19 @@ void Application::renderFrame()
         quit_requested_ = true;
         config_->consumeQuitRequest();
     }
-    
+
     if (show_settings_)
         settings_panel_->render(show_settings_);
-    
+
     if (utils::ErrorReporter::HasPendingErrors())
     {
         auto errors = utils::ErrorReporter::GetPendingErrors();
         error_dialog_->Show(errors);
     }
-    
+
     if (error_dialog_->Render())
         quit_requested_ = true;
-    
+
     DockState::ConsumeReDock();
     context_->renderVignette();
     context_->endFrame();

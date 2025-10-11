@@ -19,10 +19,10 @@ class AppModeManager;
 class Application
 {
 public:
-    Application();
+    Application(int argc, char** argv);
     ~Application();
 
-    bool initialize(int argc, char** argv);
+    bool initialize();
     int run();
 
 private:
@@ -33,6 +33,10 @@ private:
     void renderFrame();
     void handleQuitRequests();
     void cleanup();
+
+    bool initializeLogging();
+    void initializeConsole();
+    void setupSDLLogging();
 
     std::unique_ptr<AppContext> context_;
     std::unique_ptr<FontManager> font_manager_;
@@ -49,4 +53,7 @@ private:
     bool quit_requested_ = false;
     bool running_ = true;
     Uint64 last_time_ = 0;
+
+    int argc_ = 0;
+    char** argv_ = nullptr;
 };

@@ -58,7 +58,6 @@ set(DQX_CORE_SOURCES
   src/platform/ProcessDetector.cpp
   src/platform/ProcessLocaleChecker.cpp
   src/platform/WineDetector.cpp
-  src/platform/PlatformSetup.cpp
   src/services/DQXClarityLauncher.cpp
   src/services/DQXClarityService.cpp
   src/ui/UITheme.cpp
