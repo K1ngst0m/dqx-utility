@@ -225,8 +225,6 @@ void Application::renderFrame()
         dockspace_id = mini_manager_->SetupDockspace();
     DockState::SetDockspace(dockspace_id);
 
-    auto& io = ImGui::GetIO();
-
     for (auto& window : registry_->windows())
     {
         if (window)

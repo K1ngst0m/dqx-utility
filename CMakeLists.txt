@@ -92,7 +92,7 @@ target_include_directories(dqx_core PRIVATE
 set_project_warnings(dqx_core)
 configure_target_properties(dqx_core)
 
-target_link_libraries(dqx_core PUBLIC SDL3::SDL3 imgui cpr::cpr)
+target_link_libraries(dqx_core PUBLIC SDL3::SDL3 imgui cpr::cpr cpptrace::cpptrace)
 target_include_directories(dqx_core PUBLIC ${tomlplusplus_SOURCE_DIR}/include ${plog_SOURCE_DIR}/include)
 
 add_executable(dqx_utility
