@@ -70,6 +70,9 @@ private:
     void renderTranslateSection();
     void renderDebugSection();
     void applyPending();
+    const TranslationConfig& activeTranslationConfig() const;
+    bool usingGlobalTranslation() const;
+    void resetTranslatorState();
 
     FontManager& font_manager_;
     DialogStateManager state_{};
@@ -92,7 +95,7 @@ private:
     
     TranslateSession session_;
     translate::TranslatorConfig cached_translator_config_{};
-    translate::Backend cached_backend_;
+    translate::Backend cached_backend_ = translate::Backend::OpenAI;
     bool translator_initialized_ = false;
     bool placeholder_active_ = false;
     PlaceholderState placeholder_state_ = PlaceholderState::Waiting;
@@ -120,5 +123,8 @@ private:
     std::unordered_map<int, std::string> failed_original_text_;
     std::unordered_map<int, std::string> failed_error_messages_;
     DialogAnimator wait_anim_;
+
+    std::uint64_t observed_global_translation_version_ = 0;
+    bool last_used_global_translation_ = false;
 
 };

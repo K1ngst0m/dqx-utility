@@ -58,6 +58,11 @@ void QuestSettingsView::render(translate::ITranslator* translator,
     if (ImGui::CollapsingHeader(i18n::get("dialog.translate.title"), ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::Indent();
+        TranslationConfig* global_config = nullptr;
+        if (auto* cm = ConfigManager_Get())
+        {
+            global_config = &cm->globalTranslationConfig();
+        }
         translation_panel_.render(translator,
                                   apply_hint,
                                   apply_hint_timer,
@@ -65,7 +70,8 @@ void QuestSettingsView::render(translate::ITranslator* translator,
                                   test_result,
                                   test_timestamp,
                                   initTranslatorIfEnabledFn,
-                                  currentTranslatorFn);
+                                  currentTranslatorFn,
+                                  global_config);
         ImGui::Unindent();
         ImGui::Spacing();
     }

@@ -167,6 +167,8 @@ hint = "对话框在无活动时将自动淡出。鼠标悬停或新文本将重
 title = "翻译"
 enable = "启用翻译"
 auto_apply = "自动应用更改"
+use_global = "使用全局翻译设置"
+use_global_hint = "（取消勾选以单独自定义窗口）"
 
 [dialog.placeholder]
 waiting = "正在初始化对话系统……"

@@ -3,6 +3,8 @@
 #include <functional>
 #include <string>
 
+#include "../../state/TranslationConfig.hpp"
+
 namespace translate { class ITranslator; }
 struct DialogStateManager;
 class TranslateSession;
@@ -22,14 +24,16 @@ public:
         std::string& testResult,
         std::string& testTimestamp,
         const std::function<void()>& initTranslatorIfEnabledFn,
-        const std::function<translate::ITranslator*()>& currentTranslatorFn
+        const std::function<translate::ITranslator*()>& currentTranslatorFn,
+        TranslationConfig* globalConfig
     );
 
 private:
-    bool renderBackendSelector();
-    bool renderBackendSpecificConfig();
+    bool renderBackendSelector(TranslationConfig& config);
+    bool renderBackendSpecificConfig(TranslationConfig& config);
     bool renderApplyAndTestButtons(
         translate::ITranslator* translator,
+        TranslationConfig& config,
         std::string& applyHint,
         float& applyHintTimer,
         bool& testingConnection,
@@ -48,6 +52,9 @@ private:
     
     DialogStateManager& state_;
     TranslateSession& session_;
+    TranslationConfig* active_config_ = nullptr;
+    TranslationConfig* global_config_ = nullptr;
+    bool using_global_config_ = false;
     
     bool enable_changed_ = false;
     bool auto_apply_changed_ = false;
@@ -56,4 +63,5 @@ private:
     bool skip_status_frame_ = false;
     bool pending_auto_apply_ = false;
     float auto_apply_elapsed_ = 0.0f;
+    bool config_dirty_pending_ = false;
 };

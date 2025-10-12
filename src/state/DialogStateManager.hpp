@@ -9,6 +9,7 @@ struct DialogStateManager
     UIState ui;
     TranslationConfig translation;
     ContentState content;
+    bool use_global_translation = true;
 
     UIState& ui_state() { return ui; }
     const UIState& ui_state() const { return ui; }
@@ -24,5 +25,6 @@ struct DialogStateManager
         ui.applyDefaults();
         translation.applyDefaults();
         content.applyDefaults();
+        use_global_translation = true;
     }
 };

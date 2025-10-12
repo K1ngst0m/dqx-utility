@@ -1,7 +1,10 @@
 #pragma once
 
 #include <string>
+#include <cstdint>
 #include <imgui.h>
+
+#include "../state/TranslationConfig.hpp"
 
 class WindowRegistry;
 
@@ -67,6 +70,11 @@ public:
     bool isQuitRequested() const { return quit_requested_; }
     void consumeQuitRequest() { quit_requested_ = false; }
 
+    const TranslationConfig& globalTranslationConfig() const { return global_translation_config_; }
+    TranslationConfig& globalTranslationConfig() { return global_translation_config_; }
+    std::uint64_t globalTranslationVersion() const { return global_translation_version_; }
+    void markGlobalTranslationDirty();
+
 private:
     bool loadAndApply();
     bool applyDialogs(const struct DialogsSnapshot& snap); // fwd declen't exist, will implement inline
@@ -96,6 +104,9 @@ private:
     // UI requests
     bool show_global_settings_requested_ = false;
     bool quit_requested_ = false;
+
+    TranslationConfig global_translation_config_;
+    std::uint64_t global_translation_version_ = 1;
 };
 
 // global accessors

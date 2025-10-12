@@ -285,7 +285,8 @@ void DialogWindow::applyPending()
     if (local.empty())
         return;
 
-    if (state_.translation_config().translate_enabled) {
+    const TranslationConfig& config = activeTranslationConfig();
+    if (config.translate_enabled) {
         if (!translator_ || !translator_->isReady()) {
             initTranslatorIfEnabled();
         }
@@ -304,14 +305,14 @@ void DialogWindow::applyPending()
             continue;
         }
 
-        if (state_.translation_config().translate_enabled)
+        if (config.translate_enabled)
         {
 
-            auto backend_before = state_.translation_config().translation_backend;
+            auto backend_before = config.translation_backend;
             auto submit = session_.submit(
                 processed_text,
                 backend_before,
-                state_.translation_config().target_lang_enum,
+                config.target_lang_enum,
                 translator_.get());
 
             if (submit.kind == TranslateSession::SubmitKind::Queued) {
@@ -344,7 +345,7 @@ void DialogWindow::applyPending()
 
             if (show_placeholder)
             {
-                std::string placeholder = waiting_text_for_lang(state_.translation_config().target_lang_enum);
+                std::string placeholder = waiting_text_for_lang(config.target_lang_enum);
                 placeholder += wait_anim_.suffix();
                 int idx = appendSegmentInternal(m.speaker, placeholder);
                 if (job_id != 0)
@@ -377,6 +378,29 @@ void DialogWindow::render()
 
     if (auto* cm = ConfigManager_Get())
         cm->pollAndApply();
+
+    bool using_global = usingGlobalTranslation();
+    if (using_global)
+    {
+        if (auto* cm = ConfigManager_Get())
+        {
+            std::uint64_t version = cm->globalTranslationVersion();
+            if (version != observed_global_translation_version_)
+            {
+                observed_global_translation_version_ = version;
+                resetTranslatorState();
+            }
+        }
+    }
+    else
+    {
+        if (last_used_global_translation_)
+        {
+            resetTranslatorState();
+        }
+        observed_global_translation_version_ = 0;
+    }
+    last_used_global_translation_ = using_global;
 
     // Process completed translations from background worker
     if (translator_)
@@ -461,6 +485,8 @@ void DialogWindow::renderDialog()
     ImGuiIO& io = ImGui::GetIO();
     const float max_dialog_width  = std::max(400.0f, io.DisplaySize.x - 40.0f);
     const float max_dialog_height = std::max(400.0f, io.DisplaySize.y - 40.0f);
+
+    const TranslationConfig& config = activeTranslationConfig();
 
     state_.ui_state().width  = std::clamp(state_.ui_state().width, 400.0f, max_dialog_width);
     state_.ui_state().height = std::clamp(state_.ui_state().height, 400.0f, max_dialog_height);
@@ -654,7 +680,7 @@ void DialogWindow::renderDialog()
         // Update 'Waiting...' placeholder animation for in-flight translations
         if (animate_translations)
         {
-            std::string base = waiting_text_for_lang(state_.translation_config().target_lang_enum);
+        std::string base = waiting_text_for_lang(config.target_lang_enum);
             const char* dots = wait_anim_.suffix();
             for (const auto& kv : pending_segment_by_job_)
             {
@@ -764,16 +790,16 @@ void DialogWindow::renderDialog()
                     {
                         std::string text_to_retry = it->second;
                         std::string processed_text = text_pipeline_->process(text_to_retry);
-                        auto submit = session_.submit(
+                    auto submit = session_.submit(
                             processed_text,
-                            state_.translation_config().translation_backend,
-                            state_.translation_config().target_lang_enum,
+                            config.translation_backend,
+                            config.target_lang_enum,
                             translator_.get());
                         
                         if (submit.kind == TranslateSession::SubmitKind::Queued && submit.job_id != 0)
                         {
                             pending_segment_by_job_[submit.job_id] = static_cast<int>(i);
-                            std::string placeholder = std::string(waiting_text_for_lang(state_.translation_config().target_lang_enum)) + " .";
+                    std::string placeholder = std::string(waiting_text_for_lang(config.target_lang_enum)) + " .";
                             safe_copy_utf8(state_.content_state().segments[i].data(), state_.content_state().segments[i].size(), placeholder);
                             failed_segments_.erase(static_cast<int>(i));
                             failed_original_text_.erase(static_cast<int>(i));
@@ -858,56 +884,58 @@ void DialogWindow::renderDialog()
 
 void DialogWindow::initTranslatorIfEnabled()
 {
-    if (!state_.translation_config().translate_enabled)
+    const TranslationConfig& config = activeTranslationConfig();
+    if (!config.translate_enabled)
     {
-        if (translator_) { translator_->shutdown(); translator_.reset(); }
-        translator_initialized_ = false;
+        resetTranslatorState();
         cached_translator_config_ = translate::TranslatorConfig{};
         return;
     }
+
     translate::TranslatorConfig cfg;
-    cfg.backend = static_cast<translate::Backend>(state_.translation_config().translation_backend);
-    switch (state_.translation_config().target_lang_enum)
+    cfg.backend = static_cast<translate::Backend>(config.translation_backend);
+    switch (config.target_lang_enum)
     {
     case TranslationConfig::TargetLang::EN_US: cfg.target_lang = "en-us"; break;
     case TranslationConfig::TargetLang::ZH_CN: cfg.target_lang = "zh-cn"; break;
     case TranslationConfig::TargetLang::ZH_TW: cfg.target_lang = "zh-tw"; break;
     }
-    if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
+
+    if (config.translation_backend == TranslationConfig::TranslationBackend::OpenAI)
     {
-        cfg.base_url = state_.translation_config().openai_base_url.data();
-        cfg.model = state_.translation_config().openai_model.data();
-        cfg.api_key = state_.translation_config().openai_api_key.data();
+        cfg.base_url = config.openai_base_url.data();
+        cfg.model = config.openai_model.data();
+        cfg.api_key = config.openai_api_key.data();
     }
-    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Google)
+    else if (config.translation_backend == TranslationConfig::TranslationBackend::Google)
     {
         cfg.base_url.clear();
         cfg.model.clear();
-        cfg.api_key = state_.translation_config().google_api_key.data();
+        cfg.api_key = config.google_api_key.data();
     }
-    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
+    else if (config.translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
     {
         cfg.base_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
         cfg.model = "glm-4-flash";
-        cfg.api_key = state_.translation_config().zhipu_api_key.data();
+        cfg.api_key = config.zhipu_api_key.data();
     }
-    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::QwenMT)
+    else if (config.translation_backend == TranslationConfig::TranslationBackend::QwenMT)
     {
         cfg.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-        const char* qm = state_.translation_config().qwen_model.data();
+        const char* qm = config.qwen_model.data();
         cfg.model = (qm && qm[0]) ? qm : "qwen-mt-turbo";
-        cfg.api_key = state_.translation_config().qwen_api_key.data();
+        cfg.api_key = config.qwen_api_key.data();
     }
-    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Niutrans)
+    else if (config.translation_backend == TranslationConfig::TranslationBackend::Niutrans)
     {
         cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
         cfg.model.clear();
-        cfg.api_key = state_.translation_config().niutrans_api_key.data();
+        cfg.api_key = config.niutrans_api_key.data();
         cfg.api_secret.clear();
     }
-    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Youdao)
+    else if (config.translation_backend == TranslationConfig::TranslationBackend::Youdao)
     {
-        if (state_.translation_config().youdao_mode == TranslationConfig::YoudaoMode::LargeModel)
+        if (config.youdao_mode == TranslationConfig::YoudaoMode::LargeModel)
         {
             cfg.base_url = "https://openapi.youdao.com/llm_trans";
             cfg.model = "youdao_large";
@@ -917,50 +945,56 @@ void DialogWindow::initTranslatorIfEnabled()
             cfg.base_url = "https://openapi.youdao.com/api";
             cfg.model = "youdao_text";
         }
-        cfg.api_key = state_.translation_config().youdao_app_key.data();
-        cfg.api_secret = state_.translation_config().youdao_app_secret.data();
+        cfg.api_key = config.youdao_app_key.data();
+        cfg.api_secret = config.youdao_app_secret.data();
     }
 
     bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
-    bool same_config = same_backend;
-    if (same_config) {
-        same_config = (cfg.base_url == cached_translator_config_.base_url &&
+    bool same_config = same_backend &&
+                       cfg.base_url == cached_translator_config_.base_url &&
                        cfg.model == cached_translator_config_.model &&
                        cfg.api_key == cached_translator_config_.api_key &&
                        cfg.api_secret == cached_translator_config_.api_secret &&
-                       cfg.target_lang == cached_translator_config_.target_lang);
-    }
-    if (same_config && translator_->isReady()) {
+                       cfg.target_lang == cached_translator_config_.target_lang;
+
+    if (same_config && translator_ && translator_->isReady())
+    {
         return;
     }
 
-    if (translator_) {
+    if (translator_)
+    {
         translator_->shutdown();
         translator_.reset();
     }
+
     translator_ = translate::createTranslator(cfg.backend);
     if (!translator_ || !translator_->init(cfg))
     {
-        if (translator_) {
+        if (translator_)
+        {
             PLOG_WARNING << "Translator init failed for backend " << static_cast<int>(cfg.backend);
-        } else {
+        }
+        else
+        {
             PLOG_WARNING << "Translator factory returned null for backend " << static_cast<int>(cfg.backend);
         }
-        translator_.reset();
-        translator_initialized_ = false;
+        resetTranslatorState();
+        cached_translator_config_ = translate::TranslatorConfig{};
         return;
     }
 
     if (!translator_->isReady())
     {
         PLOG_WARNING << "Translator not ready after init for backend " << static_cast<int>(cfg.backend);
-        translator_initialized_ = false;
+        resetTranslatorState();
+        cached_translator_config_ = translate::TranslatorConfig{};
     }
     else
     {
         PLOG_INFO << "Translator ready for backend " << static_cast<int>(cfg.backend);
         cached_translator_config_ = cfg;
-        cached_backend_ = static_cast<translate::Backend>(state_.translation_config().translation_backend);
+        cached_backend_ = cfg.backend;
         translator_initialized_ = true;
     }
 }
@@ -979,6 +1013,39 @@ void DialogWindow::renderSettingsPanel()
         [this]() { this->initTranslatorIfEnabled(); },
         [this]() -> translate::ITranslator* { return translator_.get(); }
     );
+}
+
+const TranslationConfig& DialogWindow::activeTranslationConfig() const
+{
+    if (state_.use_global_translation)
+    {
+        if (auto* cm = ConfigManager_Get())
+        {
+            return cm->globalTranslationConfig();
+        }
+    }
+    return state_.translation_config();
+}
+
+bool DialogWindow::usingGlobalTranslation() const
+{
+    return state_.use_global_translation && ConfigManager_Get() != nullptr;
+}
+
+void DialogWindow::resetTranslatorState()
+{
+    if (translator_)
+    {
+        translator_->shutdown();
+        translator_.reset();
+    }
+    translator_initialized_ = false;
+    cached_translator_config_ = translate::TranslatorConfig{};
+    cached_backend_ = translate::Backend::OpenAI;
+    pending_segment_by_job_.clear();
+    failed_segments_.clear();
+    failed_original_text_.clear();
+    failed_error_messages_.clear();
 }
 // Handle right-click context menu for dialog window
 void DialogWindow::renderDialogContextMenu()

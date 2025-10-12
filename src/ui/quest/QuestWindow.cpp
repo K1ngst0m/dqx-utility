@@ -25,48 +25,48 @@
 
 namespace {
 
-translate::TranslatorConfig buildTranslatorConfig(const QuestStateManager& state)
+translate::TranslatorConfig buildTranslatorConfig(const TranslationConfig& config)
 {
     translate::TranslatorConfig cfg;
-    cfg.backend = static_cast<translate::Backend>(state.translation_config().translation_backend);
+    cfg.backend = static_cast<translate::Backend>(config.translation_backend);
 
-    switch (state.translation_config().target_lang_enum)
+    switch (config.target_lang_enum)
     {
     case TranslationConfig::TargetLang::EN_US: cfg.target_lang = "en-us"; break;
     case TranslationConfig::TargetLang::ZH_CN: cfg.target_lang = "zh-cn"; break;
     case TranslationConfig::TargetLang::ZH_TW: cfg.target_lang = "zh-tw"; break;
     }
 
-    switch (state.translation_config().translation_backend)
+    switch (config.translation_backend)
     {
     case TranslationConfig::TranslationBackend::OpenAI:
-        cfg.base_url = state.translation_config().openai_base_url.data();
-        cfg.model = state.translation_config().openai_model.data();
-        cfg.api_key = state.translation_config().openai_api_key.data();
+        cfg.base_url = config.openai_base_url.data();
+        cfg.model = config.openai_model.data();
+        cfg.api_key = config.openai_api_key.data();
         break;
     case TranslationConfig::TranslationBackend::Google:
         cfg.base_url.clear();
         cfg.model.clear();
-        cfg.api_key = state.translation_config().google_api_key.data();
+        cfg.api_key = config.google_api_key.data();
         break;
     case TranslationConfig::TranslationBackend::ZhipuGLM:
         cfg.base_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
-        cfg.model = state.translation_config().zhipu_model.data();
-        cfg.api_key = state.translation_config().zhipu_api_key.data();
+        cfg.model = config.zhipu_model.data();
+        cfg.api_key = config.zhipu_api_key.data();
         break;
     case TranslationConfig::TranslationBackend::QwenMT:
         cfg.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-        cfg.model = state.translation_config().qwen_model.data();
-        cfg.api_key = state.translation_config().qwen_api_key.data();
+        cfg.model = config.qwen_model.data();
+        cfg.api_key = config.qwen_api_key.data();
         break;
     case TranslationConfig::TranslationBackend::Niutrans:
         cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
         cfg.model.clear();
-        cfg.api_key = state.translation_config().niutrans_api_key.data();
+        cfg.api_key = config.niutrans_api_key.data();
         break;
     case TranslationConfig::TranslationBackend::Youdao:
         cfg.base_url.clear();
-        if (state.translation_config().youdao_mode == TranslationConfig::YoudaoMode::LargeModel)
+        if (config.youdao_mode == TranslationConfig::YoudaoMode::LargeModel)
         {
             cfg.model = "youdao-lm-tr-1.0-L";
         }
@@ -74,8 +74,8 @@ translate::TranslatorConfig buildTranslatorConfig(const QuestStateManager& state
         {
             cfg.model = "generic";
         }
-        cfg.api_key = state.translation_config().youdao_app_key.data();
-        cfg.api_secret = state.translation_config().youdao_app_secret.data();
+        cfg.api_key = config.youdao_app_key.data();
+        cfg.api_secret = config.youdao_app_secret.data();
         break;
     }
 
@@ -548,7 +548,8 @@ void QuestWindow::applyQuestUpdate()
     resetTranslationState();
     appended_since_last_frame_ = true;
 
-    if (state_.translation_config().translate_enabled && !state_.quest.description.empty()) {
+    const TranslationConfig& config = activeTranslationConfig();
+    if (config.translate_enabled && !state_.quest.description.empty()) {
         submitTranslationRequest();
     }
 }
@@ -572,6 +573,39 @@ void QuestWindow::render()
     applyQuestUpdate();
     processTranslatorEvents();
     refreshFontBinding();
+
+    bool requeue_translation = false;
+    bool using_global = usingGlobalTranslation();
+    if (using_global)
+    {
+        if (auto* cm = ConfigManager_Get())
+        {
+            std::uint64_t version = cm->globalTranslationVersion();
+            if (version != observed_global_translation_version_)
+            {
+                observed_global_translation_version_ = version;
+                resetTranslatorState();
+                requeue_translation = true;
+            }
+        }
+    }
+    else
+    {
+        if (last_used_global_translation_)
+        {
+            resetTranslatorState();
+            requeue_translation = true;
+        }
+        observed_global_translation_version_ = 0;
+    }
+    last_used_global_translation_ = using_global;
+
+    const TranslationConfig& config = activeTranslationConfig();
+
+    if (requeue_translation && config.translate_enabled)
+    {
+        submitTranslationRequest();
+    }
 
     ImGuiIO& io = ImGui::GetIO();
 
@@ -947,7 +981,9 @@ void QuestWindow::renderTranslationControls(float wrap_width)
 {
     ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + wrap_width);
 
-    if (!state_.translation_config().translate_enabled) {
+    const TranslationConfig& config = activeTranslationConfig();
+
+    if (!config.translate_enabled) {
         ImGui::TextDisabled("%s", ui::LocalizedOrFallback("quest.translation.disabled", "Translation disabled. Enable it in settings.").c_str());
         ImGui::PopTextWrapPos();
         return;
@@ -1079,17 +1115,13 @@ void QuestWindow::renderContextMenu()
 
 void QuestWindow::initTranslatorIfEnabled()
 {
-    if (!state_.translation_config().translate_enabled) {
-        if (translator_) {
-            translator_->shutdown();
-            translator_.reset();
-        }
-        translator_initialized_ = false;
-        cached_config_ = {};
+    const TranslationConfig& config = activeTranslationConfig();
+    if (!config.translate_enabled) {
+        resetTranslatorState();
         return;
     }
 
-    translate::TranslatorConfig cfg = buildTranslatorConfig(state_);
+    translate::TranslatorConfig cfg = buildTranslatorConfig(config);
     bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
     bool same_config = same_backend &&
                        cfg.base_url == cached_config_.base_url &&
@@ -1114,13 +1146,12 @@ void QuestWindow::initTranslatorIfEnabled()
         } else {
             PLOG_WARNING << "Quest translator creation failed for backend " << static_cast<int>(cfg.backend);
         }
-        translator_.reset();
-        translator_initialized_ = false;
+        resetTranslatorState();
         return;
     }
 
     if (!translator_->isReady()) {
-        translator_initialized_ = false;
+        resetTranslatorState();
         PLOG_WARNING << "Quest translator not ready after init for backend " << static_cast<int>(cfg.backend);
     } else {
         translator_initialized_ = true;
@@ -1170,6 +1201,7 @@ void QuestWindow::submitTranslationRequest()
         return;
     }
 
+    const TranslationConfig& config = activeTranslationConfig();
     job_lookup_.clear();
     for (auto& status : field_status_) {
         status = FieldStatus{};
@@ -1178,16 +1210,16 @@ void QuestWindow::submitTranslationRequest()
     state_.translation_error.clear();
     state_.translation_failed = false;
 
-    submitFieldTranslation(QuestField::SubQuest, state_.quest.subquest_name);
-    submitFieldTranslation(QuestField::Title, state_.quest.quest_name);
-    submitFieldTranslation(QuestField::Description, state_.quest.description);
-    submitFieldTranslation(QuestField::Rewards, state_.quest.rewards);
-    submitFieldTranslation(QuestField::RepeatRewards, state_.quest.repeat_rewards);
+    submitFieldTranslation(QuestField::SubQuest, state_.quest.subquest_name, config);
+    submitFieldTranslation(QuestField::Title, state_.quest.quest_name, config);
+    submitFieldTranslation(QuestField::Description, state_.quest.description, config);
+    submitFieldTranslation(QuestField::Rewards, state_.quest.rewards, config);
+    submitFieldTranslation(QuestField::RepeatRewards, state_.quest.repeat_rewards, config);
 
     refreshTranslationFlags();
 }
 
-void QuestWindow::submitFieldTranslation(QuestField field, const std::string& text)
+void QuestWindow::submitFieldTranslation(QuestField field, const std::string& text, const TranslationConfig& config)
 {
     FieldStatus& status = fieldStatus(field);
     status = FieldStatus{};
@@ -1199,8 +1231,8 @@ void QuestWindow::submitFieldTranslation(QuestField field, const std::string& te
     }
 
     auto submit = session_.submit(text,
-                                  state_.translation_config().translation_backend,
-                                  state_.translation_config().target_lang_enum,
+                                  config.translation_backend,
+                                  config.target_lang_enum,
                                   translator_.get());
 
     if (submit.kind == TranslateSession::SubmitKind::Cached) {
@@ -1390,5 +1422,42 @@ float QuestWindow::estimateGridHeight(float wrap_width) const
     float body_height = std::max(rewards_size.y, repeat_size.y) + style.CellPadding.y * 2.0f;
 
     return header_height + body_height + style.ItemSpacing.y;
+}
+
+const TranslationConfig& QuestWindow::activeTranslationConfig() const
+{
+    if (state_.use_global_translation)
+    {
+        if (auto* cm = ConfigManager_Get())
+        {
+            return cm->globalTranslationConfig();
+        }
+    }
+    return state_.translation_config();
+}
+
+bool QuestWindow::usingGlobalTranslation() const
+{
+    return state_.use_global_translation && ConfigManager_Get() != nullptr;
+}
+
+void QuestWindow::resetTranslatorState()
+{
+    if (translator_)
+    {
+        translator_->shutdown();
+        translator_.reset();
+    }
+    translator_initialized_ = false;
+    cached_backend_ = translate::Backend::OpenAI;
+    cached_config_ = {};
+    job_lookup_.clear();
+    for (auto& status : field_status_)
+    {
+        status = FieldStatus{};
+    }
+    state_.translation_failed = false;
+    state_.translation_valid = false;
+    state_.translation_error.clear();
 }
 

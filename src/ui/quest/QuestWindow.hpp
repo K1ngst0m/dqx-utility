@@ -53,7 +53,7 @@ private:
     void processTranslatorEvents();
     void resetTranslationState();
     void submitTranslationRequest();
-    void submitFieldTranslation(QuestField field, const std::string& text);
+    void submitFieldTranslation(QuestField field, const std::string& text, const TranslationConfig& config);
     void applyCachedTranslation(QuestField field, const std::string& text);
     void handleTranslationFailure(QuestField field, const std::string& message);
     void refreshTranslationFlags();
@@ -62,6 +62,9 @@ private:
     const FieldStatus& fieldStatus(QuestField field) const;
     static std::size_t fieldIndex(QuestField field);
     std::string buildCopyBuffer() const;
+    const TranslationConfig& activeTranslationConfig() const;
+    bool usingGlobalTranslation() const;
+    void resetTranslatorState();
 
     FontManager& font_manager_;
     QuestStateManager state_{};
@@ -89,4 +92,6 @@ private:
     std::uint64_t last_applied_seq_ = 0;
     bool should_be_removed_ = false;
     bool appended_since_last_frame_ = false;
+    std::uint64_t observed_global_translation_version_ = 0;
+    bool last_used_global_translation_ = false;
 };

@@ -23,6 +23,7 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     toml::table t;
     t.insert("name", name);
     t.insert("auto_scroll_to_new", state.ui_state().auto_scroll_to_new);
+    t.insert("use_global_translation", state.use_global_translation);
     t.insert("translate_enabled", state.translation_config().translate_enabled);
     t.insert("auto_apply_changes", state.translation_config().auto_apply_changes);
     t.insert("translation_backend", static_cast<int>(state.translation_config().translation_backend));
@@ -78,6 +79,7 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
     name = *name_val;
 
     if (auto v = t["auto_scroll_to_new"].value<bool>()) state.ui_state().auto_scroll_to_new = *v;
+    if (auto v = t["use_global_translation"].value<bool>()) state.use_global_translation = *v;
     if (auto v = t["translate_enabled"].value<bool>()) state.translation_config().translate_enabled = *v;
     if (auto v = t["auto_apply_changes"].value<bool>()) state.translation_config().auto_apply_changes = *v;
     if (auto v = t["translation_backend"].value<int>())
@@ -159,6 +161,7 @@ ConfigManager::ConfigManager()
 {
     config_path_ = "config.toml";
     last_mtime_ = file_mtime_ms(config_path_);
+    global_translation_config_.applyDefaults();
     applyVerboseSetting();
 }
 
@@ -205,6 +208,34 @@ bool ConfigManager::saveAll()
     global.insert("dialog_fade_enabled", dialog_fade_enabled_);
     global.insert("dialog_fade_timeout", dialog_fade_timeout_);
     global.insert("verbose_logging", verbose_logging_);
+
+    toml::table translation;
+    translation.insert("translate_enabled", global_translation_config_.translate_enabled);
+    translation.insert("auto_apply_changes", global_translation_config_.auto_apply_changes);
+    translation.insert("translation_backend", static_cast<int>(global_translation_config_.translation_backend));
+    std::string global_target_lang;
+    switch (global_translation_config_.target_lang_enum)
+    {
+    case TranslationConfig::TargetLang::EN_US: global_target_lang = "en-us"; break;
+    case TranslationConfig::TargetLang::ZH_CN: global_target_lang = "zh-cn"; break;
+    case TranslationConfig::TargetLang::ZH_TW: global_target_lang = "zh-tw"; break;
+    }
+    translation.insert("target_lang", global_target_lang);
+    translation.insert("openai_base_url", std::string(global_translation_config_.openai_base_url.data()));
+    translation.insert("openai_model", std::string(global_translation_config_.openai_model.data()));
+    translation.insert("openai_api_key", std::string(global_translation_config_.openai_api_key.data()));
+    translation.insert("google_api_key", std::string(global_translation_config_.google_api_key.data()));
+    translation.insert("qwen_api_key", std::string(global_translation_config_.qwen_api_key.data()));
+    translation.insert("qwen_model", std::string(global_translation_config_.qwen_model.data()));
+    translation.insert("niutrans_api_key", std::string(global_translation_config_.niutrans_api_key.data()));
+    translation.insert("zhipu_base_url", std::string(global_translation_config_.zhipu_base_url.data()));
+    translation.insert("zhipu_model", std::string(global_translation_config_.zhipu_model.data()));
+    translation.insert("zhipu_api_key", std::string(global_translation_config_.zhipu_api_key.data()));
+    translation.insert("youdao_app_key", std::string(global_translation_config_.youdao_app_key.data()));
+    translation.insert("youdao_app_secret", std::string(global_translation_config_.youdao_app_secret.data()));
+    translation.insert("youdao_mode", static_cast<int>(global_translation_config_.youdao_mode));
+    global.insert("translation", std::move(translation));
+
     root.insert("global", std::move(global));
 
     auto windows = registry_->windowsByType(UIWindowType::Dialog);
@@ -290,6 +321,53 @@ bool ConfigManager::loadAndApply()
                 dialog_fade_timeout_ = static_cast<float>(*v);
             if (auto v = (*g)["verbose_logging"].value<bool>())
                 setVerboseLogging(*v);
+
+            global_translation_config_.applyDefaults();
+            if (auto* trans = (*g)["translation"].as_table())
+            {
+                if (auto v = (*trans)["translate_enabled"].value<bool>()) global_translation_config_.translate_enabled = *v;
+                if (auto v = (*trans)["auto_apply_changes"].value<bool>()) global_translation_config_.auto_apply_changes = *v;
+                if (auto v = (*trans)["translation_backend"].value<int>())
+                    global_translation_config_.translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
+                if (auto v = (*trans)["target_lang"].value<std::string>())
+                {
+                    if (*v == "en-us") global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::EN_US;
+                    else if (*v == "zh-cn") global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
+                    else if (*v == "zh-tw") global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
+                }
+                if (auto v = (*trans)["openai_base_url"].value<std::string>())
+                    std::snprintf(global_translation_config_.openai_base_url.data(), global_translation_config_.openai_base_url.size(), "%s", v->c_str());
+                if (auto v = (*trans)["openai_model"].value<std::string>())
+                    std::snprintf(global_translation_config_.openai_model.data(), global_translation_config_.openai_model.size(), "%s", v->c_str());
+                if (auto v = (*trans)["openai_api_key"].value<std::string>())
+                    std::snprintf(global_translation_config_.openai_api_key.data(), global_translation_config_.openai_api_key.size(), "%s", v->c_str());
+                if (auto v = (*trans)["google_api_key"].value<std::string>())
+                    std::snprintf(global_translation_config_.google_api_key.data(), global_translation_config_.google_api_key.size(), "%s", v->c_str());
+                if (auto v = (*trans)["qwen_api_key"].value<std::string>())
+                    std::snprintf(global_translation_config_.qwen_api_key.data(), global_translation_config_.qwen_api_key.size(), "%s", v->c_str());
+                if (auto v = (*trans)["qwen_model"].value<std::string>())
+                    std::snprintf(global_translation_config_.qwen_model.data(), global_translation_config_.qwen_model.size(), "%s", v->c_str());
+                if (auto v = (*trans)["niutrans_api_key"].value<std::string>())
+                    std::snprintf(global_translation_config_.niutrans_api_key.data(), global_translation_config_.niutrans_api_key.size(), "%s", v->c_str());
+                if (auto v = (*trans)["zhipu_base_url"].value<std::string>())
+                    std::snprintf(global_translation_config_.zhipu_base_url.data(), global_translation_config_.zhipu_base_url.size(), "%s", v->c_str());
+                if (auto v = (*trans)["zhipu_model"].value<std::string>())
+                    std::snprintf(global_translation_config_.zhipu_model.data(), global_translation_config_.zhipu_model.size(), "%s", v->c_str());
+                if (auto v = (*trans)["zhipu_api_key"].value<std::string>())
+                    std::snprintf(global_translation_config_.zhipu_api_key.data(), global_translation_config_.zhipu_api_key.size(), "%s", v->c_str());
+                if (auto v = (*trans)["youdao_app_key"].value<std::string>())
+                    std::snprintf(global_translation_config_.youdao_app_key.data(), global_translation_config_.youdao_app_key.size(), "%s", v->c_str());
+                if (auto v = (*trans)["youdao_app_secret"].value<std::string>())
+                    std::snprintf(global_translation_config_.youdao_app_secret.data(), global_translation_config_.youdao_app_secret.size(), "%s", v->c_str());
+                if (auto v = (*trans)["youdao_mode"].value<int>())
+                {
+                    if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
+                        global_translation_config_.youdao_mode = TranslationConfig::YoudaoMode::LargeModel;
+                    else
+                        global_translation_config_.youdao_mode = TranslationConfig::YoudaoMode::Text;
+                }
+            }
+            markGlobalTranslationDirty();
         }
         applyVerboseSetting();
 
@@ -464,6 +542,15 @@ void ConfigManager::setForceVerboseLogging(bool enabled)
 void ConfigManager::applyVerboseSetting()
 {
     processing::Diagnostics::SetVerbose(force_verbose_logging_ || verbose_logging_);
+}
+
+void ConfigManager::markGlobalTranslationDirty()
+{
+    ++global_translation_version_;
+    if (global_translation_version_ == 0)
+    {
+        ++global_translation_version_;
+    }
 }
 
 ConfigManager* ConfigManager_Get() { return g_cfg_mgr; }

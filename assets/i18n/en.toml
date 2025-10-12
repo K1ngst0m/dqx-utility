@@ -169,6 +169,8 @@ hint = "Dialog will fade out after inactivity. Hover or new text resets."
 title = "Translate"
 enable = "Enable Translation"
 auto_apply = "Auto-apply changes"
+use_global = "Use global translation settings"
+use_global_hint = "(uncheck for per-window overrides)"
 
 [dialog.placeholder]
 waiting = "Initializing dialog system..."

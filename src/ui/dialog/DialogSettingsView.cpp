@@ -61,8 +61,20 @@ void DialogSettingsView::render(
     if (ImGui::CollapsingHeader(i18n::get("dialog.translate.title"), ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::Indent();
-        translationPanel_.render(translator, applyHint, applyHintTimer, testingConnection,
-                                testResult, testTimestamp, initTranslatorIfEnabledFn, currentTranslatorFn);
+        TranslationConfig* global_config = nullptr;
+        if (auto* cm = ConfigManager_Get())
+        {
+            global_config = &cm->globalTranslationConfig();
+        }
+        translationPanel_.render(translator,
+                                 applyHint,
+                                 applyHintTimer,
+                                 testingConnection,
+                                 testResult,
+                                 testTimestamp,
+                                 initTranslatorIfEnabledFn,
+                                 currentTranslatorFn,
+                                 global_config);
         ImGui::Unindent();
         ImGui::Spacing();
     }

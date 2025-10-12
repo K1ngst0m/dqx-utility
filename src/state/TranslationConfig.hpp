@@ -89,4 +89,25 @@ struct TranslationConfig
         youdao_app_secret.fill('\0');
         youdao_mode = YoudaoMode::Text;
     }
+
+    void copyFrom(const TranslationConfig& other)
+    {
+        translate_enabled = other.translate_enabled;
+        auto_apply_changes = other.auto_apply_changes;
+        translation_backend = other.translation_backend;
+        target_lang_enum = other.target_lang_enum;
+        openai_base_url = other.openai_base_url;
+        openai_model = other.openai_model;
+        openai_api_key = other.openai_api_key;
+        google_api_key = other.google_api_key;
+        zhipu_base_url = other.zhipu_base_url;
+        zhipu_model = other.zhipu_model;
+        zhipu_api_key = other.zhipu_api_key;
+        qwen_model = other.qwen_model;
+        qwen_api_key = other.qwen_api_key;
+        niutrans_api_key = other.niutrans_api_key;
+        youdao_app_key = other.youdao_app_key;
+        youdao_app_secret = other.youdao_app_secret;
+        youdao_mode = other.youdao_mode;
+    }
 };
