@@ -4,6 +4,7 @@
 #include "../memory/IProcessMemory.hpp"
 #include "../process/ProcessFinder.hpp"
 #include "../hooking/DialogHook.hpp"
+#include "../hooking/QuestHook.hpp"
 #include "../hooking/IntegrityDetour.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
 #include "dialog_message.hpp"
@@ -20,6 +21,7 @@ struct Engine::Impl {
   Logger log{};
   std::shared_ptr<IProcessMemory> memory;
   std::unique_ptr<DialogHook> hook;
+  std::unique_ptr<QuestHook> quest_hook;
   std::unique_ptr<class IntegrityDetour> integrity;
 
   SpscRing<DialogMessage, 1024> ring;
@@ -81,6 +83,16 @@ bool Engine::start_hook(StartPolicy policy) {
 
   // Do NOT pre-change page protections at startup; some builds crash on login if code pages change protection.
 
+  impl_->quest_hook = std::make_unique<dqxclarity::QuestHook>(impl_->memory);
+  impl_->quest_hook->SetVerbose(impl_->cfg.verbose);
+  impl_->quest_hook->SetLogger(impl_->log);
+  impl_->quest_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
+  impl_->quest_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+  if (impl_->quest_hook && !impl_->quest_hook->InstallHook(/*enable_patch=*/false)) {
+    if (impl_->log.warn) impl_->log.warn("Failed to prepare quest hook; continuing without quest capture");
+    impl_->quest_hook.reset();
+  }
+
   // Install integrity detour and configure it to restore dialog hook bytes during checks
   impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
   impl_->integrity->SetVerbose(impl_->cfg.verbose);
@@ -90,9 +102,16 @@ bool Engine::start_hook(StartPolicy policy) {
   if (impl_->hook && impl_->hook->GetHookAddress() != 0) {
     impl_->integrity->AddRestoreTarget(impl_->hook->GetHookAddress(), impl_->hook->GetOriginalBytes());
   }
+  if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0) {
+    impl_->integrity->AddRestoreTarget(impl_->quest_hook->GetHookAddress(), impl_->quest_hook->GetOriginalBytes());
+  }
   if (!impl_->integrity->Install()) {
     if (impl_->log.error) impl_->log.error("Failed to install integrity detour");
     impl_->integrity.reset();
+    if (impl_->quest_hook) {
+      impl_->quest_hook->RemoveHook();
+      impl_->quest_hook.reset();
+    }
     impl_->hook.reset();
     impl_->memory.reset();
     status_ = Status::Error;
@@ -102,7 +121,8 @@ bool Engine::start_hook(StartPolicy policy) {
   // Optionally enable the dialog hook immediately (will be restored during integrity)
   const bool enable_patch_now = (policy == StartPolicy::EnableImmediately);
   if (enable_patch_now) {
-    (void)impl_->hook->EnablePatch();
+    if (impl_->hook) (void)impl_->hook->EnablePatch();
+    if (impl_->quest_hook) (void)impl_->quest_hook->EnablePatch();
   }
 
   // Proactive verification after immediate enable
@@ -110,12 +130,19 @@ bool Engine::start_hook(StartPolicy policy) {
     auto delay = std::chrono::milliseconds(impl_->cfg.proactive_verify_after_enable_ms);
     std::thread([this, delay]{
       std::this_thread::sleep_for(delay);
-      if (!impl_->hook) return;
-      if (!impl_->hook->IsPatched()) {
-        if (impl_->log.warn) impl_->log.warn("Post-enable verify: hook not present; reapplying once");
-        (void)impl_->hook->ReapplyPatch();
-      } else {
-        if (impl_->log.info) impl_->log.info("Post-enable verify: hook present");
+      if (impl_->hook) {
+        if (!impl_->hook->IsPatched()) {
+          if (impl_->log.warn) impl_->log.warn("Post-enable verify: dialog hook not present; reapplying once");
+          (void)impl_->hook->ReapplyPatch();
+        } else {
+          if (impl_->log.info) impl_->log.info("Post-enable verify: dialog hook present");
+        }
+      }
+      if (impl_->quest_hook) {
+        if (!impl_->quest_hook->IsPatched()) {
+          if (impl_->log.warn) impl_->log.warn("Post-enable verify: quest hook not present; reapplying once");
+          (void)impl_->quest_hook->ReapplyPatch();
+        }
       }
     }).detach();
   }
@@ -127,19 +154,33 @@ bool Engine::start_hook(StartPolicy policy) {
   } else {
     impl_->monitor = std::make_unique<dqxclarity::IntegrityMonitor>(impl_->memory, impl_->log, state_addr,
       [this](bool first){
-        if (!impl_->hook) return;
         if (first) {
-          (void)impl_->hook->EnablePatch();
-          if (impl_->log.info) impl_->log.info("Dialog hook enabled after first integrity run");
+          if (impl_->hook) {
+            (void)impl_->hook->EnablePatch();
+            if (impl_->log.info) impl_->log.info("Dialog hook enabled after first integrity run");
+          }
+          if (impl_->quest_hook) {
+            (void)impl_->quest_hook->EnablePatch();
+            if (impl_->log.info) impl_->log.info("Quest hook enabled after first integrity run");
+          }
         } else {
-          (void)impl_->hook->ReapplyPatch();
-          if (impl_->log.info) impl_->log.info("Dialog hook re-applied after integrity");
+          if (impl_->hook) {
+            (void)impl_->hook->ReapplyPatch();
+            if (impl_->log.info) impl_->log.info("Dialog hook re-applied after integrity");
+          }
+          if (impl_->quest_hook) {
+            (void)impl_->quest_hook->ReapplyPatch();
+            if (impl_->log.info) impl_->log.info("Quest hook re-applied after integrity");
+          }
         }
       }
     );
     // Provide restore targets (dialog hook site and original bytes) to monitor for out-of-process restore
     if (impl_->hook && impl_->hook->GetHookAddress() != 0) {
       impl_->monitor->AddRestoreTarget(impl_->hook->GetHookAddress(), impl_->hook->GetOriginalBytes());
+    }
+    if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0) {
+      impl_->monitor->AddRestoreTarget(impl_->quest_hook->GetHookAddress(), impl_->quest_hook->GetOriginalBytes());
     }
     (void)impl_->monitor->start();
   }
@@ -161,6 +202,9 @@ bool Engine::start_hook(StartPolicy policy) {
           impl_->ring.try_push(std::move(msg));
         }
       }
+      if (impl_->quest_hook) {
+        (void)impl_->quest_hook->PollQuestData();
+      }
       std::this_thread::sleep_for(100ms);
     }
   });
@@ -179,6 +223,10 @@ bool Engine::stop_hook() {
   if (impl_->monitor) {
     impl_->monitor->stop();
     impl_->monitor.reset();
+  }
+  if (impl_->quest_hook) {
+    impl_->quest_hook->RemoveHook();
+    impl_->quest_hook.reset();
   }
   if (impl_->hook) {
     impl_->hook->RemoveHook();
