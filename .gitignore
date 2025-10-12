@@ -17,3 +17,4 @@ dqxclarity/logs
 config.toml
 imgui.ini
 unknown_labels.txt
+Testing/Temporary/**

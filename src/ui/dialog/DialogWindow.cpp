@@ -301,12 +301,18 @@ void DialogWindow::applyPending()
     appended_since_last_frame_ = true;
     for (auto& m : local)
     {
+        // Handle empty text for NPC-only messages
+        std::string text_to_process = m.text.empty() ? " " : m.text;
+
+        std::string processed_text = text_pipeline_->process(text_to_process);
+        if (processed_text.empty())
+        {
+            if (m.seq > 0) last_applied_seq_ = m.seq;
+            continue;
+        }
+
         if (state_.translation_config().translate_enabled)
         {
-            // Handle empty text for NPC-only messages
-            std::string text_to_process = m.text.empty() ? " " : m.text;
-            
-            std::string processed_text = text_pipeline_->process(text_to_process);
 
             auto backend_before = state_.translation_config().translation_backend;
             auto submit = session_.submit(

@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "processing/JapaneseTextDetector.hpp"
+#include "processing/TextPipeline.hpp"
 
 namespace {
     void safe_copy_utf8(char* dest, size_t dest_size, const std::string& src)
@@ -342,4 +343,18 @@ TEST_CASE("ContainsJapaneseText handles mixed language lines", "[japanese_detect
 {
     const std::string mixed = "Quest Start! 「冒険の始まりだ！」";
     REQUIRE(processing::ContainsJapaneseText(mixed));
+}
+
+TEST_CASE("TextPipeline filters out non-Japanese text", "[text_pipeline]")
+{
+    processing::TextPipeline pipeline;
+    auto result = pipeline.process("This line should be ignored.");
+    REQUIRE(result.empty());
+}
+
+TEST_CASE("TextPipeline keeps Japanese text", "[text_pipeline]")
+{
+    processing::TextPipeline pipeline;
+    auto result = pipeline.process("「旅人よ、ようこそ！」");
+    REQUIRE_FALSE(result.empty());
 }

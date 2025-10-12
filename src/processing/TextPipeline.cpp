@@ -2,6 +2,7 @@
 #include "../translate/LabelProcessor.hpp"
 #include "StageRunner.hpp"
 #include "../processing/TextNormalizer.hpp"
+#include "JapaneseTextDetector.hpp"
 #include "Diagnostics.hpp"
 #include "../utils/Profile.hpp"
 
@@ -58,6 +59,32 @@ std::string TextPipeline::process(const std::string& input)
         }
         // On failure, return original input as a safe fallback
         return input;
+    }
+
+    auto language_stage = run_stage<bool>("language_filter", [&]() {
+        return ContainsJapaneseText(norm_stage.result);
+    });
+    if (verbose) {
+        if (language_stage.succeeded) {
+            PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] stage=language_filter status=ok duration="
+                      << language_stage.duration.count() << "us detected="
+                      << (language_stage.result ? "jp" : "non-jp");
+        } else {
+            PLOG_ERROR_(Diagnostics::kLogInstance) << "[TextPipeline] stage=language_filter status=error duration="
+                       << language_stage.duration.count() << "us reason="
+                       << (language_stage.error ? *language_stage.error : "unknown");
+        }
+    }
+    if (language_stage.succeeded && !language_stage.result) {
+        if (verbose) {
+            PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] filtered_out reason=non_japanese";
+        }
+        return std::string();
+    }
+    if (!language_stage.succeeded) {
+        if (verbose) {
+            PLOG_WARNING_(Diagnostics::kLogInstance) << "[TextPipeline] language_filter failure -> continuing with normalized text";
+        }
     }
 
     // Label processing stage
