@@ -32,6 +32,9 @@ public:
     AppMode getAppMode() const { return app_mode_; }
     void setAppMode(AppMode m) { app_mode_ = m; }
 
+    bool getWindowAlwaysOnTop() const { return window_always_on_top_; }
+    void setWindowAlwaysOnTop(bool enabled) { window_always_on_top_ = enabled; }
+
     // GUI localization language (e.g., "en", "zh-CN")
     const char* getUILanguageCode() const { return ui_language_.c_str(); }
     void setUILanguageCode(const char* code) { ui_language_ = (code && code[0]) ? code : "en"; }
@@ -79,6 +82,7 @@ private:
     bool append_logs_ = false;
     bool borderless_windows_ = false; // default to bordered (title bar visible)
     AppMode app_mode_ = AppMode::Normal;
+    bool window_always_on_top_ = false;
     std::string ui_language_ = "en"; // GUI localization language code
     bool verbose_logging_ = false;
     bool force_verbose_logging_ = false;

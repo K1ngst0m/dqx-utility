@@ -25,6 +25,7 @@ public:
 
     // Toggle OS-level window decorations (title bar, borders)
     void setWindowBorderless(bool borderless);
+    void setWindowAlwaysOnTop(bool topmost);
     void maximizeWindow();
     void restoreWindow();
     void setWindowSize(int w, int h);

@@ -6,6 +6,7 @@ rename_instance = "重命名实例"
 window_type = "窗口类型"
 ui_scale = "界面缩放"
 borderless = "无边框窗口"
+always_on_top = "窗口置顶"
 logs = "日志"
 refresh_logs = "刷新"
 [settings.log_viewer]

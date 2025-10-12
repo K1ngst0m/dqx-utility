@@ -180,6 +180,9 @@ void Application::initializeConfig()
 
     i18n::init(config_->getUILanguageCode());
 
+    last_window_topmost_ = config_->getWindowAlwaysOnTop();
+    context_->setWindowAlwaysOnTop(last_window_topmost_);
+
     if (registry_->windowsByType(UIWindowType::Dialog).empty())
         registry_->createDialogWindow();
 
@@ -234,6 +237,13 @@ void Application::handleModeChanges()
     if (current_mode != mode_manager_->GetCurrentMode())
     {
         mode_manager_->HandleModeChange(mode_manager_->GetCurrentMode(), current_mode);
+    }
+
+    bool desired_topmost = config_->getWindowAlwaysOnTop();
+    if (desired_topmost != last_window_topmost_)
+    {
+        context_->setWindowAlwaysOnTop(desired_topmost);
+        last_window_topmost_ = desired_topmost;
     }
 }
 

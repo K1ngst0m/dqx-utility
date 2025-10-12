@@ -53,6 +53,7 @@ private:
     bool quit_requested_ = false;
     bool running_ = true;
     Uint64 last_time_ = 0;
+    bool last_window_topmost_ = false;
 
     int argc_ = 0;
     char** argv_ = nullptr;

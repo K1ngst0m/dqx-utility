@@ -199,6 +199,7 @@ bool ConfigManager::saveAll()
     global.insert("append_logs", append_logs_);
     global.insert("borderless_windows", borderless_windows_);
     global.insert("app_mode", static_cast<int>(app_mode_));
+    global.insert("window_always_on_top", window_always_on_top_);
     global.insert("ui_language", ui_language_);
     global.insert("dialog_fade_enabled", dialog_fade_enabled_);
     global.insert("dialog_fade_timeout", dialog_fade_timeout_);
@@ -268,6 +269,8 @@ bool ConfigManager::loadAndApply()
                 borderless_windows_ = *v;
             if (auto v = (*g)["app_mode"].value<int>())
                 app_mode_ = static_cast<AppMode>(*v);
+            if (auto v = (*g)["window_always_on_top"].value<bool>())
+                window_always_on_top_ = *v;
             if (auto v = (*g)["ui_language"].value<std::string>())
                 ui_language_ = *v;
             if (auto v = (*g)["dialog_fade_enabled"].value<bool>())

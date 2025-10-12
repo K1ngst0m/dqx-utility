@@ -460,11 +460,11 @@ void DialogWindow::renderSettings()
 void DialogWindow::renderDialog()
 {
     ImGuiIO& io = ImGui::GetIO();
-    const float max_dialog_width  = std::max(200.0f, io.DisplaySize.x - 40.0f);
-    const float max_dialog_height = std::max(120.0f, io.DisplaySize.y - 40.0f);
+    const float max_dialog_width  = std::max(400.0f, io.DisplaySize.x - 40.0f);
+    const float max_dialog_height = std::max(400.0f, io.DisplaySize.y - 40.0f);
 
-    state_.ui_state().width  = std::clamp(state_.ui_state().width, 200.0f, max_dialog_width);
-    state_.ui_state().height = std::clamp(state_.ui_state().height, 80.0f, max_dialog_height);
+    state_.ui_state().width  = std::clamp(state_.ui_state().width, 400.0f, max_dialog_width);
+    state_.ui_state().height = std::clamp(state_.ui_state().height, 400.0f, max_dialog_height);
     state_.ui_state().padding.x        = std::clamp(state_.ui_state().padding.x, 4.0f, 80.0f);
     state_.ui_state().padding.y        = std::clamp(state_.ui_state().padding.y, 4.0f, 80.0f);
     state_.ui_state().rounding         = std::clamp(state_.ui_state().rounding, 0.0f, 32.0f);
@@ -546,7 +546,7 @@ void DialogWindow::renderDialog()
         ImGui::SetNextWindowSize(ImVec2(state_.ui_state().width, state_.ui_state().height), ImGuiCond_Always);
     }
 
-    ImGui::SetNextWindowSizeConstraints(ImVec2(200.0f, 80.0f), ImVec2(max_dialog_width, io.DisplaySize.y));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(400.0f, 400.0f), ImVec2(max_dialog_width, io.DisplaySize.y));
 
     // Apply fade multiplier to background alpha and border
     float effective_alpha = state_.ui_state().background_alpha * state_.ui_state().current_alpha_multiplier;

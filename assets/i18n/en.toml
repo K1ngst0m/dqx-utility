@@ -6,6 +6,7 @@ rename_instance = "Rename Instance"
 window_type = "Window Type"
 ui_scale = "UI Scale"
 borderless = "Borderless windows"
+always_on_top = "Always on top"
 logs = "Logs"
 refresh_logs = "Refresh"
 [settings.log_viewer]

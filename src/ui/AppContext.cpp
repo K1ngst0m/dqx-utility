@@ -249,6 +249,22 @@ void AppContext::setWindowBorderless(bool borderless)
     SDL_SetWindowBordered(window_, !borderless);
 }
 
+void AppContext::setWindowAlwaysOnTop(bool topmost)
+{
+    if (!window_) return;
+    SDL_SetWindowAlwaysOnTop(window_, topmost);
+#ifdef _WIN32
+    SDL_PropertiesID props = SDL_GetWindowProperties(window_);
+    void* hwnd_ptr = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+    if (hwnd_ptr)
+    {
+        HWND hwnd = reinterpret_cast<HWND>(hwnd_ptr);
+        SetWindowPos(hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+#endif
+}
+
 void AppContext::maximizeWindow()
 {
     if (!window_) return;
