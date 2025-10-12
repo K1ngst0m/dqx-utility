@@ -1209,7 +1209,21 @@ void DialogWindow::renderSeparator(
         ImVec4 sep_text_color = UITheme::dialogSeparatorColor();
         sep_text_color.w *= global_alpha;
         ImVec2 text_pos((x1 + x2 - text_size.x) * 0.5f, y);
-        draw_list->AddText(text_pos, ImGui::ColorConvertFloat4ToU32(sep_text_color), speaker.c_str());
+
+        ImU32 text_col = ImGui::ColorConvertFloat4ToU32(sep_text_color);
+        ImU32 outline_col = IM_COL32(0, 0, 0, static_cast<int>(sep_text_color.w * 255.0f));
+        float outline_offset = 1.0f;
+        for (int ox = -1; ox <= 1; ++ox)
+        {
+            for (int oy = -1; oy <= 1; ++oy)
+            {
+                if (ox == 0 && oy == 0) continue;
+                draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+                                    ImVec2(text_pos.x + ox * outline_offset, text_pos.y + oy * outline_offset),
+                                    outline_col, speaker.c_str());
+            }
+        }
+        draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(), text_pos, text_col, speaker.c_str());
 
         ImGui::Dummy(ImVec2(0.0f, text_size.y + UITheme::dialogSeparatorSpacing()));
     }
