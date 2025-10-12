@@ -44,16 +44,45 @@ void TranslationSettingsPanel::render(
     
     if (state_.translation_config().auto_apply_changes && any_field_changed)
     {
-        initTranslatorIfEnabledFn();
-        applyHint = i18n::get("dialog.settings.apply_hint");
-        applyHintTimer = 5.0f;
-        translator_invalidated = true;
+        pending_auto_apply_ = true;
+        auto_apply_elapsed_ = 0.0f;
+        applyHint.clear();
+        applyHintTimer = 0.0f;
+    }
+    else if (!state_.translation_config().auto_apply_changes)
+    {
+        pending_auto_apply_ = false;
+        auto_apply_elapsed_ = 0.0f;
     }
     
     ImGui::Spacing();
     
     translator_invalidated |= renderApplyAndTestButtons(translator, applyHint, applyHintTimer, testingConnection, 
                               testResult, testTimestamp, initTranslatorIfEnabledFn, any_field_changed);
+
+    if (applyHintTimer > 0.0f)
+    {
+        applyHintTimer -= ImGui::GetIO().DeltaTime;
+        if (applyHintTimer <= 0.0f)
+        {
+            applyHintTimer = 0.0f;
+            applyHint.clear();
+        }
+    }
+
+    if (state_.translation_config().auto_apply_changes && pending_auto_apply_)
+    {
+        auto_apply_elapsed_ += ImGui::GetIO().DeltaTime;
+        if (auto_apply_elapsed_ >= 0.5f)
+        {
+            pending_auto_apply_ = false;
+            auto_apply_elapsed_ = 0.0f;
+            initTranslatorIfEnabledFn();
+            applyHint = i18n::get("dialog.settings.apply_hint");
+            applyHintTimer = 3.0f;
+            translator_invalidated = true;
+        }
+    }
 
     if (translator_invalidated)
     {
