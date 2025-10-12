@@ -3,6 +3,8 @@
 #include <cstring>
 #include <algorithm>
 
+#include "processing/JapaneseTextDetector.hpp"
+
 namespace {
     void safe_copy_utf8(char* dest, size_t dest_size, const std::string& src)
     {
@@ -298,4 +300,46 @@ TEST_CASE("safe_copy_utf8 one byte over boundary", "[text_processing]")
     char buffer[6];
     safe_copy_utf8(buffer, sizeof(buffer), "Hello!");
     REQUIRE(std::strlen(buffer) == 5);
+}
+
+TEST_CASE("ContainsJapaneseText detects hiragana and katakana from dialog log", "[japanese_detection]")
+{
+    const std::string from_log = "「どの子を　連れていきますか？\n";
+    REQUIRE(processing::ContainsJapaneseText(from_log));
+}
+
+TEST_CASE("ContainsJapaneseText ignores plain ASCII", "[japanese_detection]")
+{
+    const std::string ascii = "This is an English line with numbers 12345.";
+    REQUIRE_FALSE(processing::ContainsJapaneseText(ascii));
+}
+
+TEST_CASE("ContainsJapaneseText ignores replacement characters", "[japanese_detection]")
+{
+    const std::string corrupted = "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD";
+    REQUIRE_FALSE(processing::ContainsJapaneseText(corrupted));
+}
+
+TEST_CASE("ContainsJapaneseText remains false for Chinese text", "[japanese_detection]")
+{
+    const std::string chinese = "这是中文，测试";
+    REQUIRE_FALSE(processing::ContainsJapaneseText(chinese));
+}
+
+TEST_CASE("ContainsJapaneseText detects Kanji when paired with Japanese punctuation", "[japanese_detection]")
+{
+    const std::string kanji_with_quotes = "「勇者」";
+    REQUIRE(processing::ContainsJapaneseText(kanji_with_quotes));
+}
+
+TEST_CASE("ContainsJapaneseText detects halfwidth katakana", "[japanese_detection]")
+{
+    const std::string halfwidth = "ｶﾀｶﾅ";
+    REQUIRE(processing::ContainsJapaneseText(halfwidth));
+}
+
+TEST_CASE("ContainsJapaneseText handles mixed language lines", "[japanese_detection]")
+{
+    const std::string mixed = "Quest Start! 「冒険の始まりだ！」";
+    REQUIRE(processing::ContainsJapaneseText(mixed));
 }

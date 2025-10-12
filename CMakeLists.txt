@@ -74,6 +74,8 @@ set(DQX_CORE_SOURCES
   src/processing/TextPipeline.cpp
   src/processing/Diagnostics.cpp
   src/processing/TextNormalizer.cpp
+  src/processing/JapaneseTextDetector.cpp
+  src/processing/JapaneseTextDetector.hpp
   src/config/ConfigManager.cpp
   src/config/ConfigManager.hpp
   src/utils/ErrorReporter.cpp
