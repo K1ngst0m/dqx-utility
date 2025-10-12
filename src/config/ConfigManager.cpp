@@ -2,6 +2,7 @@
 
 #include "../ui/WindowRegistry.hpp"
 #include "../ui/dialog/DialogWindow.hpp"
+#include "../ui/quest/QuestWindow.hpp"
 #include "../state/DialogStateManager.hpp"
 #include "../utils/ErrorReporter.hpp"
 #include "../processing/Diagnostics.hpp"
@@ -217,6 +218,16 @@ bool ConfigManager::saveAll()
     }
     root.insert("dialogs", std::move(arr));
 
+    auto quest_windows = registry_->windowsByType(UIWindowType::Quest);
+    if (!quest_windows.empty())
+    {
+        if (auto* qw = dynamic_cast<QuestWindow*>(quest_windows.front()))
+        {
+            auto t = dialogStateToToml(qw->displayName(), qw->state());
+            root.insert("quest", std::move(t));
+        }
+    }
+
     std::string tmp = config_path_ + ".tmp";
     std::ofstream ofs(tmp, std::ios::binary);
     if (!ofs)
@@ -340,6 +351,56 @@ bool ConfigManager::loadAndApply()
                     dw->refreshFontBinding();
                     dw->initTranslatorIfEnabled();
                 }
+            }
+        }
+
+        if (auto* quest_tbl = root["quest"].as_table())
+        {
+            QuestStateManager quest_state;
+            quest_state.applyDefaults();
+            std::string quest_name;
+            if (tomlToDialogState(*quest_tbl, quest_state, quest_name))
+            {
+                auto quests = registry_->windowsByType(UIWindowType::Quest);
+                QuestWindow* quest_window = nullptr;
+                if (quests.empty())
+                {
+                    quest_window = &registry_->createQuestWindow();
+                }
+                else
+                {
+                    quest_window = dynamic_cast<QuestWindow*>(quests.front());
+                }
+
+                if (quest_window)
+                {
+                    if (!quest_name.empty())
+                        quest_window->rename(quest_name.c_str());
+
+                    quest_window->state() = quest_state;
+                    quest_window->state().quest.applyDefaults();
+                    quest_window->state().translated.applyDefaults();
+                    quest_window->state().original.applyDefaults();
+                    quest_window->state().translation_valid = false;
+                    quest_window->state().translation_failed = false;
+                    quest_window->state().translation_error.clear();
+                    quest_window->state().ui_state().window_size = ImVec2(
+                        quest_window->state().ui_state().width,
+                        quest_window->state().ui_state().height);
+                    quest_window->state().ui_state().pending_resize = true;
+                    quest_window->state().ui_state().pending_reposition = true;
+                    quest_window->state().ui_state().font = nullptr;
+                    quest_window->state().ui_state().font_base_size = 0.0f;
+                    quest_window->refreshFontBinding();
+                    quest_window->initTranslatorIfEnabled();
+                }
+            }
+        }
+        else
+        {
+            if (registry_->windowsByType(UIWindowType::Quest).empty())
+            {
+                registry_->createQuestWindow();
             }
         }
         return true;

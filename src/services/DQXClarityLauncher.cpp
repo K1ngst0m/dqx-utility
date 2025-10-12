@@ -5,6 +5,7 @@
 
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "dqxclarity/api/dialog_message.hpp"
+#include "dqxclarity/api/quest_message.hpp"
 #include "dqxclarity/process/NoticeWaiter.hpp"
 #include "dqxclarity/process/PostLoginDetector.hpp"
 
@@ -44,6 +45,10 @@ struct DQXClarityLauncher::Impl
     std::vector<dqxclarity::DialogMessage> backlog;
     static constexpr std::size_t kMaxBacklog = 2048;
 
+    mutable std::mutex quest_mutex;
+    dqxclarity::QuestMessage latest_quest;
+    bool quest_valid = false;
+
     // Config mirrors
     dqxclarity::Config engine_cfg{};
     bool enable_post_login_heuristics = false;
@@ -59,7 +64,12 @@ struct DQXClarityLauncher::Impl
     bool stopHookLocked()
     {
         std::lock_guard<std::mutex> lock(engine_mutex);
-        return engine.stop_hook();
+        bool ok = engine.stop_hook();
+        if (ok) {
+            std::lock_guard<std::mutex> qlock(quest_mutex);
+            quest_valid = false;
+        }
+        return ok;
     }
 };
 
@@ -172,6 +182,13 @@ DQXClarityLauncher::DQXClarityLauncher()
                 }
             }
 
+            dqxclarity::QuestMessage quest_snapshot;
+            if (pimpl_->engine.latest_quest(quest_snapshot)) {
+                std::lock_guard<std::mutex> qlock(pimpl_->quest_mutex);
+                pimpl_->latest_quest = std::move(quest_snapshot);
+                pimpl_->quest_valid = true;
+            }
+
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     });
@@ -190,6 +207,16 @@ bool DQXClarityLauncher::copyDialogsSince(std::uint64_t since_seq, std::vector<d
         if (m.seq > since_seq) out.push_back(m);
     }
     return !out.empty();
+}
+
+bool DQXClarityLauncher::getLatestQuest(dqxclarity::QuestMessage& out) const
+{
+    std::lock_guard<std::mutex> lock(pimpl_->quest_mutex);
+    if (!pimpl_->quest_valid) {
+        return false;
+    }
+    out = pimpl_->latest_quest;
+    return true;
 }
 
 bool DQXClarityLauncher::isDQXGameRunning() const

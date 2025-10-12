@@ -210,6 +210,29 @@ retry = "重试"
 increase_font = "增大字体"
 decrease_font = "减小字体"
 
+[quest]
+
+[quest.title]
+empty = "（无任务）"
+
+[quest.description]
+empty = "暂无任务描述"
+
+[quest.rewards]
+label = "奖励"
+empty = "无"
+
+[quest.repeat_rewards]
+label = "重复奖励"
+empty = "无"
+
+[quest.translation]
+disabled = "翻译已禁用。请在设置中启用。"
+pending = "正在翻译..."
+error = "翻译失败"
+not_ready = "翻译器尚未就绪。"
+queue_failed = "无法加入翻译请求队列。"
+
 
 [error.category]
 initialization = "初始化"

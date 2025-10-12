@@ -47,6 +47,7 @@ set(DQX_CORE_SOURCES
   src/Application.cpp
   src/ui/AppContext.cpp
   src/ui/dialog/DialogWindow.cpp
+  src/ui/CommonUIComponents.hpp
   src/ui/FontManager.cpp
   src/ui/GlobalSettingsPanel.cpp
   src/ui/WindowRegistry.cpp
@@ -58,6 +59,10 @@ set(DQX_CORE_SOURCES
   src/ui/dialog/AppearanceSettingsPanel.cpp
   src/ui/dialog/TranslationSettingsPanel.cpp
   src/ui/dialog/DebugSettingsPanel.cpp
+  src/ui/quest/QuestWindow.cpp
+  src/ui/quest/QuestWindow.hpp
+  src/ui/quest/QuestSettingsView.cpp
+  src/ui/quest/QuestSettingsView.hpp
   src/platform/ProcessDetector.cpp
   src/platform/ProcessLocaleChecker.cpp
   src/platform/WineDetector.cpp
@@ -76,6 +81,7 @@ set(DQX_CORE_SOURCES
   src/processing/TextNormalizer.cpp
   src/processing/JapaneseTextDetector.cpp
   src/processing/JapaneseTextDetector.hpp
+  src/state/QuestStateManager.hpp
   src/config/ConfigManager.cpp
   src/config/ConfigManager.hpp
   src/utils/ErrorReporter.cpp

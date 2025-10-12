@@ -9,6 +9,8 @@ namespace dqxclarity {
 
 enum class Status { Stopped, Starting, Hooked, Stopping, Error };
 
+struct QuestMessage;
+
 struct Config {
   bool verbose = false;
   bool console_output = false; // kept for parity; not used by the library
@@ -42,6 +44,8 @@ class Engine {
 
   // Drain all available dialog messages into out (single consumer)
   bool drain(std::vector<struct DialogMessage>& out);
+
+  bool latest_quest(struct QuestMessage& out) const;
 
  private:
   struct Impl;

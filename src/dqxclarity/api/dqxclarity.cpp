@@ -8,11 +8,13 @@
 #include "../hooking/IntegrityDetour.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
 #include "dialog_message.hpp"
+#include "quest_message.hpp"
 #include "../util/SPSCRing.hpp"
 
 #include <chrono>
 #include <thread>
 #include <atomic>
+#include <mutex>
 
 namespace dqxclarity {
 
@@ -29,6 +31,11 @@ struct Engine::Impl {
   std::thread poller;
   std::atomic<bool> poll_stop{false};
   std::unique_ptr<class IntegrityMonitor> monitor;
+
+  std::atomic<std::uint64_t> quest_seq{0};
+  mutable std::mutex quest_mutex;
+  QuestMessage quest_snapshot;
+  bool quest_valid = false;
 };
 
 Engine::Engine() : impl_(new Impl{}) {}
@@ -49,6 +56,13 @@ bool Engine::start_hook() {
 bool Engine::start_hook(StartPolicy policy) {
   if (status_ == Status::Hooked || status_ == Status::Starting) return true;
   status_ = Status::Starting;
+
+  impl_->quest_seq.store(0, std::memory_order_relaxed);
+  {
+    std::lock_guard<std::mutex> lock(impl_->quest_mutex);
+    impl_->quest_valid = false;
+    impl_->quest_snapshot = QuestMessage{};
+  }
 
   // Find DQXGame.exe
   auto pids = dqxclarity::ProcessFinder::FindByName("DQXGame.exe", false);
@@ -202,8 +216,21 @@ bool Engine::start_hook(StartPolicy policy) {
           impl_->ring.try_push(std::move(msg));
         }
       }
-      if (impl_->quest_hook) {
-        (void)impl_->quest_hook->PollQuestData();
+      if (impl_->quest_hook && impl_->quest_hook->PollQuestData()) {
+        QuestMessage snapshot;
+        const auto& quest = impl_->quest_hook->GetLastQuest();
+        snapshot.subquest_name = quest.subquest_name;
+        snapshot.quest_name = quest.quest_name;
+        snapshot.description = quest.description;
+        snapshot.rewards = quest.rewards;
+        snapshot.repeat_rewards = quest.repeat_rewards;
+        snapshot.seq = impl_->quest_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+
+        {
+          std::lock_guard<std::mutex> lock(impl_->quest_mutex);
+          impl_->quest_snapshot = std::move(snapshot);
+          impl_->quest_valid = true;
+        }
       }
       std::this_thread::sleep_for(100ms);
     }
@@ -218,6 +245,11 @@ bool Engine::stop_hook() {
   status_ = Status::Stopping;
   impl_->poll_stop.store(true);
   if (impl_->poller.joinable()) impl_->poller.join();
+
+  {
+    std::lock_guard<std::mutex> lock(impl_->quest_mutex);
+    impl_->quest_valid = false;
+  }
 
 
   if (impl_->monitor) {
@@ -244,6 +276,15 @@ bool Engine::stop_hook() {
 
 bool Engine::drain(std::vector<DialogMessage>& out) {
   return impl_->ring.pop_all(out) > 0;
+}
+
+bool Engine::latest_quest(QuestMessage& out) const {
+  std::lock_guard<std::mutex> lock(impl_->quest_mutex);
+  if (!impl_->quest_valid) {
+    return false;
+  }
+  out = impl_->quest_snapshot;
+  return true;
 }
 
 } // namespace dqxclarity

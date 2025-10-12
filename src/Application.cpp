@@ -186,6 +186,9 @@ void Application::initializeConfig()
     if (registry_->windowsByType(UIWindowType::Dialog).empty())
         registry_->createDialogWindow();
 
+    if (registry_->windowsByType(UIWindowType::Quest).empty())
+        registry_->createQuestWindow();
+
     config_->setAppMode(ConfigManager::AppMode::Normal);
     mode_manager_->ApplyModeSettings(ConfigManager::AppMode::Normal);
     mode_manager_->SetCurrentMode(ConfigManager::AppMode::Normal);

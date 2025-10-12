@@ -212,6 +212,29 @@ retry = "Retry"
 increase_font = "Increase Font Size"
 decrease_font = "Decrease Font Size"
 
+[quest]
+
+[quest.title]
+empty = "(No Quest)"
+
+[quest.description]
+empty = "No quest description available"
+
+[quest.rewards]
+label = "Rewards"
+empty = "None"
+
+[quest.repeat_rewards]
+label = "Repeat Rewards"
+empty = "None"
+
+[quest.translation]
+disabled = "Translation disabled. Enable it in settings."
+pending = "Translating..."
+error = "Translation failed"
+not_ready = "Translator not ready."
+queue_failed = "Unable to queue translation request."
+
 
 
 [error.category]

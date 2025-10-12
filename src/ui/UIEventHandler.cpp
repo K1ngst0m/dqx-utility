@@ -2,6 +2,7 @@
 #include "AppContext.hpp"
 #include "WindowRegistry.hpp"
 #include "dialog/DialogWindow.hpp"
+#include "quest/QuestWindow.hpp"
 #include "config/ConfigManager.hpp"
 #include "Localization.hpp"
 
@@ -19,22 +20,43 @@ bool UIEventHandler::IsMouseOutsideDialogs() const
     if (!ImGui::IsMousePosValid(&io.MousePos))
         return false;
 
-    auto dialogs = registry_.windowsByType(UIWindowType::Dialog);
-    for (auto* window : dialogs)
+    auto is_mouse_over = [](UIWindow* window) -> bool
     {
-        auto* dialog = dynamic_cast<DialogWindow*>(window);
-        if (dialog)
+        if (auto* dialog = dynamic_cast<DialogWindow*>(window))
         {
             const auto& state = dialog->state();
-            bool within_dialog = ImGui::IsMouseHoveringRect(
+            return ImGui::IsMouseHoveringRect(
                 state.ui_state().window_pos,
                 ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
                        state.ui_state().window_pos.y + state.ui_state().window_size.y),
                 false);
-            if (within_dialog)
-                return false;
         }
+        if (auto* quest = dynamic_cast<QuestWindow*>(window))
+        {
+            const auto& state = quest->state();
+            return ImGui::IsMouseHoveringRect(
+                state.ui_state().window_pos,
+                ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
+                       state.ui_state().window_pos.y + state.ui_state().window_size.y),
+                false);
+        }
+        return false;
+    };
+
+    auto dialogs = registry_.windowsByType(UIWindowType::Dialog);
+    for (auto* window : dialogs)
+    {
+        if (is_mouse_over(window))
+            return false;
     }
+
+    auto quests = registry_.windowsByType(UIWindowType::Quest);
+    for (auto* window : quests)
+    {
+        if (is_mouse_over(window))
+            return false;
+    }
+
     return true;
 }
 

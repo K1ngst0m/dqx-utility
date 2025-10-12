@@ -1,6 +1,8 @@
 #include "WindowRegistry.hpp"
 
 #include "dialog/DialogWindow.hpp"
+#include "quest/QuestWindow.hpp"
+#include "CommonUIComponents.hpp"
 #include "FontManager.hpp"
 #include "ui/Localization.hpp"
 
@@ -20,6 +22,15 @@ DialogWindow& WindowRegistry::createDialogWindow()
     DialogWindow& ref = *dialog;
     windows_.push_back(std::move(dialog));
     ++dialog_counter_;
+    return ref;
+}
+
+QuestWindow& WindowRegistry::createQuestWindow()
+{
+    auto quest = std::make_unique<QuestWindow>(font_manager_, makeQuestName());
+    QuestWindow& ref = *quest;
+    windows_.push_back(std::move(quest));
+    ++quest_counter_;
     return ref;
 }
 
@@ -50,8 +61,17 @@ void WindowRegistry::processRemovals()
         [](const std::unique_ptr<UIWindow>& window) {
             if (window->type() == UIWindowType::Dialog)
             {
-                auto* dialog = dynamic_cast<DialogWindow*>(window.get());
-                return dialog && dialog->shouldBeRemoved();
+                if (auto* dialog = dynamic_cast<DialogWindow*>(window.get()))
+                {
+                    return dialog->shouldBeRemoved();
+                }
+            }
+            else if (window->type() == UIWindowType::Quest)
+            {
+                if (auto* quest = dynamic_cast<QuestWindow*>(window.get()))
+                {
+                    return quest->shouldBeRemoved();
+                }
             }
             return false;
         }), windows_.end());
@@ -70,4 +90,12 @@ std::string WindowRegistry::makeDialogName()
     } while (value >= 0);
 
     return std::string(i18n::get("window.default_name_prefix")) + " " + suffix;
+}
+
+std::string WindowRegistry::makeQuestName()
+{
+    if (quest_counter_ == 0) {
+        return ui::LocalizedOrFallback("window.quest.default_name", "Quest Log");
+    }
+    return ui::LocalizedOrFallback("window.quest.default_name", "Quest Log") + " " + std::to_string(quest_counter_ + 1);
 }
