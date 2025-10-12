@@ -63,8 +63,8 @@ private:
     void resetPlaceholder();
 
     void renderVignette(const ImVec2& win_pos, const ImVec2& win_size, float thickness, float rounding, float alpha_multiplier);
-    void renderSeparator(bool hasNPC, const std::string& speaker, float content_width, float alpha_multiplier);
-    void renderOutlinedText(const char* text, const ImVec2& position, ImFont* font, float font_size_px, float wrap_width, float alpha_multiplier);
+    void renderSeparator(bool hasNPC, const std::string& speaker, float content_width);
+    void renderOutlinedText(const char* text, const ImVec2& position, ImFont* font, float font_size_px, float wrap_width);
 
     void renderAppearanceSection();
     void renderTranslateSection();

@@ -84,4 +84,5 @@ private:
 #ifdef _WIN32
     void nativeNCClick(int ht_code);
 #endif
+
 };

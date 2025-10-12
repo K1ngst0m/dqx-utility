@@ -70,13 +70,22 @@ AppearanceSettingsPanel::RenderResult AppearanceSettingsPanel::render()
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::TextUnformatted(i18n::get("dialog.appearance.fade.label"));
-    ImGui::Checkbox(i18n::get("dialog.appearance.fade.enabled"), &state_.ui_state().fade_enabled);
-    
+    bool fade_enabled_changed = ImGui::Checkbox(i18n::get("dialog.appearance.fade.enabled"), &state_.ui_state().fade_enabled);
+    if (fade_enabled_changed)
+    {
+        state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
+        state_.ui_state().current_alpha_multiplier = 1.0f;
+    }
+
     if (state_.ui_state().fade_enabled)
     {
         ImGui::TextUnformatted(i18n::get("dialog.appearance.fade.timeout"));
         set_slider_width();
-        ImGui::SliderFloat("##fade_timeout_slider", &state_.ui_state().fade_timeout, 5.0f, 120.0f, "%.0fs");
+        if (ImGui::SliderFloat("##fade_timeout_slider", &state_.ui_state().fade_timeout, 5.0f, 120.0f, "%.0fs"))
+        {
+            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
+            state_.ui_state().current_alpha_multiplier = 1.0f;
+        }
         ImGui::TextColored(UITheme::disabledColor(), "%s", i18n::get("dialog.appearance.fade.hint"));
     }
     

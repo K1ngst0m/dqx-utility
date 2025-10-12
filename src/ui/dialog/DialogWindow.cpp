@@ -517,6 +517,24 @@ void DialogWindow::renderDialog()
         state_.ui_state().current_alpha_multiplier = 1.0f;
     }
 
+    if (fade_enabled && state_.ui_state().current_alpha_multiplier <= 0.01f)
+    {
+        if (ImGui::IsMousePosValid(&io.MousePos))
+        {
+            ImVec2 cached_pos = state_.ui_state().window_pos;
+            ImVec2 cached_size = state_.ui_state().window_size;
+            if (cached_size.x > 0.0f && cached_size.y > 0.0f)
+            {
+                ImVec2 cached_max(cached_pos.x + cached_size.x, cached_pos.y + cached_size.y);
+                if (ImGui::IsMouseHoveringRect(cached_pos, cached_max, false))
+                {
+                    state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
+                    state_.ui_state().current_alpha_multiplier = 1.0f;
+                }
+            }
+        }
+    }
+
     if (auto* cm = ConfigManager_Get())
     {
         if (DockState::IsScattering())
@@ -548,9 +566,11 @@ void DialogWindow::renderDialog()
 
     ImGui::SetNextWindowSizeConstraints(ImVec2(400.0f, 400.0f), ImVec2(max_dialog_width, io.DisplaySize.y));
 
-    // Apply fade multiplier to background alpha and border
-    float effective_alpha = state_.ui_state().background_alpha * state_.ui_state().current_alpha_multiplier;
-    UITheme::pushDialogStyle(effective_alpha, state_.ui_state().padding, state_.ui_state().rounding, state_.ui_state().border_thickness, state_.ui_state().border_enabled, state_.ui_state().current_alpha_multiplier);
+    const float fade_alpha = state_.ui_state().current_alpha_multiplier;
+    float effective_alpha = state_.ui_state().background_alpha * fade_alpha;
+    UITheme::pushDialogStyle(effective_alpha, state_.ui_state().padding, state_.ui_state().rounding, state_.ui_state().border_thickness, state_.ui_state().border_enabled);
+    const float style_alpha = std::max(fade_alpha, 0.001f);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, style_alpha);
 
     ImGuiWindowFlags dialog_flags = ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoSavedSettings |
@@ -566,8 +586,16 @@ void DialogWindow::renderDialog()
 
     if (ImGui::Begin(window_label_.c_str(), nullptr, dialog_flags))
     {
-        // Check if mouse is hovering over the dialog window
+        ImVec2 window_pos = ImGui::GetWindowPos();
+        ImVec2 window_size = ImGui::GetWindowSize();
+
+        // Check if mouse is hovering over the dialog window (fallback to rect hit when nearly transparent)
         bool is_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+        if (!is_hovered && fade_enabled && fade_alpha < 0.99f)
+        {
+            ImVec2 window_max(window_pos.x + window_size.x, window_pos.y + window_size.y);
+            is_hovered = ImGui::IsMouseHoveringRect(window_pos, window_max, false);
+        }
         if (fade_enabled && is_hovered)
         {
             // Reset fade timer on hover
@@ -576,8 +604,8 @@ void DialogWindow::renderDialog()
         }
         
         renderVignette(
-            ImGui::GetWindowPos(),
-            ImGui::GetWindowSize(),
+            window_pos,
+            window_size,
             state_.ui_state().vignette_thickness,
             state_.ui_state().rounding,
             state_.ui_state().current_alpha_multiplier
@@ -675,7 +703,7 @@ void DialogWindow::renderDialog()
             ImVec2 cr_max = ImGui::GetWindowContentRegionMax();
             float content_width = cr_max.x - cr_min.x;
             
-            renderSeparator(hasValidNpc, currentSpeaker, content_width, state_.ui_state().current_alpha_multiplier);
+            renderSeparator(hasValidNpc, currentSpeaker, content_width);
             
             ImVec2 pos = ImGui::GetCursorScreenPos();
             const char* txt = state_.content_state().segments[i].data();
@@ -684,7 +712,6 @@ void DialogWindow::renderDialog()
             if (placeholder_failed)
             {
                 ImVec4 err_color(1.0f, 0.4f, 0.3f, 1.0f);
-                err_color.w *= state_.ui_state().current_alpha_multiplier;
                 ImGui::PushStyleColor(ImGuiCol_Text, err_color);
             }
 
@@ -693,8 +720,7 @@ void DialogWindow::renderDialog()
                 pos,
                 ImGui::GetFont(),
                 ImGui::GetFontSize(),
-                wrap_width,
-                state_.ui_state().current_alpha_multiplier
+                wrap_width
             );
 
             if (placeholder_failed)
@@ -716,7 +742,6 @@ void DialogWindow::renderDialog()
                 {
                     std::string reason_label = i18n::get_str("dialog.translate.timeout.reason");
                     ImVec4 reason_color(1.0f, 0.6f, 0.4f, 1.0f);
-                    reason_color.w *= state_.ui_state().current_alpha_multiplier;
                     ImGui::TextColored(reason_color, "%s %s", reason_label.c_str(), err_it->second.c_str());
                     ImGui::Spacing();
                 }
@@ -825,10 +850,10 @@ void DialogWindow::renderDialog()
         state_.ui_state().pending_reposition = false;
         state_.ui_state().pending_resize     = false;
 
-
     }
     ImGui::End();
 
+    ImGui::PopStyleVar();
     UITheme::popDialogStyle();
 }
 
@@ -1141,8 +1166,7 @@ void DialogWindow::renderVignette(
 void DialogWindow::renderSeparator(
     bool hasNPC,
     const std::string& speaker,
-    float content_width,
-    float alpha_multiplier
+    float content_width
 )
 {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -1154,6 +1178,7 @@ void DialogWindow::renderSeparator(
 
     ImGui::Dummy(ImVec2(0.0f, UITheme::dialogSeparatorSpacing()));
     float y = ImGui::GetCursorScreenPos().y;
+    float global_alpha = ImGui::GetStyle().Alpha;
 
     if (hasNPC)
     {
@@ -1166,7 +1191,7 @@ void DialogWindow::renderSeparator(
         {
             float line_y = y + text_size.y * 0.5f;
             ImVec4 sep_color = UITheme::dialogSeparatorColor();
-            sep_color.w *= alpha_multiplier;
+            sep_color.w *= global_alpha;
             ImU32 sep_col_u32 = ImGui::ColorConvertFloat4ToU32(sep_color);
 
             draw_list->AddRectFilled(
@@ -1182,7 +1207,7 @@ void DialogWindow::renderSeparator(
         }
 
         ImVec4 sep_text_color = UITheme::dialogSeparatorColor();
-        sep_text_color.w *= alpha_multiplier;
+        sep_text_color.w *= global_alpha;
         ImVec2 text_pos((x1 + x2 - text_size.x) * 0.5f, y);
         draw_list->AddText(text_pos, ImGui::ColorConvertFloat4ToU32(sep_text_color), speaker.c_str());
 
@@ -1192,7 +1217,7 @@ void DialogWindow::renderSeparator(
     {
         float line_y = y;
         ImVec4 sep_color = UITheme::dialogSeparatorColor();
-        sep_color.w *= alpha_multiplier;
+        sep_color.w *= global_alpha;
         draw_list->AddRectFilled(
             ImVec2(x1, line_y),
             ImVec2(x2, line_y + UITheme::dialogSeparatorThickness()),
@@ -1207,14 +1232,13 @@ void DialogWindow::renderOutlinedText(
     const ImVec2& position,
     ImFont* font,
     float font_size_px,
-    float wrap_width,
-    float alpha_multiplier
+    float wrap_width
 )
 {
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
     ImVec4 text_col_v4 = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-    text_col_v4.w *= alpha_multiplier;
+    text_col_v4.w *= ImGui::GetStyle().Alpha;
     ImU32 text_col = ImGui::ColorConvertFloat4ToU32(text_col_v4);
     ImU32 outline_col = IM_COL32(0, 0, 0, (int)(text_col_v4.w * 255.0f));
 

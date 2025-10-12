@@ -21,7 +21,7 @@ public:
     static void pushSettingsWindowStyle();
     static void popSettingsWindowStyle();
 
-    static void pushDialogStyle(float background_alpha, const ImVec2& padding, float rounding, float border_thickness, bool border_enabled = true, float alpha_multiplier = 1.0f);
+    static void pushDialogStyle(float background_alpha, const ImVec2& padding, float rounding, float border_thickness, bool border_enabled = true);
     static void popDialogStyle();
 
     static ImVec4 statusColor(bool is_success, bool is_error = false, bool is_disabled = false);

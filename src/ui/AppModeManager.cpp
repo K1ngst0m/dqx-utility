@@ -4,8 +4,6 @@
 #include "MiniModeManager.hpp"
 #include "DockState.hpp"
 
-#include <SDL3/SDL.h>
-
 namespace ui {
 
 AppModeManager::AppModeManager(AppContext& app_context, WindowRegistry& registry, MiniModeManager& mini_manager)
@@ -21,30 +19,20 @@ void AppModeManager::ApplyModeSettings(ConfigManager::AppMode mode)
     {
     case ConfigManager::AppMode::Mini:
         app_context_.setWindowBorderless(true);
+        app_context_.setWindowAlwaysOnTop(true);
         app_context_.restoreWindow();
         app_context_.setWindowSize(600, 800);
         break;
         
     case ConfigManager::AppMode::Borderless:
         app_context_.setWindowBorderless(true);
-        if (SDL_Window* window = app_context_.window())
-        {
-            SDL_Rect bounds{0, 0, 0, 0};
-            SDL_DisplayID display = SDL_GetDisplayForWindow(window);
-            if (display != 0 && SDL_GetDisplayBounds(display, &bounds) == 0)
-            {
-                app_context_.setWindowPosition(bounds.x, bounds.y);
-                app_context_.setWindowSize(bounds.w, bounds.h);
-            }
-            else
-            {
-                app_context_.maximizeWindow();
-            }
-        }
+        app_context_.setWindowAlwaysOnTop(false);
+        app_context_.maximizeWindow();
         break;
         
     case ConfigManager::AppMode::Normal:
         app_context_.setWindowBorderless(false);
+        app_context_.setWindowAlwaysOnTop(true);
         app_context_.restoreWindow();
         app_context_.setWindowSize(1024, 800);
         break;
