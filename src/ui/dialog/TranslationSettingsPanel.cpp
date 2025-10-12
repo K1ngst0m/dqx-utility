@@ -89,7 +89,8 @@ bool TranslationSettingsPanel::renderBackendSelector()
         i18n::get("dialog.translate.backend.items.google"),
         i18n::get("dialog.translate.backend.items.glm4_zhipu"),
         i18n::get("dialog.translate.backend.items.qwen_mt"),
-        i18n::get("dialog.translate.backend.items.niutrans")
+        i18n::get("dialog.translate.backend.items.niutrans"),
+        i18n::get("dialog.translate.backend.items.youdao")
     };
     int current_backend = static_cast<int>(state_.translation_config().translation_backend);
     ImGui::SetNextItemWidth(220.0f);
@@ -125,6 +126,9 @@ bool TranslationSettingsPanel::renderBackendSpecificConfig()
     bool zhipu_key_changed = false;
     bool qwen_key_changed = false;
     bool niutrans_key_changed = false;
+    bool youdao_app_key_changed = false;
+    bool youdao_app_secret_changed = false;
+    bool youdao_mode_changed = false;
     
     if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::OpenAI)
     {
@@ -198,9 +202,40 @@ bool TranslationSettingsPanel::renderBackendSpecificConfig()
                                                state_.translation_config().niutrans_api_key.size(), 
                                                ImGuiInputTextFlags_Password);
     }
+    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Youdao)
+    {
+        ImGui::TextUnformatted(i18n::get("dialog.settings.youdao_app_key"));
+        ImGui::SetNextItemWidth(300.0f);
+        youdao_app_key_changed = ImGui::InputText("##youdao_app_key",
+                                                 state_.translation_config().youdao_app_key.data(),
+                                                 state_.translation_config().youdao_app_key.size());
+
+        ImGui::TextUnformatted(i18n::get("dialog.settings.youdao_app_secret"));
+        ImGui::SetNextItemWidth(300.0f);
+        youdao_app_secret_changed = ImGui::InputText("##youdao_app_secret",
+                                                    state_.translation_config().youdao_app_secret.data(),
+                                                    state_.translation_config().youdao_app_secret.size(),
+                                                    ImGuiInputTextFlags_Password);
+
+        ImGui::TextUnformatted(i18n::get("dialog.settings.youdao_mode_label"));
+        const char* mode_items[] = {
+            i18n::get("dialog.settings.youdao_mode_text"),
+            i18n::get("dialog.settings.youdao_mode_large")
+        };
+        int current_mode = static_cast<int>(state_.translation_config().youdao_mode);
+        ImGui::SetNextItemWidth(220.0f);
+        if (ImGui::Combo("##youdao_mode", &current_mode, mode_items, IM_ARRAYSIZE(mode_items)))
+        {
+            state_.translation_config().youdao_mode = (current_mode == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
+                ? TranslationConfig::YoudaoMode::LargeModel
+                : TranslationConfig::YoudaoMode::Text;
+            youdao_mode_changed = true;
+        }
+    }
     
     return base_url_changed || model_changed || openai_key_changed || google_key_changed || 
-           zhipu_key_changed || qwen_key_changed || niutrans_key_changed;
+           zhipu_key_changed || qwen_key_changed || niutrans_key_changed ||
+           youdao_app_key_changed || youdao_app_secret_changed || youdao_mode_changed;
 }
 
 bool TranslationSettingsPanel::renderApplyAndTestButtons(
@@ -273,6 +308,21 @@ bool TranslationSettingsPanel::renderApplyAndTestButtons(
             test_cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
             test_cfg.model.clear();
             test_cfg.api_key = state_.translation_config().niutrans_api_key.data();
+        }
+        else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Youdao)
+        {
+            if (state_.translation_config().youdao_mode == TranslationConfig::YoudaoMode::LargeModel)
+            {
+                test_cfg.base_url = "https://openapi.youdao.com/llm_trans";
+                test_cfg.model = "youdao_large";
+            }
+            else
+            {
+                test_cfg.base_url = "https://openapi.youdao.com/api";
+                test_cfg.model = "youdao_text";
+            }
+            test_cfg.api_key = state_.translation_config().youdao_app_key.data();
+            test_cfg.api_secret = state_.translation_config().youdao_app_secret.data();
         }
         
         auto temp_translator = translate::createTranslator(test_cfg.backend);

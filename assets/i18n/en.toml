@@ -93,6 +93,11 @@ status_label = "Status:"
 ready = "Ready"
 not_ready = "Not Ready"
 translation_cache = "Translation Cache"
+youdao_app_key = "Youdao App Key"
+youdao_app_secret = "Youdao App Secret"
+youdao_mode_label = "Youdao Mode"
+youdao_mode_text = "Text Translation"
+youdao_mode_large = "Large Model Translation"
 enable_cache = "Enable Cache"
 clear_cache = "Clear Cache"
 font_path = "Font Path"
@@ -115,6 +120,7 @@ test_result_no_time = "Test result: {text}"
 en_us = "English (US)"
 zh_cn = "Chinese (Simplified)"
 zh_tw = "Chinese (Traditional)"
+
 
 [error]
 title = "Error Report"
@@ -177,6 +183,7 @@ google = "Google Translate"
 glm4_zhipu = "GLM-4 Flash (Zhipu)"
 qwen_mt = "Qwen-MT (Aliyun)"
 niutrans = "Niutrans (MT)"
+youdao = "Youdao"
 
 [dialog.debug]
 title = "Debug"

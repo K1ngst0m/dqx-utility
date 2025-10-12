@@ -879,6 +879,22 @@ void DialogWindow::initTranslatorIfEnabled()
         cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
         cfg.model.clear();
         cfg.api_key = state_.translation_config().niutrans_api_key.data();
+        cfg.api_secret.clear();
+    }
+    else if (state_.translation_config().translation_backend == TranslationConfig::TranslationBackend::Youdao)
+    {
+        if (state_.translation_config().youdao_mode == TranslationConfig::YoudaoMode::LargeModel)
+        {
+            cfg.base_url = "https://openapi.youdao.com/llm_trans";
+            cfg.model = "youdao_large";
+        }
+        else
+        {
+            cfg.base_url = "https://openapi.youdao.com/api";
+            cfg.model = "youdao_text";
+        }
+        cfg.api_key = state_.translation_config().youdao_app_key.data();
+        cfg.api_secret = state_.translation_config().youdao_app_secret.data();
     }
 
     bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
@@ -887,6 +903,7 @@ void DialogWindow::initTranslatorIfEnabled()
         same_config = (cfg.base_url == cached_translator_config_.base_url &&
                        cfg.model == cached_translator_config_.model &&
                        cfg.api_key == cached_translator_config_.api_key &&
+                       cfg.api_secret == cached_translator_config_.api_secret &&
                        cfg.target_lang == cached_translator_config_.target_lang);
     }
     if (same_config && translator_->isReady()) {

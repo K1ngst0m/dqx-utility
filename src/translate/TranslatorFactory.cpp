@@ -4,6 +4,7 @@
 #include "ZhipuGLMTranslator.hpp"
 #include "QwenMTTranslator.hpp"
 #include "NiutransTranslator.hpp"
+#include "YoudaoTranslator.hpp"
 
 #include <memory>
 
@@ -23,6 +24,8 @@ namespace translate
             return std::make_unique<QwenMTTranslator>();
         case Backend::Niutrans:
             return std::make_unique<NiutransTranslator>();
+        case Backend::Youdao:
+            return std::make_unique<YoudaoTranslator>();
         default:
             return nullptr;
         }

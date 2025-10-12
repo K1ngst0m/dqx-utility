@@ -13,7 +13,8 @@ namespace translate
         Google = 1,
         ZhipuGLM = 2,
         QwenMT = 3,
-        Niutrans = 4
+        Niutrans = 4,
+        Youdao = 5
     };
 
     struct TranslatorConfig
@@ -23,6 +24,7 @@ namespace translate
         std::string base_url;
         std::string model;
         std::string api_key;
+        std::string api_secret;
     };
 
     struct Completed

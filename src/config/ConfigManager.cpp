@@ -45,6 +45,9 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     t.insert("zhipu_base_url", std::string(state.translation_config().zhipu_base_url.data()));
     t.insert("zhipu_model", std::string(state.translation_config().zhipu_model.data()));
     t.insert("zhipu_api_key", std::string(state.translation_config().zhipu_api_key.data()));
+    t.insert("youdao_app_key", std::string(state.translation_config().youdao_app_key.data()));
+    t.insert("youdao_app_secret", std::string(state.translation_config().youdao_app_secret.data()));
+    t.insert("youdao_mode", static_cast<int>(state.translation_config().youdao_mode));
 
     // GUI properties
     t.insert("width", state.ui_state().width);
@@ -106,6 +109,17 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
         std::snprintf(state.translation_config().zhipu_model.data(), state.translation_config().zhipu_model.size(), "%s", v->c_str());
     if (auto v = t["zhipu_api_key"].value<std::string>())
         std::snprintf(state.translation_config().zhipu_api_key.data(), state.translation_config().zhipu_api_key.size(), "%s", v->c_str());
+    if (auto v = t["youdao_app_key"].value<std::string>())
+        std::snprintf(state.translation_config().youdao_app_key.data(), state.translation_config().youdao_app_key.size(), "%s", v->c_str());
+    if (auto v = t["youdao_app_secret"].value<std::string>())
+        std::snprintf(state.translation_config().youdao_app_secret.data(), state.translation_config().youdao_app_secret.size(), "%s", v->c_str());
+    if (auto v = t["youdao_mode"].value<int>())
+    {
+        if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
+            state.translation_config().youdao_mode = TranslationConfig::YoudaoMode::LargeModel;
+        else
+            state.translation_config().youdao_mode = TranslationConfig::YoudaoMode::Text;
+    }
 
     // GUI properties
     if (auto v = t["width"].value<double>()) state.ui_state().width = static_cast<float>(*v);

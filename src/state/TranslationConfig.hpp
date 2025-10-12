@@ -24,7 +24,14 @@ struct TranslationConfig
         Google = 1,
         ZhipuGLM = 2,
         QwenMT = 3,
-        Niutrans = 4
+        Niutrans = 4,
+        Youdao = 5
+    };
+
+    enum class YoudaoMode
+    {
+        Text = 0,
+        LargeModel = 1
     };
 
     bool translate_enabled;
@@ -46,6 +53,11 @@ struct TranslationConfig
 
     // Niutrans settings
     std::array<char, ApiKeySize> niutrans_api_key{};
+
+    // Youdao settings
+    std::array<char, ApiKeySize> youdao_app_key{};
+    std::array<char, ApiKeySize> youdao_app_secret{};
+    YoudaoMode youdao_mode = YoudaoMode::Text;
 
     void applyDefaults()
     {
@@ -72,5 +84,9 @@ struct TranslationConfig
         qwen_api_key.fill('\0');
 
         niutrans_api_key.fill('\0');
+
+        youdao_app_key.fill('\0');
+        youdao_app_secret.fill('\0');
+        youdao_mode = YoudaoMode::Text;
     }
 };

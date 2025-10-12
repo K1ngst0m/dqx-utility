@@ -32,6 +32,8 @@ set(MAIN_TRANSLATOR_SOURCES
   src/translate/QwenMTTranslator.hpp
   src/translate/NiutransTranslator.cpp
   src/translate/NiutransTranslator.hpp
+  src/translate/YoudaoTranslator.cpp
+  src/translate/YoudaoTranslator.hpp
   src/translate/TranslatorFactory.cpp
 )
 
