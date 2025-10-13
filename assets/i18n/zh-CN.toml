@@ -1,6 +1,7 @@
 [settings]
 title = "全局设置"
 add_dialog = "添加对话框"
+add_quest = "添加任务窗口"
 no_instances = "暂无实例"
 rename_instance = "重命名实例"
 window_type = "窗口类型"
@@ -63,6 +64,7 @@ actions = "操作"
 
 [window_type]
 dialog = "对话框"
+quest = "任务窗口"
 
 [window]
 default_name_prefix = "对话框"

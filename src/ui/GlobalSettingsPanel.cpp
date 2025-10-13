@@ -1,6 +1,7 @@
 #include "GlobalSettingsPanel.hpp"
 
 #include "dialog/DialogWindow.hpp"
+#include "quest/QuestWindow.hpp"
 #include "ProcessDetector.hpp"
 #include "ProcessLocaleChecker.hpp"
 #include "DQXClarityLauncher.hpp"
@@ -17,18 +18,55 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <vector>
 
 namespace
 {
     struct WindowTypeEntry
     {
         UIWindowType type;
-        const char*  label;
+        const char*  label_key;
     };
 
     constexpr WindowTypeEntry kWindowTypes[] = {
-        {UIWindowType::Dialog, "Dialog"}
+        {UIWindowType::Dialog, "window_type.dialog"},
+        {UIWindowType::Quest, "window_type.quest"}
     };
+
+    const char* windowTypeLabel(UIWindowType type)
+    {
+        for (const auto& entry : kWindowTypes)
+        {
+            if (entry.type == type)
+            {
+                return i18n::get(entry.label_key);
+            }
+        }
+        return "";
+    }
+
+    const char* addButtonLabel(UIWindowType type)
+    {
+        switch (type)
+        {
+        case UIWindowType::Dialog:
+            return i18n::get("settings.add_dialog");
+        case UIWindowType::Quest:
+            return i18n::get("settings.add_quest");
+        }
+        return nullptr;
+    }
+
+    std::vector<UIWindow*> collectAllWindows(WindowRegistry& registry)
+    {
+        std::vector<UIWindow*> result;
+        result.reserve(registry.windows().size());
+        for (auto& window : registry.windows())
+        {
+            result.push_back(window.get());
+        }
+        return result;
+    }
 }
 
 // Builds a settings panel tied to the window registry.
@@ -116,17 +154,32 @@ void GlobalSettingsPanel::renderTypeSelector()
         }
     }
 
-    const char* preview = i18n::get("window_type.dialog");
+    const char* preview = windowTypeLabel(selected_type_);
     if (ImGui::BeginCombo("##window_type_combo", preview))
     {
         for (int i = 0; i < static_cast<int>(std::size(kWindowTypes)); ++i)
         {
             const bool selected = (i == current_index);
-            const char* label = i18n::get("window_type.dialog");
+            const char* label = i18n::get(kWindowTypes[i].label_key);
             if (ImGui::Selectable(label, selected))
             {
                 selected_type_ = kWindowTypes[i].type;
-                selected_index_ = 0;
+                previous_selected_index_ = -1;
+
+                int new_index = 0;
+                bool found = false;
+                int idx = 0;
+                for (auto& window : registry_.windows())
+                {
+                    if (window->type() == selected_type_)
+                    {
+                        new_index = idx;
+                        found = true;
+                        break;
+                    }
+                    ++idx;
+                }
+                selected_index_ = found ? new_index : 0;
             }
             if (selected)
                 ImGui::SetItemDefaultFocus();
@@ -136,22 +189,47 @@ void GlobalSettingsPanel::renderTypeSelector()
 }
 
 // Displays instance list and creation controls for the active type.
-void GlobalSettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& windows)
+void GlobalSettingsPanel::renderInstanceSelector()
 {
-    if (selected_type_ == UIWindowType::Dialog)
+    UIWindow* newly_created = nullptr;
+
+    if (const char* add_label = addButtonLabel(selected_type_))
     {
-        if (ImGui::Button(i18n::get("settings.add_dialog")))
+        if (ImGui::Button(add_label))
         {
-            registry_.createDialogWindow();
-            auto filtered = registry_.windowsByType(UIWindowType::Dialog);
-            selected_index_ = static_cast<int>(filtered.size()) - 1;
+            switch (selected_type_)
+            {
+            case UIWindowType::Dialog:
+                newly_created = &registry_.createDialogWindow();
+                break;
+            case UIWindowType::Quest:
+                newly_created = &registry_.createQuestWindow();
+                break;
+            default:
+                break;
+            }
             previous_selected_index_ = -1;
         }
         ImGui::SameLine();
+    }
+
+    auto windows = collectAllWindows(registry_);
+
+    if (newly_created)
+    {
+        for (int i = 0; i < static_cast<int>(windows.size()); ++i)
         {
-            std::string total = i18n::format("total", {{"count", std::to_string(windows.size())}});
-            ImGui::TextDisabled("%s", total.c_str());
+            if (windows[i] == newly_created)
+            {
+                selected_index_ = i;
+                break;
+            }
         }
+    }
+
+    {
+        std::string total = i18n::format("total", {{"count", std::to_string(windows.size())}});
+        ImGui::TextDisabled("%s", total.c_str());
     }
 
     if (windows.empty())
@@ -163,6 +241,8 @@ void GlobalSettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& w
 
     if (selected_index_ >= static_cast<int>(windows.size()))
         selected_index_ = static_cast<int>(windows.size()) - 1;
+    if (selected_index_ < 0)
+        selected_index_ = 0;
 
     if (ImGui::BeginTable("InstanceTable", 3, ImGuiTableFlags_BordersInner | ImGuiTableFlags_RowBg))
     {
@@ -170,6 +250,8 @@ void GlobalSettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& w
         ImGui::TableSetupColumn(i18n::get("settings.table.type"), ImGuiTableColumnFlags_WidthFixed, 80.0f);
         ImGui::TableSetupColumn(i18n::get("settings.table.actions"), ImGuiTableColumnFlags_WidthFixed, 80.0f);
         ImGui::TableHeadersRow();
+
+        int quest_count = static_cast<int>(registry_.windowsByType(UIWindowType::Quest).size());
 
         for (int i = 0; i < static_cast<int>(windows.size()); ++i)
         {
@@ -183,17 +265,20 @@ void GlobalSettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& w
                 selected_index_ = i;
             }
 
-    ImGui::TableSetColumnIndex(1);
-    ImGui::TextUnformatted(i18n::get("window_type.dialog"));
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(windowTypeLabel(win->type()));
 
             ImGui::TableSetColumnIndex(2);
             std::string remove_id = std::string(i18n::get("common.remove")) + "##" + win->windowLabel();
+            bool disable_remove = (win->type() == UIWindowType::Quest && quest_count <= 1);
+            if (disable_remove)
+                ImGui::BeginDisabled();
             if (ImGui::SmallButton(remove_id.c_str()))
             {
                 registry_.removeWindow(win);
                 
                 // Update the windows list after removal
-                auto updated_windows = registry_.windowsByType(selected_type_);
+                auto updated_windows = collectAllWindows(registry_);
                 
                 // Reset state after removal
                 if (updated_windows.empty())
@@ -210,8 +295,12 @@ void GlobalSettingsPanel::renderInstanceSelector(const std::vector<UIWindow*>& w
                 rename_buffer_.fill('\0');
                 
                 ImGui::EndTable();
+                if (disable_remove)
+                    ImGui::EndDisabled();
                 return;
             }
+            if (disable_remove)
+                ImGui::EndDisabled();
         }
 
         ImGui::EndTable();
@@ -440,8 +529,7 @@ void GlobalSettingsPanel::renderWindowManagementSection()
         renderTypeSelector();
         ImGui::Spacing();
 
-        auto windows = registry_.windowsByType(selected_type_);
-        renderInstanceSelector(windows);
+        renderInstanceSelector();
     }
 }
 

@@ -1,6 +1,7 @@
 [settings]
 title = "Global Settings"
 add_dialog = "Add Dialog"
+add_quest = "Add Quest Window"
 no_instances = "No instances available."
 rename_instance = "Rename Instance"
 window_type = "Window Type"
@@ -63,6 +64,7 @@ actions = "Actions"
 
 [window_type]
 dialog = "Dialog"
+quest = "Quest Log"
 
 [window]
 default_name_prefix = "Dialog"

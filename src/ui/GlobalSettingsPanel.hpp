@@ -20,7 +20,7 @@ private:
     void renderWindowManagementSection();
     void renderAppearanceSection();
     void renderTypeSelector();
-    void renderInstanceSelector(const std::vector<UIWindow*>& windows);
+    void renderInstanceSelector();
     void renderDQXClaritySection();
     void renderDebugSection();
     
