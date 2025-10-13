@@ -9,7 +9,7 @@ using namespace translate;
 QwenMTTranslator::QwenMTTranslator() = default;
 QwenMTTranslator::~QwenMTTranslator() { shutdown(); }
 
-bool QwenMTTranslator::init(const TranslatorConfig& cfg)
+bool QwenMTTranslator::init(const BackendConfig& cfg)
 {
     shutdown();
     cfg_ = cfg;

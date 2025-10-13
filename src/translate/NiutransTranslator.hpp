@@ -14,7 +14,7 @@ public:
     NiutransTranslator();
     ~NiutransTranslator() override;
 
-    bool init(const TranslatorConfig& cfg) override;
+    bool init(const BackendConfig& cfg) override;
     bool isReady() const override;
     void shutdown() override;
     bool translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id) override;
@@ -29,7 +29,7 @@ private:
     bool doRequest(const std::string& text, const std::string& dst_lang, std::string& out_text);
     static std::string mapTarget(const std::string& dst_lang);
 
-    TranslatorConfig cfg_;
+    BackendConfig cfg_;
     std::atomic<bool> running_{false};
     std::thread worker_;
     std::atomic<std::uint64_t> next_id_{1};

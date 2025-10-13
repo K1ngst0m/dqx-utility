@@ -14,7 +14,7 @@ public:
     YoudaoTranslator();
     ~YoudaoTranslator() override;
 
-    bool init(const TranslatorConfig& cfg) override;
+    bool init(const BackendConfig& cfg) override;
     bool isReady() const override;
     void shutdown() override;
     bool translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id) override;
@@ -60,7 +60,7 @@ public:
     }
 #endif
 
-    TranslatorConfig cfg_{};
+    BackendConfig cfg_{};
     Mode mode_ = Mode::Text;
     std::atomic<bool> running_{false};
     std::thread worker_;

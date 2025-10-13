@@ -9,7 +9,7 @@ using namespace translate;
 NiutransTranslator::NiutransTranslator() = default;
 NiutransTranslator::~NiutransTranslator() { shutdown(); }
 
-bool NiutransTranslator::init(const TranslatorConfig& cfg)
+bool NiutransTranslator::init(const BackendConfig& cfg)
 {
     shutdown();
     cfg_ = cfg;

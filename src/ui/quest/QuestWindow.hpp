@@ -81,7 +81,7 @@ private:
     TranslateSession session_;
     std::unique_ptr<translate::ITranslator> translator_;
     translate::Backend cached_backend_ = translate::Backend::OpenAI;
-    translate::TranslatorConfig cached_config_{};
+    translate::BackendConfig cached_config_{};
     bool translator_initialized_ = false;
     std::array<FieldStatus, 5> field_status_{};
     std::unordered_map<std::uint64_t, QuestField> job_lookup_;

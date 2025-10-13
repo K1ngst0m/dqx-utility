@@ -9,7 +9,7 @@ using namespace translate;
 GoogleTranslator::GoogleTranslator() = default;
 GoogleTranslator::~GoogleTranslator() { shutdown(); }
 
-bool GoogleTranslator::init(const TranslatorConfig& cfg)
+bool GoogleTranslator::init(const BackendConfig& cfg)
 {
     shutdown();
     cfg_ = cfg;

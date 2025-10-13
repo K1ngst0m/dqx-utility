@@ -9,7 +9,7 @@ using namespace translate;
 ZhipuGLMTranslator::ZhipuGLMTranslator() = default;
 ZhipuGLMTranslator::~ZhipuGLMTranslator() { shutdown(); }
 
-bool ZhipuGLMTranslator::init(const TranslatorConfig& cfg)
+bool ZhipuGLMTranslator::init(const BackendConfig& cfg)
 {
     shutdown();
     cfg_ = cfg;

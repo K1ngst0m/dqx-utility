@@ -167,7 +167,7 @@ YoudaoTranslator::~YoudaoTranslator()
     shutdown();
 }
 
-bool YoudaoTranslator::init(const TranslatorConfig& cfg)
+bool YoudaoTranslator::init(const BackendConfig& cfg)
 {
     shutdown();
     cfg_ = cfg;

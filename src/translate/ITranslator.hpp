@@ -20,7 +20,7 @@ namespace translate
         Youdao = 5
     };
 
-    struct TranslatorConfig
+    struct BackendConfig
     {
         Backend backend = Backend::OpenAI;
         std::string target_lang;
@@ -29,7 +29,7 @@ namespace translate
         std::string api_key;
         std::string api_secret;
 
-        static TranslatorConfig from(const ::TranslationConfig& cfg_ui);
+        static BackendConfig from(const ::TranslationConfig& cfg_ui);
     };
 
     struct Completed
@@ -45,7 +45,7 @@ namespace translate
     {
     public:
         virtual ~ITranslator() = default;
-        virtual bool init(const TranslatorConfig& cfg) = 0;
+        virtual bool init(const BackendConfig& cfg) = 0;
         virtual bool isReady() const = 0;
         virtual void shutdown() = 0;
         virtual bool translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id) = 0;

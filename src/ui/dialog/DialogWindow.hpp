@@ -20,7 +20,7 @@
 
 namespace translate {
 class ITranslator;
-struct TranslatorConfig;
+struct BackendConfig;
 enum class Backend;
 }
 namespace processing { class TextPipeline; }
@@ -94,7 +94,7 @@ private:
     std::unique_ptr<processing::TextPipeline> text_pipeline_;
     
     TranslateSession session_;
-    translate::TranslatorConfig cached_translator_config_{};
+    translate::BackendConfig cached_translator_config_{};
     translate::Backend cached_backend_ = translate::Backend::OpenAI;
     bool translator_initialized_ = false;
     bool placeholder_active_ = false;

@@ -25,7 +25,7 @@
 
 namespace {
 
-// removed legacy buildTranslatorConfig; use translate::TranslatorConfig::from
+// removed legacy buildTranslatorConfig; use translate::BackendConfig::from
 
 const std::string kFullWidthSpace = "\xE3\x80\x80"; // full-width space
 const std::string kBullet = "\xE3\x83\xBB";         // ・
@@ -1029,7 +1029,7 @@ void QuestWindow::initTranslatorIfEnabled()
         return;
     }
 
-    translate::TranslatorConfig cfg = translate::TranslatorConfig::from(config);
+    translate::BackendConfig cfg = translate::BackendConfig::from(config);
     bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
     bool same_config = same_backend &&
                        cfg.base_url == cached_config_.base_url &&

@@ -782,11 +782,11 @@ void DialogWindow::initTranslatorIfEnabled()
     if (!config.translate_enabled)
     {
         resetTranslatorState();
-        cached_translator_config_ = translate::TranslatorConfig{};
+        cached_translator_config_ = translate::BackendConfig{};
         return;
     }
 
-    translate::TranslatorConfig cfg = translate::TranslatorConfig::from(config);
+    translate::BackendConfig cfg = translate::BackendConfig::from(config);
 
     bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
     bool same_config = same_backend &&
@@ -819,7 +819,7 @@ void DialogWindow::initTranslatorIfEnabled()
             PLOG_WARNING << "Translator factory returned null for backend " << static_cast<int>(cfg.backend);
         }
         resetTranslatorState();
-        cached_translator_config_ = translate::TranslatorConfig{};
+        cached_translator_config_ = translate::BackendConfig{};
         return;
     }
 
@@ -827,7 +827,7 @@ void DialogWindow::initTranslatorIfEnabled()
     {
         PLOG_WARNING << "Translator not ready after init for backend " << static_cast<int>(cfg.backend);
         resetTranslatorState();
-        cached_translator_config_ = translate::TranslatorConfig{};
+        cached_translator_config_ = translate::BackendConfig{};
     }
     else
     {
@@ -879,7 +879,7 @@ void DialogWindow::resetTranslatorState()
         translator_.reset();
     }
     translator_initialized_ = false;
-    cached_translator_config_ = translate::TranslatorConfig{};
+    cached_translator_config_ = translate::BackendConfig{};
     cached_backend_ = translate::Backend::OpenAI;
     pending_segment_by_job_.clear();
     failed_segments_.clear();

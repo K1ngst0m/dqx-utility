@@ -360,7 +360,7 @@ bool TranslationSettingsPanel::renderApplyAndTestButtons(
         testingConnection = true;
         testResult = i18n::get("dialog.settings.testing");
         
-        translate::TranslatorConfig test_cfg;
+        translate::BackendConfig test_cfg;
         test_cfg.backend = static_cast<translate::Backend>(config.translation_backend);
         switch (config.target_lang_enum)
         {

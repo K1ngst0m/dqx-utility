@@ -9,7 +9,7 @@ using namespace translate;
 OpenAITranslator::OpenAITranslator() = default;
 OpenAITranslator::~OpenAITranslator() { shutdown(); }
 
-bool OpenAITranslator::init(const TranslatorConfig& cfg)
+bool OpenAITranslator::init(const BackendConfig& cfg)
 {
     shutdown();
     cfg_ = cfg;

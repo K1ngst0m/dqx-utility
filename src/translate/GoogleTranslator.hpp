@@ -18,7 +18,7 @@ namespace translate
         GoogleTranslator();
         ~GoogleTranslator() override;
 
-        bool init(const TranslatorConfig& cfg) override;
+        bool init(const BackendConfig& cfg) override;
         bool isReady() const override;
         void shutdown() override;
         bool translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id) override;
@@ -47,7 +47,7 @@ namespace translate
         static std::string unescapeJSONString(const std::string& escaped);
         static size_t findQuoteEnd(const std::string& body, size_t start_pos);
 
-        TranslatorConfig cfg_{};
+        BackendConfig cfg_{};
         std::atomic<bool> running_{false};
         std::thread worker_;
         std::mutex q_mtx_;

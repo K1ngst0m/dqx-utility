@@ -23,8 +23,8 @@ namespace translate {
      return a.data();
  }
 
- TranslatorConfig TranslatorConfig::from(const ::TranslationConfig& cfg_ui) {
-     TranslatorConfig out;
+ BackendConfig BackendConfig::from(const ::TranslationConfig& cfg_ui) {
+     BackendConfig out;
      out.backend = static_cast<Backend>(cfg_ui.translation_backend);
      out.target_lang = to_string_lang(cfg_ui.target_lang_enum);
 
