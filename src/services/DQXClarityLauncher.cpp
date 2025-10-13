@@ -40,6 +40,9 @@ struct DQXClarityLauncher::Impl
     bool process_running_at_start = false;
     bool attempted_auto_start = false;
 
+    mutable std::mutex error_mutex;
+    std::string last_error_message;
+
     // Backlog for UI consumers to read with per-window seq cursors
     mutable std::mutex backlog_mutex;
     std::vector<dqxclarity::DialogMessage> backlog;
@@ -58,6 +61,7 @@ struct DQXClarityLauncher::Impl
     bool startHookLocked(dqxclarity::Engine::StartPolicy policy)
     {
         std::lock_guard<std::mutex> lock(engine_mutex);
+        clearLastErrorMessage();
         return engine.start_hook(policy);
     }
 
@@ -69,7 +73,28 @@ struct DQXClarityLauncher::Impl
             std::lock_guard<std::mutex> qlock(quest_mutex);
             quest_valid = false;
         }
+        if (ok) {
+            clearLastErrorMessage();
+        }
         return ok;
+    }
+
+    void setLastErrorMessage(const std::string& msg)
+    {
+        std::lock_guard<std::mutex> lock(error_mutex);
+        last_error_message = msg;
+    }
+
+    std::string getLastErrorMessage() const
+    {
+        std::lock_guard<std::mutex> lock(error_mutex);
+        return last_error_message;
+    }
+
+    void clearLastErrorMessage()
+    {
+        std::lock_guard<std::mutex> lock(error_mutex);
+        last_error_message.clear();
     }
 };
 
@@ -83,7 +108,12 @@ DQXClarityLauncher::DQXClarityLauncher()
     dqxclarity::Logger log{};
     log.info = [](const std::string& m){ PLOG_INFO << m; };
     log.warn = [](const std::string& m){ PLOG_WARNING << m; };
-    log.error = [](const std::string& m){ PLOG_ERROR << m; };
+    log.error = [this](const std::string& m){
+        PLOG_ERROR << m;
+        if (pimpl_) {
+            pimpl_->setLastErrorMessage(m);
+        }
+    };
     pimpl_->engine.initialize(pimpl_->engine_cfg, std::move(log));
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
 
@@ -98,6 +128,9 @@ DQXClarityLauncher::DQXClarityLauncher()
             }
             const bool game_running = isDQXGameRunning();
             auto st = pimpl_->engine.status();
+            if (st == dqxclarity::Status::Hooked) {
+                pimpl_->clearLastErrorMessage();
+            }
             if (game_running) {
                 if (st == dqxclarity::Status::Stopped || st == dqxclarity::Status::Error) {
                     // If process was already running when tool started, enable immediately once.
@@ -167,6 +200,9 @@ DQXClarityLauncher::DQXClarityLauncher()
                 if (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting || st == dqxclarity::Status::Stopping) {
                     PLOG_INFO << "DQXGame.exe not running; ensuring hook is stopped";
                     (void)pimpl_->stopHookLocked();
+                }
+                if (st != dqxclarity::Status::Error) {
+                    pimpl_->clearLastErrorMessage();
                 }
             }
 
@@ -314,6 +350,11 @@ std::string DQXClarityLauncher::getStatusString() const
 dqxclarity::Status DQXClarityLauncher::getEngineStage() const
 {
     return pimpl_->engine.status();
+}
+
+std::string DQXClarityLauncher::getLastErrorMessage() const
+{
+    return pimpl_->getLastErrorMessage();
 }
 
 

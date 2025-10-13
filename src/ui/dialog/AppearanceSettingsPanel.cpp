@@ -50,6 +50,13 @@ AppearanceSettingsPanel::RenderResult AppearanceSettingsPanel::render()
     ImGui::Checkbox(i18n::get("dialog.appearance.border_enabled"), &state_.ui_state().border_enabled);
     ImGui::Spacing();
 
+    ImGui::BeginDisabled(!state_.ui_state().border_enabled);
+    ImGui::TextUnformatted(i18n::get("dialog.appearance.border_thickness"));
+    set_slider_width();
+    ImGui::SliderFloat("##dialog_border_thickness_slider", &state_.ui_state().border_thickness, 0.5f, 6.0f);
+    ImGui::EndDisabled();
+    ImGui::Spacing();
+
     ImGui::TextUnformatted(i18n::get("dialog.appearance.dark_border_size"));
     set_slider_width();
     ImGui::SliderFloat("##dialog_vignette_thickness", &state_.ui_state().vignette_thickness, 0.0f, 100.0f);

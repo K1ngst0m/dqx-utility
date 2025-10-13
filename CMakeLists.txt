@@ -66,6 +66,8 @@ set(DQX_CORE_SOURCES
   src/ui/quest/QuestWindow.hpp
   src/ui/quest/QuestSettingsView.cpp
   src/ui/quest/QuestSettingsView.hpp
+  src/ui/help/HelpWindow.cpp
+  src/ui/help/HelpWindow.hpp
   src/platform/ProcessDetector.cpp
   src/platform/ProcessLocaleChecker.cpp
   src/platform/WineDetector.cpp

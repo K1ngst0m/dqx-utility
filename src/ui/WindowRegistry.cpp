@@ -2,6 +2,7 @@
 
 #include "dialog/DialogWindow.hpp"
 #include "quest/QuestWindow.hpp"
+#include "help/HelpWindow.hpp"
 #include "CommonUIComponents.hpp"
 #include "FontManager.hpp"
 #include "ui/Localization.hpp"
@@ -31,6 +32,15 @@ QuestWindow& WindowRegistry::createQuestWindow()
     QuestWindow& ref = *quest;
     windows_.push_back(std::move(quest));
     ++quest_counter_;
+    return ref;
+}
+
+HelpWindow& WindowRegistry::createHelpWindow()
+{
+    auto help = std::make_unique<HelpWindow>(font_manager_, makeHelpName());
+    HelpWindow& ref = *help;
+    windows_.push_back(std::move(help));
+    ++help_counter_;
     return ref;
 }
 
@@ -73,6 +83,10 @@ void WindowRegistry::processRemovals()
                     return quest->shouldBeRemoved();
                 }
             }
+            else if (window->type() == UIWindowType::Help)
+            {
+                return false;
+            }
             return false;
         }), windows_.end());
 }
@@ -98,4 +112,12 @@ std::string WindowRegistry::makeQuestName()
         return ui::LocalizedOrFallback("window.quest.default_name", "Quest Log");
     }
     return ui::LocalizedOrFallback("window.quest.default_name", "Quest Log") + " " + std::to_string(quest_counter_ + 1);
+}
+
+std::string WindowRegistry::makeHelpName()
+{
+    if (help_counter_ == 0) {
+        return ui::LocalizedOrFallback("window.help.default_name", "Help");
+    }
+    return ui::LocalizedOrFallback("window.help.default_name", "Help") + " " + std::to_string(help_counter_ + 1);
 }

@@ -2,6 +2,7 @@
 
 #include "dialog/DialogWindow.hpp"
 #include "quest/QuestWindow.hpp"
+#include "help/HelpWindow.hpp"
 #include "ProcessDetector.hpp"
 #include "ProcessLocaleChecker.hpp"
 #include "DQXClarityLauncher.hpp"
@@ -30,7 +31,8 @@ namespace
 
     constexpr WindowTypeEntry kWindowTypes[] = {
         {UIWindowType::Dialog, "window_type.dialog"},
-        {UIWindowType::Quest, "window_type.quest"}
+        {UIWindowType::Quest, "window_type.quest"},
+        {UIWindowType::Help, "window_type.help"}
     };
 
     const char* windowTypeLabel(UIWindowType type)
@@ -53,6 +55,8 @@ namespace
             return i18n::get("settings.add_dialog");
         case UIWindowType::Quest:
             return i18n::get("settings.add_quest");
+        case UIWindowType::Help:
+            return i18n::get("settings.add_help");
         }
         return nullptr;
     }
@@ -204,6 +208,9 @@ void GlobalSettingsPanel::renderInstanceSelector()
                 break;
             case UIWindowType::Quest:
                 newly_created = &registry_.createQuestWindow();
+                break;
+            case UIWindowType::Help:
+                newly_created = &registry_.createHelpWindow();
                 break;
             default:
                 break;

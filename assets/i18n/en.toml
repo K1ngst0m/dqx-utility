@@ -2,6 +2,7 @@
 title = "Global Settings"
 add_dialog = "Add Dialog"
 add_quest = "Add Quest Window"
+add_help = "Add Help Window"
 no_instances = "No instances available."
 rename_instance = "Rename Instance"
 window_type = "Window Type"
@@ -65,9 +66,33 @@ actions = "Actions"
 [window_type]
 dialog = "Dialog"
 quest = "Quest Log"
+help = "Help"
 
 [window]
 default_name_prefix = "Dialog"
+
+[window.help]
+default_name = "Help"
+
+[help.status]
+label = "Status"
+ok = "OK"
+warning = "Warning"
+error = "Error"
+
+[help.message]
+game_not_running = "DQX isn't running. Launch the game before continuing."
+waiting_for_service = "Waiting for DQX-Utility to finish initializing..."
+error_generic = "Initialization failed. Check the logs for more details."
+error_with_reason = "Initialization failed: {reason}"
+ready = "All systems are online."
+ready_with_timer = "All systems are online. (This window will disappear after {seconds}s)"
+
+[help.tips]
+header = "Quick Tips"
+global_context = "Right-click empty space to open Global Settings or quit."
+window_context = "Right-click any dialog or quest window to adjust its settings."
+drag_hint = "Drag a window's body to move it; drag borders or corners to resize."
 
 [settings.ui_language]
 label = "UI Language"

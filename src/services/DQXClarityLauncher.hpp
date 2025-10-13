@@ -36,6 +36,9 @@ public:
     // Human-readable status
     std::string getStatusString() const;
 
+    // Last error emitted by the engine (empty if none)
+    std::string getLastErrorMessage() const;
+
     // Check if DQXGame.exe is running
     bool isDQXGameRunning() const;
 

@@ -49,7 +49,7 @@ private:
     std::unique_ptr<ui::MiniModeManager> mini_manager_;
     std::unique_ptr<ui::AppModeManager> mode_manager_;
     
-    bool show_settings_ = true;
+    bool show_settings_ = false;
     bool quit_requested_ = false;
     bool running_ = true;
     Uint64 last_time_ = 0;

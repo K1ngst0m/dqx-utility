@@ -2,6 +2,7 @@
 title = "全局设置"
 add_dialog = "添加对话框"
 add_quest = "添加任务窗口"
+add_help = "添加帮助窗口"
 no_instances = "暂无实例"
 rename_instance = "重命名实例"
 window_type = "窗口类型"
@@ -65,9 +66,33 @@ actions = "操作"
 [window_type]
 dialog = "对话框"
 quest = "任务窗口"
+help = "帮助窗口"
 
 [window]
 default_name_prefix = "对话框"
+
+[window.help]
+default_name = "帮助"
+
+[help.status]
+label = "状态"
+ok = "正常"
+warning = "警告"
+error = "错误"
+
+[help.message]
+game_not_running = "DQX 尚未运行。请先启动游戏。"
+waiting_for_service = "正在等待 DQX-Utility 完成初始化……"
+error_generic = "初始化失败。请检查日志了解详情。"
+error_with_reason = "初始化失败：{reason}"
+ready = "所有系统均已就绪。"
+ready_with_timer = "所有系统均已就绪。（窗口将在 {seconds} 秒后隐藏）"
+
+[help.tips]
+header = "使用提示"
+global_context = "在空白区域单击鼠标右键可打开全局设置或退出程序。"
+window_context = "在对话或任务窗口上单击鼠标右键可打开该窗口的设置。"
+drag_hint = "拖动窗口主体可移动窗口，拖动边缘或角落可调整大小。"
 
 [settings.ui_language]
 label = "界面语言"
