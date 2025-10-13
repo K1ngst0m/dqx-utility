@@ -36,6 +36,7 @@ set(MAIN_TRANSLATOR_SOURCES
   src/translate/YoudaoTranslator.hpp
   src/translate/HttpCommon.cpp
   src/translate/HttpCommon.hpp
+  src/translate/TranslatorConfigBuilder.cpp
   src/translate/TranslatorFactory.cpp
 )
 
@@ -56,7 +57,7 @@ set(DQX_CORE_SOURCES
   src/ui/UIEventHandler.cpp
   src/ui/MiniModeManager.cpp
   src/ui/AppModeManager.cpp
-  src/ui/dialog/DialogAnimator.cpp
+  src/ui/WindowAnimator.cpp
   src/ui/dialog/DialogSettingsView.cpp
   src/ui/dialog/AppearanceSettingsPanel.cpp
   src/ui/dialog/TranslationSettingsPanel.cpp

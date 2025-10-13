@@ -4,7 +4,7 @@
 #include "../FontManager.hpp"
 #include "../WindowRegistry.hpp"
 #include "../../translate/TranslateSession.hpp"
-#include "DialogAnimator.hpp"
+#include "../WindowAnimator.hpp"
 #include "../../utils/PendingQueue.hpp"
 #include "DialogSettingsView.hpp"
 
@@ -111,18 +111,12 @@ private:
     float apply_hint_timer_ = 0.0f;
     DialogSettingsView settings_view_;
 
-    // Smooth scroll animation (content-growth driven)
-    bool  scroll_animating_   = false;
-    bool  scroll_initialized_ = false;
-    float last_scroll_max_y_  = 0.0f;
-    static constexpr float SCROLL_SPEED = 800.0f;  // pixels per second (constant speed)
-
     // Pending translation placeholders and animation
     std::unordered_map<std::uint64_t, int> pending_segment_by_job_;
     std::unordered_set<int> failed_segments_;
     std::unordered_map<int, std::string> failed_original_text_;
     std::unordered_map<int, std::string> failed_error_messages_;
-    DialogAnimator wait_anim_;
+    ui::WindowAnimator animator_;
 
     std::uint64_t observed_global_translation_version_ = 0;
     bool last_used_global_translation_ = false;

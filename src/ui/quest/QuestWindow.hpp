@@ -8,6 +8,7 @@
 #include "../WindowRegistry.hpp"
 #include "../../state/QuestStateManager.hpp"
 #include "../../translate/TranslateSession.hpp"
+#include "../WindowAnimator.hpp"
 
 namespace translate { class ITranslator; }
 class FontManager;
@@ -94,4 +95,5 @@ private:
     bool appended_since_last_frame_ = false;
     std::uint64_t observed_global_translation_version_ = 0;
     bool last_used_global_translation_ = false;
+    ui::WindowAnimator animator_;
 };

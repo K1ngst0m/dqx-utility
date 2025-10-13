@@ -23,7 +23,6 @@
 #include "../../services/DQXClarityLauncher.hpp"
 #include "../../dqxclarity/api/dialog_message.hpp"
 #include "../Localization.hpp"
-#include "DialogAnimator.hpp"
 #include "../../dqxclarity/api/dqxclarity.hpp"
 
 namespace
@@ -62,17 +61,7 @@ namespace
         return "Waiting";
     }
 
-    const char* dots_for_phase(int phase)
-    {
-        switch (phase % 4)
-        {
-        case 0: return ".";
-        case 1: return "..";
-        case 2: return "...";
-        case 3: return "..";
-        }
-        return ".";
-    }
+    
 
     std::string strip_waiting_suffix(std::string text)
     {
@@ -147,7 +136,7 @@ void DialogWindow::setPlaceholderText(const std::string& text, PlaceholderState 
     placeholder_state_ = state;
     placeholder_base_text_ = text;
     if (state == PlaceholderState::Waiting) {
-        wait_anim_.reset();
+        animator_.reset();
     }
 }
 
@@ -346,7 +335,7 @@ void DialogWindow::applyPending()
             if (show_placeholder)
             {
                 std::string placeholder = waiting_text_for_lang(config.target_lang_enum);
-                placeholder += wait_anim_.suffix();
+                placeholder += animator_.waitSuffix();
                 int idx = appendSegmentInternal(m.speaker, placeholder);
                 if (job_id != 0)
                 {
@@ -495,52 +484,8 @@ void DialogWindow::renderDialog()
     state_.ui_state().rounding         = std::clamp(state_.ui_state().rounding, 0.0f, 32.0f);
     state_.ui_state().border_thickness = std::clamp(state_.ui_state().border_thickness, 0.5f, 6.0f);
     
-    // Auto-fade logic: update timer and calculate alpha multiplier (per-dialog setting)
+    // Auto-fade logic (per-window setting)
     bool fade_enabled = state_.ui_state().fade_enabled;
-    float fade_timeout = state_.ui_state().fade_timeout;
-    
-    if (fade_enabled)
-    {
-        // Initialize timer on first frame
-        if (state_.ui_state().last_activity_time == 0.0f)
-        {
-            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
-        }
-        
-        // Reset timer on new text append
-        if (appended_since_last_frame_)
-        {
-            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
-            state_.ui_state().current_alpha_multiplier = 1.0f;
-        }
-        
-        // Calculate time since last activity
-        float current_time = static_cast<float>(ImGui::GetTime());
-        float time_since_activity = current_time - state_.ui_state().last_activity_time;
-        
-        // Calculate fade effect
-        // Start fading at 75% of timeout (15s for 20s timeout)
-        // Complete fade at 100% of timeout (20s)
-        float fade_start = fade_timeout * 0.75f;
-        float fade_duration = fade_timeout * 0.25f;
-        
-        if (time_since_activity >= fade_start)
-        {
-            float fade_progress = (time_since_activity - fade_start) / fade_duration;
-            fade_progress = std::clamp(fade_progress, 0.0f, 1.0f);
-            
-            // Smooth fade curve (ease-in)
-            state_.ui_state().current_alpha_multiplier = 1.0f - (fade_progress * fade_progress);
-        }
-        else
-        {
-            state_.ui_state().current_alpha_multiplier = 1.0f;
-        }
-    }
-    else
-    {
-        state_.ui_state().current_alpha_multiplier = 1.0f;
-    }
 
     if (fade_enabled && state_.ui_state().current_alpha_multiplier <= 0.01f)
     {
@@ -621,12 +566,7 @@ void DialogWindow::renderDialog()
             ImVec2 window_max(window_pos.x + window_size.x, window_pos.y + window_size.y);
             is_hovered = ImGui::IsMouseHoveringRect(window_pos, window_max, false);
         }
-        if (fade_enabled && is_hovered)
-        {
-            // Reset fade timer on hover
-            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
-            state_.ui_state().current_alpha_multiplier = 1.0f;
-        }
+        
         
         renderVignette(
             window_pos,
@@ -655,11 +595,6 @@ void DialogWindow::renderDialog()
         bool animate_placeholder = placeholder_active_ && placeholder_state_ == PlaceholderState::Waiting;
         bool animate_translations = !pending_segment_by_job_.empty();
 
-        if (animate_placeholder || animate_translations)
-        {
-            wait_anim_.advance(io.DeltaTime);
-        }
-
         if (animate_placeholder)
         {
             ensurePlaceholderEntry();
@@ -668,7 +603,7 @@ void DialogWindow::renderDialog()
                 base = ui::LocalizedOrFallback("dialog.placeholder.waiting", "Initializing dialog system...");
             }
             std::string trimmed = strip_waiting_suffix(base);
-            const char* dots = wait_anim_.suffix();
+            const char* dots = animator_.waitSuffix();
             std::string composed;
             if (trimmed.empty())
                 composed = dots;
@@ -681,7 +616,7 @@ void DialogWindow::renderDialog()
         if (animate_translations)
         {
         std::string base = waiting_text_for_lang(config.target_lang_enum);
-            const char* dots = wait_anim_.suffix();
+            const char* dots = animator_.waitSuffix();
             for (const auto& kv : pending_segment_by_job_)
             {
                 int idx = kv.second;
@@ -817,49 +752,8 @@ void DialogWindow::renderDialog()
             ImGui::PopFont();
         }
 
-        // Smooth, constant-speed auto-scroll to bottom when content grows
-        if (state_.ui_state().auto_scroll_to_new)
-        {
-            const float curr_scroll = ImGui::GetScrollY();
-            const float curr_max    = ImGui::GetScrollMaxY();
-
-            // Initialize tracking on first layout
-            if (!scroll_initialized_)
-            {
-                last_scroll_max_y_ = curr_max;
-                scroll_initialized_ = true;
-            }
-
-            // If content height increased since last frame and user was at (or near) bottom, start animating
-            const bool content_grew   = (curr_max > last_scroll_max_y_ + 0.5f);
-            const bool was_at_bottom  = (last_scroll_max_y_ <= 0.5f) || ((last_scroll_max_y_ - curr_scroll) <= 2.0f);
-            if (!scroll_animating_ && content_grew && was_at_bottom)
-            {
-                scroll_animating_ = true;
-            }
-
-            // Advance animation at constant speed until we reach the bottom
-            if (scroll_animating_)
-            {
-                const float target = curr_max;
-                const float current = ImGui::GetScrollY();
-                float delta = target - current;
-                const float step = SCROLL_SPEED * io.DeltaTime;
-
-                if (std::fabs(delta) <= step)
-                {
-                    ImGui::SetScrollY(target);
-                    scroll_animating_ = false;
-                }
-                else
-                {
-                    ImGui::SetScrollY(current + (delta > 0.0f ? step : -step));
-                }
-            }
-
-            // Update for next frame comparison
-            last_scroll_max_y_ = curr_max;
-        }
+        // Unified animator update
+        animator_.update(state_.ui_state(), io.DeltaTime, appended_since_last_frame_, is_hovered);
 
         const bool was_pending_resize = state_.ui_state().pending_resize;
 
@@ -892,62 +786,7 @@ void DialogWindow::initTranslatorIfEnabled()
         return;
     }
 
-    translate::TranslatorConfig cfg;
-    cfg.backend = static_cast<translate::Backend>(config.translation_backend);
-    switch (config.target_lang_enum)
-    {
-    case TranslationConfig::TargetLang::EN_US: cfg.target_lang = "en-us"; break;
-    case TranslationConfig::TargetLang::ZH_CN: cfg.target_lang = "zh-cn"; break;
-    case TranslationConfig::TargetLang::ZH_TW: cfg.target_lang = "zh-tw"; break;
-    }
-
-    if (config.translation_backend == TranslationConfig::TranslationBackend::OpenAI)
-    {
-        cfg.base_url = config.openai_base_url.data();
-        cfg.model = config.openai_model.data();
-        cfg.api_key = config.openai_api_key.data();
-    }
-    else if (config.translation_backend == TranslationConfig::TranslationBackend::Google)
-    {
-        cfg.base_url.clear();
-        cfg.model.clear();
-        cfg.api_key = config.google_api_key.data();
-    }
-    else if (config.translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
-    {
-        cfg.base_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
-        cfg.model = "glm-4-flash";
-        cfg.api_key = config.zhipu_api_key.data();
-    }
-    else if (config.translation_backend == TranslationConfig::TranslationBackend::QwenMT)
-    {
-        cfg.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-        const char* qm = config.qwen_model.data();
-        cfg.model = (qm && qm[0]) ? qm : "qwen-mt-turbo";
-        cfg.api_key = config.qwen_api_key.data();
-    }
-    else if (config.translation_backend == TranslationConfig::TranslationBackend::Niutrans)
-    {
-        cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
-        cfg.model.clear();
-        cfg.api_key = config.niutrans_api_key.data();
-        cfg.api_secret.clear();
-    }
-    else if (config.translation_backend == TranslationConfig::TranslationBackend::Youdao)
-    {
-        if (config.youdao_mode == TranslationConfig::YoudaoMode::LargeModel)
-        {
-            cfg.base_url = "https://openapi.youdao.com/llm_trans";
-            cfg.model = "youdao_large";
-        }
-        else
-        {
-            cfg.base_url = "https://openapi.youdao.com/api";
-            cfg.model = "youdao_text";
-        }
-        cfg.api_key = config.youdao_app_key.data();
-        cfg.api_secret = config.youdao_app_secret.data();
-    }
+    translate::TranslatorConfig cfg = translate::TranslatorConfig::from(config);
 
     bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
     bool same_config = same_backend &&

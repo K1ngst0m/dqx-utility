@@ -5,6 +5,9 @@
 #include <cstdint>
 #include <memory>
 
+// Forward declaration to avoid hard include here
+struct TranslationConfig;
+
 namespace translate
 {
     enum class Backend
@@ -25,6 +28,8 @@ namespace translate
         std::string model;
         std::string api_key;
         std::string api_secret;
+
+        static TranslatorConfig from(const ::TranslationConfig& cfg_ui);
     };
 
     struct Completed

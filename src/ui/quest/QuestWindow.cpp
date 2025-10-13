@@ -25,62 +25,7 @@
 
 namespace {
 
-translate::TranslatorConfig buildTranslatorConfig(const TranslationConfig& config)
-{
-    translate::TranslatorConfig cfg;
-    cfg.backend = static_cast<translate::Backend>(config.translation_backend);
-
-    switch (config.target_lang_enum)
-    {
-    case TranslationConfig::TargetLang::EN_US: cfg.target_lang = "en-us"; break;
-    case TranslationConfig::TargetLang::ZH_CN: cfg.target_lang = "zh-cn"; break;
-    case TranslationConfig::TargetLang::ZH_TW: cfg.target_lang = "zh-tw"; break;
-    }
-
-    switch (config.translation_backend)
-    {
-    case TranslationConfig::TranslationBackend::OpenAI:
-        cfg.base_url = config.openai_base_url.data();
-        cfg.model = config.openai_model.data();
-        cfg.api_key = config.openai_api_key.data();
-        break;
-    case TranslationConfig::TranslationBackend::Google:
-        cfg.base_url.clear();
-        cfg.model.clear();
-        cfg.api_key = config.google_api_key.data();
-        break;
-    case TranslationConfig::TranslationBackend::ZhipuGLM:
-        cfg.base_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
-        cfg.model = config.zhipu_model.data();
-        cfg.api_key = config.zhipu_api_key.data();
-        break;
-    case TranslationConfig::TranslationBackend::QwenMT:
-        cfg.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-        cfg.model = config.qwen_model.data();
-        cfg.api_key = config.qwen_api_key.data();
-        break;
-    case TranslationConfig::TranslationBackend::Niutrans:
-        cfg.base_url = "https://api.niutrans.com/NiuTransServer/translation";
-        cfg.model.clear();
-        cfg.api_key = config.niutrans_api_key.data();
-        break;
-    case TranslationConfig::TranslationBackend::Youdao:
-        cfg.base_url.clear();
-        if (config.youdao_mode == TranslationConfig::YoudaoMode::LargeModel)
-        {
-            cfg.model = "youdao-lm-tr-1.0-L";
-        }
-        else
-        {
-            cfg.model = "generic";
-        }
-        cfg.api_key = config.youdao_app_key.data();
-        cfg.api_secret = config.youdao_app_secret.data();
-        break;
-    }
-
-    return cfg;
-}
+// removed legacy buildTranslatorConfig; use translate::TranslatorConfig::from
 
 const std::string kFullWidthSpace = "\xE3\x80\x80"; // full-width space
 const std::string kBullet = "\xE3\x83\xBB";         // ・
@@ -620,42 +565,6 @@ void QuestWindow::render()
     state_.ui_state().border_thickness = std::clamp(state_.ui_state().border_thickness, 0.5f, 6.0f);
 
     bool fade_enabled = state_.ui_state().fade_enabled;
-    float fade_timeout = state_.ui_state().fade_timeout;
-
-    if (fade_enabled)
-    {
-        if (state_.ui_state().last_activity_time == 0.0f)
-        {
-            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
-        }
-
-        if (appended_since_last_frame_)
-        {
-            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
-            state_.ui_state().current_alpha_multiplier = 1.0f;
-        }
-
-        float current_time = static_cast<float>(ImGui::GetTime());
-        float time_since_activity = current_time - state_.ui_state().last_activity_time;
-
-        float fade_start = fade_timeout * 0.75f;
-        float fade_duration = fade_timeout * 0.25f;
-
-        if (time_since_activity >= fade_start)
-        {
-            float fade_progress = (fade_duration > 0.0f) ? (time_since_activity - fade_start) / fade_duration : 1.0f;
-            fade_progress = std::clamp(fade_progress, 0.0f, 1.0f);
-            state_.ui_state().current_alpha_multiplier = 1.0f - (fade_progress * fade_progress);
-        }
-        else
-        {
-            state_.ui_state().current_alpha_multiplier = 1.0f;
-        }
-    }
-    else
-    {
-        state_.ui_state().current_alpha_multiplier = 1.0f;
-    }
 
     if (fade_enabled && state_.ui_state().current_alpha_multiplier <= 0.01f)
     {
@@ -727,11 +636,7 @@ void QuestWindow::render()
             ImVec2 window_max(win_pos.x + win_size.x, win_pos.y + win_size.y);
             is_hovered = ImGui::IsMouseHoveringRect(win_pos, window_max, false);
         }
-        if (fade_enabled && is_hovered)
-        {
-            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
-            state_.ui_state().current_alpha_multiplier = 1.0f;
-        }
+        
 
         ui::RenderVignette(win_pos,
                             win_size,
@@ -756,6 +661,9 @@ void QuestWindow::render()
             ImGui::PopFont();
             ImGui::SetWindowFontScale(1.0f);
         }
+
+        // Unified animator update (fade + optional scroll)
+        animator_.update(state_.ui_state(), io.DeltaTime, appended_since_last_frame_, is_hovered);
 
         state_.ui_state().window_pos = win_pos;
         state_.ui_state().window_size = win_size;
@@ -1121,7 +1029,7 @@ void QuestWindow::initTranslatorIfEnabled()
         return;
     }
 
-    translate::TranslatorConfig cfg = buildTranslatorConfig(config);
+    translate::TranslatorConfig cfg = translate::TranslatorConfig::from(config);
     bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
     bool same_config = same_backend &&
                        cfg.base_url == cached_config_.base_url &&
