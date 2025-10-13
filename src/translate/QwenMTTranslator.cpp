@@ -2,6 +2,7 @@
 
 #include <cpr/cpr.h>
 #include <plog/Log.h>
+#include "HttpCommon.hpp"
 
 using namespace translate;
 
@@ -148,24 +149,12 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
     body += "\"messages\":[{\"role\":\"user\",\"content\":\"" + escapeJSON(text) + "\"}],";
     body += "\"translation_options\":{\"source_lang\":\"auto\",\"target_lang\":\"" + target + "\"}}";
 
-    cpr::Header headers{{"Content-Type","application/json"},{"Authorization", std::string("Bearer ")+cfg_.api_key}};
-
-    cpr::Session session;
-    session.SetUrl(cpr::Url{url});
-    session.SetHeader(headers);
-    session.SetBody(cpr::Body{body});
-    session.SetConnectTimeout(cpr::ConnectTimeout{5000});
-    session.SetTimeout(cpr::Timeout{45000});
-    session.SetProgressCallback(cpr::ProgressCallback(
-        [](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t userdata) -> bool {
-            auto flag = reinterpret_cast<std::atomic<bool>*>(userdata);
-            return flag && flag->load();
-        }, reinterpret_cast<intptr_t>(&running_)));
-
-    auto r = session.Post();
-    if (r.error)
+    std::vector<translate::Header> headers{{"Content-Type","application/json"},{"Authorization", std::string("Bearer ")+cfg_.api_key}};
+    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 45000; scfg.cancel_flag = &running_;
+    auto r = translate::post_json(url, body, headers, scfg);
+    if (!r.error.empty())
     {
-        std::string err_msg = r.error.message;
+        std::string err_msg = r.error;
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;

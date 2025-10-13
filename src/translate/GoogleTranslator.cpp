@@ -2,6 +2,7 @@
 
 #include <cpr/cpr.h>
 #include <plog/Log.h>
+#include "HttpCommon.hpp"
 
 using namespace translate;
 
@@ -167,15 +168,12 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
     
     std::string body = R"({"q": ")" + escaped_text + R"(", "source": ")" + src + R"(", "target": ")" + dst + R"(", "format": "text"})";
     
-    cpr::Header headers{
-        {"Content-Type", "application/json"},
-        {"Authorization", "Bearer " + cfg_.api_key}
-    };
-    
-    auto r = cpr::Post(cpr::Url{url}, headers, cpr::Body{body});
-    if (r.error)
+    std::vector<translate::Header> headers{{"Content-Type","application/json"},{"Authorization", std::string("Bearer ")+cfg_.api_key}};
+    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 45000; scfg.cancel_flag = &running_;
+    auto r = translate::post_json(url, body, headers, scfg);
+    if (!r.error.empty())
     {
-        std::string err_msg = r.error.message;
+        std::string err_msg = r.error;
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
@@ -217,10 +215,11 @@ bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& sr
     std::string url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + 
                       escapeUrl(src) + "&tl=" + escapeUrl(dst) + "&dt=t&q=" + escapeUrl(text);
     
-    auto r = cpr::Get(cpr::Url{url});
-    if (r.error)
+    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 30000; scfg.cancel_flag = &running_;
+    auto r = translate::get(url, {}, scfg);
+    if (!r.error.empty())
     {
-        std::string err_msg = r.error.message;
+        std::string err_msg = r.error;
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;

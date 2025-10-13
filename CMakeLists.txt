@@ -34,6 +34,8 @@ set(MAIN_TRANSLATOR_SOURCES
   src/translate/NiutransTranslator.hpp
   src/translate/YoudaoTranslator.cpp
   src/translate/YoudaoTranslator.hpp
+  src/translate/HttpCommon.cpp
+  src/translate/HttpCommon.hpp
   src/translate/TranslatorFactory.cpp
 )
 

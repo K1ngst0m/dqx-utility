@@ -2,6 +2,7 @@
 
 #include <cpr/cpr.h>
 #include <plog/Log.h>
+#include "HttpCommon.hpp"
 
 #include <algorithm>
 #include <array>
@@ -313,10 +314,7 @@ bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string&
     std::string input = truncateInput(text);
     std::string sign = buildSignature(cfg_.api_key, cfg_.api_secret, input, salt, curtime);
 
-    cpr::Session session;
-    session.SetUrl(cpr::Url{url});
-    session.SetHeader(cpr::Header{{"Content-Type", "application/x-www-form-urlencoded"}});
-    session.SetPayload(cpr::Payload{
+    std::vector<std::pair<std::string,std::string>> fields{
         {"q", text},
         {"from", from},
         {"to", to},
@@ -325,19 +323,12 @@ bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string&
         {"signType", "v3"},
         {"curtime", curtime},
         {"sign", sign}
-    });
-    session.SetConnectTimeout(cpr::ConnectTimeout{5000});
-    session.SetTimeout(cpr::Timeout{15000});
-    session.SetProgressCallback(cpr::ProgressCallback(
-        [](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t userdata) -> bool {
-            auto flag = reinterpret_cast<std::atomic<bool>*>(userdata);
-            return flag && flag->load();
-        }, reinterpret_cast<intptr_t>(&running_)));
-
-    auto response = session.Post();
-    if (response.error)
+    };
+    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 15000; scfg.cancel_flag = &running_;
+    auto response = translate::post_form(url, fields, scfg);
+    if (!response.error.empty())
     {
-        last_error_ = response.error.message;
+        last_error_ = response.error;
         return false;
     }
     if (response.status_code < 200 || response.status_code >= 300)
@@ -381,11 +372,7 @@ bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::s
     std::string input = truncateInput(text);
     std::string sign = buildSignature(cfg_.api_key, cfg_.api_secret, input, salt, curtime);
 
-    cpr::Session session;
-    session.SetUrl(cpr::Url{url});
-    session.SetHeader(cpr::Header{{"Accept", "text/event-stream"},
-                                  {"Content-Type", "application/x-www-form-urlencoded"}});
-    session.SetPayload(cpr::Payload{
+    std::vector<std::pair<std::string,std::string>> fields{
         {"i", text},
         {"from", from},
         {"to", to},
@@ -396,19 +383,13 @@ bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::s
         {"sign", sign},
         {"handleOption", "2"},
         {"streamType", "full"}
-    });
-    session.SetConnectTimeout(cpr::ConnectTimeout{5000});
-    session.SetTimeout(cpr::Timeout{20000});
-    session.SetProgressCallback(cpr::ProgressCallback(
-        [](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t userdata) -> bool {
-            auto flag = reinterpret_cast<std::atomic<bool>*>(userdata);
-            return flag && flag->load();
-        }, reinterpret_cast<intptr_t>(&running_)));
-
-    auto response = session.Post();
-    if (response.error)
+    };
+    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 20000; scfg.cancel_flag = &running_;
+    std::vector<translate::Header> headers{{"Accept","text/event-stream"}};
+    auto response = translate::post_form(url, fields, scfg, headers);
+    if (!response.error.empty())
     {
-        last_error_ = response.error.message;
+        last_error_ = response.error;
         return false;
     }
     if (response.status_code < 200 || response.status_code >= 300)

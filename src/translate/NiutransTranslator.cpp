@@ -2,6 +2,7 @@
 
 #include <cpr/cpr.h>
 #include <plog/Log.h>
+#include "HttpCommon.hpp"
 
 using namespace translate;
 
@@ -121,28 +122,21 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
     if (text.empty()) return false;
     std::string url = cfg_.base_url.empty() ? std::string("https://api.niutrans.com/NiuTransServer/translation") : cfg_.base_url;
 
-    cpr::Parameters params{
+    std::vector<std::pair<std::string, std::string>> fields{
         {"from", "auto"},
         {"to", mapTarget(dst_lang)},
         {"apikey", cfg_.api_key},
         {"src_text", text}
     };
 
-    cpr::Session session;
-    session.SetUrl(cpr::Url{url});
-    session.SetParameters(params);
-    session.SetConnectTimeout(cpr::ConnectTimeout{5000});
-    session.SetTimeout(cpr::Timeout{15000});
-    session.SetProgressCallback(cpr::ProgressCallback(
-        [](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t userdata) -> bool {
-            auto flag = reinterpret_cast<std::atomic<bool>*>(userdata);
-            return flag && flag->load();
-        }, reinterpret_cast<intptr_t>(&running_)));
-
-    auto r = session.Post();
-    if (r.error)
+    translate::SessionConfig scfg;
+    scfg.connect_timeout_ms = 5000;
+    scfg.timeout_ms = 15000;
+    scfg.cancel_flag = &running_;
+    auto resp = translate::post_form(url, fields, scfg);
+    if (!resp.error.empty())
     {
-        std::string err_msg = r.error.message;
+        std::string err_msg = resp.error;
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
@@ -150,46 +144,46 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
         }
         return false;
     }
-    if (r.status_code < 200 || r.status_code >= 300)
+    if (resp.status_code < 200 || resp.status_code >= 300)
     {
-        std::string err_msg = std::string("http ") + std::to_string(r.status_code);
+        std::string err_msg = std::string("http ") + std::to_string(resp.status_code);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
-            PLOG_WARNING << "Niutrans request failed with status " << r.status_code << ": " << r.text;
+            PLOG_WARNING << "Niutrans request failed with status " << resp.status_code << ": " << resp.text;
         }
         return false;
     }
 
     const std::string key = "\"tgt_text\"";
-    size_t p = r.text.find(key);
+    size_t p = resp.text.find(key);
     if (p == std::string::npos)
     {
         // Try error_msg
-        size_t em = r.text.find("\"error_msg\"");
+        size_t em = resp.text.find("\"error_msg\"");
         if (em != std::string::npos)
         {
-            size_t c = r.text.find(':', em); if (c != std::string::npos) {
-                ++c; while (c < r.text.size() && (r.text[c]==' '||r.text[c]=='\t')) ++c;
-                if (c<r.text.size() && r.text[c]=='"') { ++c; std::string msg; while (c<r.text.size()) { char ch=r.text[c++]; if (ch=='\\' && c<r.text.size()) { msg.push_back(r.text[c++]); } else if (ch=='"') break; else msg.push_back(ch);} last_error_ = msg; }
+            size_t c = resp.text.find(':', em); if (c != std::string::npos) {
+                ++c; while (c < resp.text.size() && (resp.text[c]==' '||resp.text[c]=='\t')) ++c;
+                if (c<resp.text.size() && resp.text[c]=='"') { ++c; std::string msg; while (c<resp.text.size()) { char ch=resp.text[c++]; if (ch=='\\' && c<resp.text.size()) { msg.push_back(resp.text[c++]); } else if (ch=='"') break; else msg.push_back(ch);} last_error_ = msg; }
             }
         }
         return false;
     }
-    p = r.text.find(':', p);
+    p = resp.text.find(':', p);
     if (p == std::string::npos) return false;
     ++p;
-    while (p < r.text.size() && (r.text[p] == ' ' || r.text[p] == '\t' || r.text[p] == '\n' || r.text[p] == '\r')) ++p;
-    if (p >= r.text.size() || r.text[p] != '"') return false;
+    while (p < resp.text.size() && (resp.text[p] == ' ' || resp.text[p] == '\t' || resp.text[p] == '\n' || resp.text[p] == '\r')) ++p;
+    if (p >= resp.text.size() || resp.text[p] != '"') return false;
     ++p;
     std::string v;
-    while (p < r.text.size())
+    while (p < resp.text.size())
     {
-        char c = r.text[p++];
+        char c = resp.text[p++];
         if (c == '\\')
         {
-            if (p >= r.text.size()) break;
-            char e = r.text[p++];
+            if (p >= resp.text.size()) break;
+            char e = resp.text[p++];
             if (e == 'n') v.push_back('\n');
             else if (e == 'r') v.push_back('\r');
             else if (e == 't') v.push_back('\t');
