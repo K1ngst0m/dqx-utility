@@ -41,6 +41,12 @@ public:
     // GUI localization language (e.g., "en", "zh-CN")
     const char* getUILanguageCode() const { return ui_language_.c_str(); }
     void setUILanguageCode(const char* code) { ui_language_ = (code && code[0]) ? code : "en"; }
+
+    bool isDefaultDialogEnabled() const { return default_dialog_enabled_; }
+    void setDefaultDialogEnabled(bool enabled);
+    bool isDefaultQuestEnabled() const { return default_quest_enabled_; }
+    void setDefaultQuestEnabled(bool enabled);
+    void reconcileDefaultWindowStates();
     
     // Dialog auto-fade settings
     bool getDialogFadeEnabled() const { return dialog_fade_enabled_; }
@@ -79,6 +85,9 @@ private:
     bool loadAndApply();
     bool applyDialogs(const struct DialogsSnapshot& snap); // fwd declen't exist, will implement inline
     void applyVerboseSetting();
+    void enforceDefaultDialogState();
+    void enforceDefaultQuestState();
+    void enforceDefaultWindowStates();
 
     std::string config_path_;
     std::string last_error_;
@@ -94,6 +103,11 @@ private:
     std::string ui_language_ = "en"; // GUI localization language code
     bool verbose_logging_ = false;
     bool force_verbose_logging_ = false;
+    bool default_dialog_enabled_ = true;
+    bool default_quest_enabled_ = true;
+    std::string default_dialog_name_;
+    std::string default_quest_name_;
+    bool suppress_default_window_updates_ = false;
     
     // Dialog fade settings
     bool dialog_fade_enabled_ = false;

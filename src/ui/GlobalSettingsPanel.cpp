@@ -12,6 +12,7 @@
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "ui/Localization.hpp"
 #include "ui/DockState.hpp"
+#include "CommonUIComponents.hpp"
 #include "utils/ErrorReporter.hpp"
 
 #include <algorithm>
@@ -678,6 +679,24 @@ void GlobalSettingsPanel::renderWindowManagementSection()
 {
     if (ImGui::CollapsingHeader(i18n::get("settings.sections.window_management")))
     {
+        if (auto* cm = ConfigManager_Get())
+        {
+            bool default_dialog = cm->isDefaultDialogEnabled();
+            std::string dialog_label = ui::LocalizedOrFallback("settings.window.default_dialog", "Default dialog window");
+            if (ImGui::Checkbox(dialog_label.c_str(), &default_dialog))
+            {
+                cm->setDefaultDialogEnabled(default_dialog);
+            }
+
+            bool default_quest = cm->isDefaultQuestEnabled();
+            std::string quest_label = ui::LocalizedOrFallback("settings.window.default_quest", "Default quest window");
+            if (ImGui::Checkbox(quest_label.c_str(), &default_quest))
+            {
+                cm->setDefaultQuestEnabled(default_quest);
+            }
+
+            ImGui::Spacing();
+        }
         ImGui::TextUnformatted(i18n::get("settings.window_type"));
         renderTypeSelector();
         ImGui::Spacing();

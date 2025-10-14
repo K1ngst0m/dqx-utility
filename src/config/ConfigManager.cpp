@@ -16,6 +16,38 @@
 
 namespace fs = std::filesystem;
 
+namespace
+{
+    struct ScopedFlagGuard
+    {
+        bool& flag;
+        bool previous;
+        bool active;
+
+        ScopedFlagGuard(bool& target, bool value)
+            : flag(target)
+            , previous(target)
+            , active(true)
+        {
+            flag = value;
+        }
+
+        ~ScopedFlagGuard()
+        {
+            if (active)
+                flag = previous;
+        }
+
+        void restore()
+        {
+            if (!active)
+                return;
+            flag = previous;
+            active = false;
+        }
+    };
+}
+
 static ConfigManager* g_cfg_mgr = nullptr;
 
 static toml::table dialogStateToToml(const std::string& name, const DialogStateManager& state)
@@ -287,6 +319,101 @@ ConfigManager::ConfigManager()
 
 ConfigManager::~ConfigManager() = default;
 
+void ConfigManager::setDefaultDialogEnabled(bool enabled)
+{
+    if (default_dialog_enabled_ == enabled)
+        return;
+    default_dialog_enabled_ = enabled;
+    if (!suppress_default_window_updates_)
+        enforceDefaultDialogState();
+}
+
+void ConfigManager::setDefaultQuestEnabled(bool enabled)
+{
+    if (default_quest_enabled_ == enabled)
+        return;
+    default_quest_enabled_ = enabled;
+    if (!suppress_default_window_updates_)
+        enforceDefaultQuestState();
+}
+
+void ConfigManager::reconcileDefaultWindowStates()
+{
+    enforceDefaultWindowStates();
+}
+
+void ConfigManager::enforceDefaultDialogState()
+{
+    if (!registry_)
+        return;
+
+    auto* current_default = registry_->defaultDialogWindow();
+    if (default_dialog_enabled_)
+    {
+        if (!current_default)
+        {
+            auto& dialog = registry_->createDialogWindow(true);
+            if (!default_dialog_name_.empty())
+            {
+                dialog.rename(default_dialog_name_.c_str());
+            }
+            else
+            {
+                default_dialog_name_ = dialog.displayName();
+            }
+            registry_->markDialogAsDefault(dialog);
+        }
+        else
+        {
+            default_dialog_name_ = current_default->displayName();
+        }
+    }
+    else if (current_default)
+    {
+        default_dialog_name_ = current_default->displayName();
+        registry_->removeWindow(current_default);
+    }
+}
+
+void ConfigManager::enforceDefaultQuestState()
+{
+    if (!registry_)
+        return;
+
+    auto* current_default = registry_->defaultQuestWindow();
+    if (default_quest_enabled_)
+    {
+        if (!current_default)
+        {
+            auto& quest = registry_->createQuestWindow(true);
+            if (!default_quest_name_.empty())
+            {
+                quest.rename(default_quest_name_.c_str());
+            }
+            else
+            {
+                default_quest_name_ = quest.displayName();
+            }
+            registry_->markQuestAsDefault(quest);
+        }
+        else
+        {
+            default_quest_name_ = current_default->displayName();
+        }
+    }
+    else if (current_default)
+    {
+        default_quest_name_ = current_default->displayName();
+        registry_->removeWindow(current_default);
+    }
+}
+
+void ConfigManager::enforceDefaultWindowStates()
+{
+    enforceDefaultDialogState();
+    enforceDefaultQuestState();
+}
+
 void ConfigManager::setUIScale(float scale)
 {
     if (scale <= 0.1f) scale = 0.1f;
@@ -331,6 +458,8 @@ bool ConfigManager::saveAll()
     global.insert("dialog_fade_enabled", dialog_fade_enabled_);
     global.insert("dialog_fade_timeout", dialog_fade_timeout_);
     global.insert("verbose_logging", verbose_logging_);
+    global.insert("default_dialog_enabled", default_dialog_enabled_);
+    global.insert("default_quest_enabled", default_quest_enabled_);
 
     toml::table translation;
     translation.insert("translate_enabled", global_translation_config_.translate_enabled);
@@ -445,6 +574,7 @@ bool ConfigManager::loadAndApply()
     {
         return false; // missing file is not an error
     }
+    ScopedFlagGuard guard(suppress_default_window_updates_, true);
     try
     {
         toml::table root = toml::parse(ifs);
@@ -469,6 +599,10 @@ bool ConfigManager::loadAndApply()
                 dialog_fade_timeout_ = static_cast<float>(*v);
             if (auto v = (*g)["verbose_logging"].value<bool>())
                 setVerboseLogging(*v);
+            if (auto v = (*g)["default_dialog_enabled"].value<bool>())
+                setDefaultDialogEnabled(*v);
+            if (auto v = (*g)["default_quest_enabled"].value<bool>())
+                setDefaultQuestEnabled(*v);
 
             global_translation_config_.applyDefaults();
             if (auto* trans = (*g)["translation"].as_table())
@@ -632,6 +766,13 @@ bool ConfigManager::loadAndApply()
                     // Rebind font pointers after state replacement
                     dw->refreshFontBinding();
                     dw->initTranslatorIfEnabled();
+
+                    dw->setDefaultInstance(false);
+                    if (default_dialog_enabled_ && i == 0)
+                    {
+                        registry_->markDialogAsDefault(*dw);
+                        default_dialog_name_ = dw->displayName();
+                    }
                 }
             }
         }
@@ -686,6 +827,12 @@ bool ConfigManager::loadAndApply()
             if (quest_window)
             {
                 applyQuestConfig(*quest_window, quest_state, quest_name);
+                quest_window->setDefaultInstance(false);
+                if (default_quest_enabled_ && index == 0)
+                {
+                    registry_->markQuestAsDefault(*quest_window);
+                    default_quest_name_ = quest_window->displayName();
+                }
             }
         };
 
@@ -707,11 +854,13 @@ bool ConfigManager::loadAndApply()
         }
         else
         {
-            if (registry_->windowsByType(UIWindowType::Quest).empty())
+            if (default_quest_enabled_ && registry_->windowsByType(UIWindowType::Quest).empty())
             {
-                registry_->createQuestWindow();
+                registry_->createQuestWindow(true);
             }
         }
+        guard.restore();
+        enforceDefaultWindowStates();
         return true;
     }
     catch (const toml::parse_error& pe)

@@ -32,6 +32,8 @@ mini = "Mini Mode"
 global_settings = "Global Settings"
 app_mode = "App Mode"
 quit = "Quit"
+default_dialog = "Default dialog window"
+default_quest = "Default quest window"
 
 [common]
 start = "Start"
@@ -70,6 +72,10 @@ help = "Help"
 
 [window]
 default_name_prefix = "Dialog"
+
+[settings.window]
+default_dialog = "Default dialog window"
+default_quest = "Default quest window"
 
 [window.help]
 default_name = "Help"

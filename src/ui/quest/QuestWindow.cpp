@@ -468,7 +468,7 @@ bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string
 
 } // namespace
 
-QuestWindow::QuestWindow(FontManager& font_manager, const std::string& name)
+QuestWindow::QuestWindow(FontManager& font_manager, const std::string& name, bool is_default)
     : font_manager_(font_manager)
     , name_(name)
 {
@@ -478,6 +478,7 @@ QuestWindow::QuestWindow(FontManager& font_manager, const std::string& name)
     settings_id_suffix_ = id_suffix_ + "_settings";
     window_label_ = name_ + "###" + id_suffix_;
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
+    is_default_instance_ = is_default;
 
     state_.applyDefaults();
     state_.ui_state().width = 580.0f;

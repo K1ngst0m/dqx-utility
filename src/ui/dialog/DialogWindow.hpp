@@ -28,13 +28,15 @@ namespace processing { class TextPipeline; }
 class DialogWindow : public UIWindow
 {
 public:
-    DialogWindow(FontManager& font_manager, int instance_id, const std::string& name);
+    DialogWindow(FontManager& font_manager, int instance_id, const std::string& name, bool is_default = false);
     ~DialogWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Dialog; }
     const char* displayName() const override { return name_.c_str(); }
     const char* windowLabel() const override { return window_label_.c_str(); }
     void rename(const char* new_name) override;
+    bool isDefaultInstance() const { return is_default_instance_; }
+    void setDefaultInstance(bool value) { is_default_instance_ = value; }
 
     void render() override;
     void renderSettings() override;
@@ -83,6 +85,7 @@ private:
     std::string settings_id_suffix_;
     bool show_settings_window_ = false;
     bool should_be_removed_ = false;
+    bool is_default_instance_ = false;
 
     // In-process messaging: pending messages and last seen seq
     PendingQueue<PendingMsg> pending_;

@@ -255,7 +255,7 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
 }
 
 
-DialogWindow::DialogWindow(FontManager& font_manager, int instance_id, const std::string& name)
+DialogWindow::DialogWindow(FontManager& font_manager, int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
     , settings_view_(state_, font_manager_, session_)
     , cached_backend_(translate::Backend::OpenAI)
@@ -266,6 +266,7 @@ DialogWindow::DialogWindow(FontManager& font_manager, int instance_id, const std
     settings_id_suffix_ = "dialog_settings_" + std::to_string(instance_id);
     window_label_ = name_ + "###" + id_suffix_;
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
+    is_default_instance_ = is_default;
     
     text_pipeline_ = std::make_unique<processing::TextPipeline>();
 

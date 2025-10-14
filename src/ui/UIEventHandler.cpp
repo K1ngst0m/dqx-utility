@@ -6,6 +6,9 @@
 #include "help/HelpWindow.hpp"
 #include "config/ConfigManager.hpp"
 #include "Localization.hpp"
+#include "CommonUIComponents.hpp"
+
+#include <string>
 
 namespace ui {
 
@@ -117,6 +120,23 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
                     cm->setAppMode(ConfigManager::AppMode::Mini);
             }
             ImGui::EndMenu();
+        }
+
+        if (auto* cm = ConfigManager_Get())
+        {
+            bool dialog_enabled = cm->isDefaultDialogEnabled();
+            std::string dialog_label = ui::LocalizedOrFallback("menu.default_dialog", "Default dialog window");
+            if (ImGui::MenuItem(dialog_label.c_str(), nullptr, dialog_enabled))
+            {
+                cm->setDefaultDialogEnabled(!dialog_enabled);
+            }
+
+            bool quest_enabled = cm->isDefaultQuestEnabled();
+            std::string quest_label = ui::LocalizedOrFallback("menu.default_quest", "Default quest window");
+            if (ImGui::MenuItem(quest_label.c_str(), nullptr, quest_enabled))
+            {
+                cm->setDefaultQuestEnabled(!quest_enabled);
+            }
         }
 
         ImGui::Separator();

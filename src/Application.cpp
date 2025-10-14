@@ -202,11 +202,7 @@ void Application::initializeConfig()
     last_window_topmost_ = config_->getWindowAlwaysOnTop();
     context_->setWindowAlwaysOnTop(last_window_topmost_);
 
-    if (registry_->windowsByType(UIWindowType::Dialog).empty())
-        registry_->createDialogWindow();
-
-    if (registry_->windowsByType(UIWindowType::Quest).empty())
-        registry_->createQuestWindow();
+    config_->reconcileDefaultWindowStates();
 
     if (registry_->windowsByType(UIWindowType::Help).empty())
         registry_->createHelpWindow();

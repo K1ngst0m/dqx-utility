@@ -234,7 +234,7 @@ void HelpWindow::render()
     refreshFontBinding();
 
     ImGuiIO& io = ImGui::GetIO();
-    const float min_width = 850.0f;
+    const float min_width = 900.0f;
     const float min_height = 400.0f;
     const float max_width = std::max(min_width, io.DisplaySize.x - 40.0f);
     const float max_height = std::max(min_height, io.DisplaySize.y - 40.0f);
@@ -319,7 +319,7 @@ void HelpWindow::render()
         const float wrap_width = std::max(80.0f, state_.ui_state().width - state_.ui_state().padding.x * 2.0f);
 
         ImFont* active_font = state_.ui_state().font ? state_.ui_state().font : ImGui::GetFont();
-        constexpr float kHelpFontScale = 1.5f;
+        constexpr float kHelpFontScale = 1.25f;
         float font_scale = 1.0f;
         if (state_.ui_state().font && state_.ui_state().font_base_size > 0.0f)
         {
@@ -329,7 +329,7 @@ void HelpWindow::render()
 
         ImGui::SetWindowFontScale(font_scale * kHelpFontScale);
         renderStatusMessage(status, active_font, wrap_width);
-        renderHelpTips(status.color);
+        renderHelpTips(status.color, wrap_width);
 
         if (state_.ui_state().font)
         {
@@ -349,7 +349,7 @@ void HelpWindow::renderSettings()
     // Help window currently has no per-instance settings.
 }
 
-void HelpWindow::renderHelpTips(const ImVec4& color)
+void HelpWindow::renderHelpTips(const ImVec4& color, float wrap_width)
 {
     ImGui::Spacing();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -368,9 +368,22 @@ void HelpWindow::renderHelpTips(const ImVec4& color)
     ImGui::Dummy(ImVec2(0.0f, thickness));
     ImGui::Spacing();
     ImGui::TextUnformatted(i18n::get("help.tips.header"));
-    ImGui::BulletText("%s", i18n::get("help.tips.global_context"));
-    ImGui::BulletText("%s", i18n::get("help.tips.window_context"));
-    ImGui::BulletText("%s", i18n::get("help.tips.drag_hint"));
+    ImGui::Spacing();
+
+    auto render_tip = [&](const char* key)
+    {
+        const char* text = i18n::get(key);
+        ImGui::Bullet();
+        ImGui::SameLine();
+        float start_x = ImGui::GetCursorPosX();
+        ImGui::PushTextWrapPos(start_x + wrap_width);
+        ImGui::TextWrapped("%s", text);
+        ImGui::PopTextWrapPos();
+    };
+
+    render_tip("help.tips.global_context");
+    render_tip("help.tips.window_context");
+    render_tip("help.tips.drag_hint");
 }
 
 void HelpWindow::updateFadeState(StatusKind kind, bool hovered, float delta_time)

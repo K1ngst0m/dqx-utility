@@ -35,14 +35,19 @@ class WindowRegistry
 public:
     WindowRegistry(FontManager& font_manager);
 
-    DialogWindow& createDialogWindow();
-    QuestWindow& createQuestWindow();
+    DialogWindow& createDialogWindow(bool mark_default = false);
+    QuestWindow& createQuestWindow(bool mark_default = false);
     HelpWindow& createHelpWindow();
     void removeWindow(UIWindow* window);
     void processRemovals(); // Remove windows marked for removal
 
     std::vector<std::unique_ptr<UIWindow>>& windows() { return windows_; }
     std::vector<UIWindow*> windowsByType(UIWindowType type);
+
+    DialogWindow* defaultDialogWindow() const { return default_dialog_; }
+    QuestWindow* defaultQuestWindow() const { return default_quest_; }
+    void markDialogAsDefault(DialogWindow& window);
+    void markQuestAsDefault(QuestWindow& window);
 
 private:
     std::string makeDialogName();
@@ -54,4 +59,6 @@ private:
     int dialog_counter_ = 0;
     int quest_counter_ = 0;
     int help_counter_ = 0;
+    DialogWindow* default_dialog_ = nullptr;
+    QuestWindow* default_quest_ = nullptr;
 };

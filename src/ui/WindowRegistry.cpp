@@ -17,21 +17,25 @@ WindowRegistry::WindowRegistry(FontManager& font_manager)
 }
 
 // Registers and returns a new dialog window instance.
-DialogWindow& WindowRegistry::createDialogWindow()
+DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 {
-    auto dialog = std::make_unique<DialogWindow>(font_manager_, dialog_counter_, makeDialogName());
+    auto dialog = std::make_unique<DialogWindow>(font_manager_, dialog_counter_, makeDialogName(), mark_default);
     DialogWindow& ref = *dialog;
     windows_.push_back(std::move(dialog));
     ++dialog_counter_;
+    if (mark_default)
+        markDialogAsDefault(ref);
     return ref;
 }
 
-QuestWindow& WindowRegistry::createQuestWindow()
+QuestWindow& WindowRegistry::createQuestWindow(bool mark_default)
 {
-    auto quest = std::make_unique<QuestWindow>(font_manager_, makeQuestName());
+    auto quest = std::make_unique<QuestWindow>(font_manager_, makeQuestName(), mark_default);
     QuestWindow& ref = *quest;
     windows_.push_back(std::move(quest));
     ++quest_counter_;
+    if (mark_default)
+        markQuestAsDefault(ref);
     return ref;
 }
 
@@ -47,6 +51,20 @@ HelpWindow& WindowRegistry::createHelpWindow()
 // Removes a window from the registry.
 void WindowRegistry::removeWindow(UIWindow* window)
 {
+    if (!window)
+        return;
+    if (window == default_dialog_)
+    {
+        if (auto* dialog = dynamic_cast<DialogWindow*>(window))
+            dialog->setDefaultInstance(false);
+        default_dialog_ = nullptr;
+    }
+    if (window == default_quest_)
+    {
+        if (auto* quest = dynamic_cast<QuestWindow*>(window))
+            quest->setDefaultInstance(false);
+        default_quest_ = nullptr;
+    }
     windows_.erase(std::remove_if(windows_.begin(), windows_.end(),
         [&](const std::unique_ptr<UIWindow>& entry) { return entry.get() == window; }), windows_.end());
 }
@@ -68,19 +86,35 @@ std::vector<UIWindow*> WindowRegistry::windowsByType(UIWindowType type)
 void WindowRegistry::processRemovals()
 {
     windows_.erase(std::remove_if(windows_.begin(), windows_.end(),
-        [](const std::unique_ptr<UIWindow>& window) {
+        [this](const std::unique_ptr<UIWindow>& window) {
             if (window->type() == UIWindowType::Dialog)
             {
                 if (auto* dialog = dynamic_cast<DialogWindow*>(window.get()))
                 {
-                    return dialog->shouldBeRemoved();
+                    if (dialog->shouldBeRemoved())
+                    {
+                        if (window.get() == default_dialog_)
+                        {
+                            dialog->setDefaultInstance(false);
+                            default_dialog_ = nullptr;
+                        }
+                        return true;
+                    }
                 }
             }
             else if (window->type() == UIWindowType::Quest)
             {
                 if (auto* quest = dynamic_cast<QuestWindow*>(window.get()))
                 {
-                    return quest->shouldBeRemoved();
+                    if (quest->shouldBeRemoved())
+                    {
+                        if (window.get() == default_quest_)
+                        {
+                            quest->setDefaultInstance(false);
+                            default_quest_ = nullptr;
+                        }
+                        return true;
+                    }
                 }
             }
             else if (window->type() == UIWindowType::Help)
@@ -89,6 +123,26 @@ void WindowRegistry::processRemovals()
             }
             return false;
         }), windows_.end());
+}
+
+void WindowRegistry::markDialogAsDefault(DialogWindow& window)
+{
+    if (default_dialog_ == &window)
+        return;
+    if (default_dialog_)
+        default_dialog_->setDefaultInstance(false);
+    window.setDefaultInstance(true);
+    default_dialog_ = &window;
+}
+
+void WindowRegistry::markQuestAsDefault(QuestWindow& window)
+{
+    if (default_quest_ == &window)
+        return;
+    if (default_quest_)
+        default_quest_->setDefaultInstance(false);
+    window.setDefaultInstance(true);
+    default_quest_ = &window;
 }
 
 // Generates a sequential dialog name using alphabetic suffixes.

@@ -17,13 +17,15 @@ class QuestSettingsView;
 class QuestWindow : public UIWindow
 {
 public:
-    QuestWindow(FontManager& font_manager, const std::string& name);
+    QuestWindow(FontManager& font_manager, const std::string& name, bool is_default = false);
     ~QuestWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Quest; }
     const char* displayName() const override { return name_.c_str(); }
     const char* windowLabel() const override { return window_label_.c_str(); }
     void rename(const char* new_name) override;
+    bool isDefaultInstance() const { return is_default_instance_; }
+    void setDefaultInstance(bool value) { is_default_instance_ = value; }
 
     void render() override;
     void renderSettings() override;
@@ -97,4 +99,5 @@ private:
     std::uint64_t observed_global_translation_version_ = 0;
     bool last_used_global_translation_ = false;
     ui::WindowAnimator animator_;
+    bool is_default_instance_ = false;
 };

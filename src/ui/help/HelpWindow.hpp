@@ -39,7 +39,7 @@ private:
     void refreshFontBinding();
     StatusInfo evaluateStatus() const;
     void renderStatusMessage(const StatusInfo& info, ImFont* font, float wrap_width);
-    void renderHelpTips(const ImVec4& color);
+    void renderHelpTips(const ImVec4& color, float wrap_width);
     void updateFadeState(StatusKind kind, bool hovered, float delta_time);
 
     static ImVec4 colorFor(StatusKind kind);
