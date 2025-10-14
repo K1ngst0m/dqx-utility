@@ -27,6 +27,9 @@ namespace translate {
      BackendConfig out;
      out.backend = static_cast<Backend>(cfg_ui.translation_backend);
      out.target_lang = to_string_lang(cfg_ui.target_lang_enum);
+  out.max_concurrent_requests = cfg_ui.max_concurrent_requests <= 0 ? 1 : static_cast<std::size_t>(cfg_ui.max_concurrent_requests);
+  out.request_interval_seconds = cfg_ui.request_interval_seconds < 0.f ? 0.0 : static_cast<double>(cfg_ui.request_interval_seconds);
+  out.max_retries = cfg_ui.max_retries < 0 ? 0 : cfg_ui.max_retries;
 
      switch (cfg_ui.translation_backend) {
          case ::TranslationConfig::TranslationBackend::OpenAI: {

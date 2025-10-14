@@ -25,6 +25,12 @@ using namespace translate;
 
 namespace {
 
+struct FlightGuard {
+    std::atomic<std::size_t>& ref;
+    explicit FlightGuard(std::atomic<std::size_t>& r) : ref(r) {}
+    ~FlightGuard() { ref.fetch_sub(1, std::memory_order_relaxed); }
+};
+
 constexpr std::array<std::uint32_t, 64> kSha256Table = {
     0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u, 0xab1c5ed5u,
     0xd807aa98u, 0x12835b01u, 0x243185beu, 0x550c7dc3u, 0x72be5d74u, 0x80deb1feu, 0x9bdc06a7u, 0xc19bf174u,
@@ -187,6 +193,12 @@ bool YoudaoTranslator::init(const BackendConfig& cfg)
     cfg_.model = trimCopy(cfg_.model);
     cfg_.base_url = trimCopy(cfg_.base_url);
     last_error_.clear();
+    max_concurrent_requests_ = cfg_.max_concurrent_requests == 0 ? 1 : cfg_.max_concurrent_requests;
+    request_interval_seconds_ = cfg_.request_interval_seconds < 0.0 ? 0.0 : cfg_.request_interval_seconds;
+    max_retries_ = cfg_.max_retries < 0 ? 0 : cfg_.max_retries;
+    in_flight_.store(0, std::memory_order_relaxed);
+    const auto interval = std::chrono::duration<double>(request_interval_seconds_);
+    last_request_ = std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
     mode_ = (cfg_.model == "youdao_large") ? Mode::LargeModel : Mode::Text;
     running_.store(true);
     worker_ = std::thread(&YoudaoTranslator::workerLoop, this);
@@ -216,6 +228,7 @@ void YoudaoTranslator::shutdown()
         std::lock_guard<std::mutex> lk(r_mtx_);
         results_.clear();
     }
+    in_flight_.store(0, std::memory_order_relaxed);
 }
 
 bool YoudaoTranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id)
@@ -262,6 +275,7 @@ bool YoudaoTranslator::drain(std::vector<Completed>& out)
 
 void YoudaoTranslator::workerLoop()
 {
+    const auto interval = std::chrono::duration<double>(request_interval_seconds_);
     while (running_.load())
     {
         Job job;
@@ -280,12 +294,54 @@ void YoudaoTranslator::workerLoop()
             continue;
         }
 
-        std::string translated;
-        bool ok = (mode_ == Mode::LargeModel)
-            ? doLargeModelRequest(job.text, job.src, job.dst, translated)
-            : doTextRequest(job.text, job.src, job.dst, translated);
+        in_flight_.fetch_add(1, std::memory_order_relaxed);
+        FlightGuard guard(in_flight_);
 
-        if (ok)
+        bool success = false;
+        std::string translated;
+        int attempt = 0;
+        while (running_.load())
+        {
+            if (interval.count() > 0.0)
+            {
+                std::chrono::steady_clock::time_point wait_until;
+                {
+                    std::lock_guard<std::mutex> lock(rate_mtx_);
+                    wait_until = last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+                }
+                auto now = std::chrono::steady_clock::now();
+                if (wait_until > now)
+                {
+                    std::this_thread::sleep_for(wait_until - now);
+                    if (!running_.load())
+                        break;
+                }
+            }
+
+            bool ok = (mode_ == Mode::LargeModel)
+                ? doLargeModelRequest(job.text, job.src, job.dst, translated)
+                : doTextRequest(job.text, job.src, job.dst, translated);
+
+            {
+                std::lock_guard<std::mutex> lock(rate_mtx_);
+                last_request_ = std::chrono::steady_clock::now();
+            }
+
+            if (ok)
+            {
+                success = true;
+                break;
+            }
+
+            if (attempt >= max_retries_)
+            {
+                break;
+            }
+            ++attempt;
+            std::this_thread::sleep_for(std::chrono::milliseconds(200 * attempt));
+        }
+
+        if (success)
         {
             PLOG_INFO << "Youdao Translation [" << job.src << " -> " << job.dst << "]: '" << job.text << "' -> '" << translated << "'";
             Completed c;

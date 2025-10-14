@@ -6,6 +6,7 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <chrono>
 
 namespace translate {
 
@@ -73,6 +74,13 @@ public:
 
     std::mutex r_mtx_;
     std::vector<Completed> results_;
+
+    std::size_t max_concurrent_requests_ = 3;
+    double request_interval_seconds_ = 0.5;
+    int max_retries_ = 3;
+    std::atomic<std::size_t> in_flight_{0};
+    std::chrono::steady_clock::time_point last_request_;
+    std::mutex rate_mtx_;
 };
 
 } // namespace translate

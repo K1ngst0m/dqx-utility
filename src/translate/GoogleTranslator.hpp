@@ -6,6 +6,7 @@
 #include <mutex>
 #include <thread>
 #include <queue>
+#include <chrono>
 
 namespace translate
 {
@@ -60,5 +61,11 @@ namespace translate
         // Track API status
         std::atomic<bool> paid_api_working_{true};
         bool warned_about_fallback_ = false;
+        std::size_t max_concurrent_requests_ = 3;
+        double request_interval_seconds_ = 0.5;
+        int max_retries_ = 3;
+        std::atomic<std::size_t> in_flight_{0};
+        std::chrono::steady_clock::time_point last_request_;
+        std::mutex rate_mtx_;
     };
 }

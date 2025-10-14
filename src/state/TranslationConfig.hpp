@@ -38,6 +38,9 @@ struct TranslationConfig
     bool auto_apply_changes;
     bool include_dialog_stream;
     bool include_corner_stream;
+    int max_concurrent_requests;
+    float request_interval_seconds;
+    int max_retries;
     TranslationBackend translation_backend;
     TargetLang target_lang_enum;
     std::array<char, URLSize>   openai_base_url{};
@@ -67,6 +70,9 @@ struct TranslationConfig
         auto_apply_changes = true;
         include_dialog_stream = true;
         include_corner_stream = true;
+        max_concurrent_requests = 3;
+        request_interval_seconds = 0.5f;
+        max_retries = 3;
         translation_backend = TranslationBackend::OpenAI;
         target_lang_enum = TargetLang::EN_US;
         
@@ -100,6 +106,9 @@ struct TranslationConfig
         auto_apply_changes = other.auto_apply_changes;
         include_dialog_stream = other.include_dialog_stream;
         include_corner_stream = other.include_corner_stream;
+        max_concurrent_requests = other.max_concurrent_requests;
+        request_interval_seconds = other.request_interval_seconds;
+        max_retries = other.max_retries;
         translation_backend = other.translation_backend;
         target_lang_enum = other.target_lang_enum;
         openai_base_url = other.openai_base_url;

@@ -2,8 +2,17 @@
 
 #include <cpr/cpr.h>
 #include <plog/Log.h>
+#include <chrono>
 #include "HttpCommon.hpp"
 #include "../utils/ErrorReporter.hpp"
+
+namespace {
+struct FlightGuard {
+    std::atomic<std::size_t>& ref;
+    explicit FlightGuard(std::atomic<std::size_t>& r) : ref(r) {}
+    ~FlightGuard() { ref.fetch_sub(1, std::memory_order_relaxed); }
+};
+}
 
 using namespace translate;
 
@@ -15,6 +24,12 @@ bool OpenAITranslator::init(const BackendConfig& cfg)
     shutdown();
     cfg_ = cfg;
     last_error_.clear();
+    max_concurrent_requests_ = cfg_.max_concurrent_requests == 0 ? 1 : cfg_.max_concurrent_requests;
+    request_interval_seconds_ = cfg_.request_interval_seconds < 0.0 ? 0.0 : cfg_.request_interval_seconds;
+    max_retries_ = cfg_.max_retries < 0 ? 0 : cfg_.max_retries;
+    in_flight_.store(0, std::memory_order_relaxed);
+    const auto interval = std::chrono::duration<double>(request_interval_seconds_);
+    last_request_ = std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
     running_.store(true);
     worker_ = std::thread(&OpenAITranslator::workerLoop, this);
     return true;
@@ -39,6 +54,7 @@ void OpenAITranslator::shutdown()
         std::lock_guard<std::mutex> lk(r_mtx_);
         results_.clear();
     }
+    in_flight_.store(0, std::memory_order_relaxed);
 }
 
 bool OpenAITranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id)
@@ -77,6 +93,7 @@ bool OpenAITranslator::drain(std::vector<Completed>& out)
 
 void OpenAITranslator::workerLoop()
 {
+    const auto interval = std::chrono::duration<double>(request_interval_seconds_);
     while (running_.load())
     {
         Job j;
@@ -93,8 +110,54 @@ void OpenAITranslator::workerLoop()
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
+        in_flight_.fetch_add(1, std::memory_order_relaxed);
+        FlightGuard guard(in_flight_);
+
+        bool success = false;
         std::string out;
-        if (doRequest(j.text, j.dst, out))
+        int attempt = 0;
+        while (running_.load())
+        {
+            if (interval.count() > 0.0)
+            {
+                std::chrono::steady_clock::time_point wait_until;
+                {
+                    std::lock_guard<std::mutex> lock(rate_mtx_);
+                    wait_until = last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+                }
+                auto now = std::chrono::steady_clock::now();
+                if (wait_until > now)
+                {
+                    std::this_thread::sleep_for(wait_until - now);
+                    if (!running_.load())
+                        break;
+                }
+            }
+
+            if (doRequest(j.text, j.dst, out))
+            {
+                success = true;
+                {
+                    std::lock_guard<std::mutex> lock(rate_mtx_);
+                    last_request_ = std::chrono::steady_clock::now();
+                }
+                break;
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(rate_mtx_);
+                last_request_ = std::chrono::steady_clock::now();
+            }
+
+            if (attempt >= max_retries_)
+            {
+                break;
+            }
+            ++attempt;
+            std::this_thread::sleep_for(std::chrono::milliseconds(200 * attempt));
+        }
+
+        if (success)
         {
             PLOG_INFO << "Translation [" << j.src << " -> " << j.dst << "]: '" << j.text << "' -> '" << out << "'";
             Completed c; c.id = j.id; c.text = std::move(out); c.failed = false;
