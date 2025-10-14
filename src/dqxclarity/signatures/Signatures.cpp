@@ -75,6 +75,9 @@ void Signatures::InitializeSignatures() {
         s_signatures["corner_text"] = Pattern::FromString(
             "8B D0 8D 5A 01 66 90 8A 0A 42 84 C9 75 F9 2B D3 0F"
         );
+        s_signatures["corner_text_trigger"] = Pattern::FromString(
+            "8B D0 8D 5A 01 66 90 8A 0A 42 84 C9 75 F9 2B D3 0F"
+        );
         s_signatures["notice_string"] = Pattern::FromString(
             "E5 8B 95 E7 94 BB E9 85 8D E4 BF A1 E3 81 AE E9 9A 9B E3 81 AF E3 82 B5 E3 83 BC E3 83 90 E3 83 BC"
         );
@@ -108,6 +111,10 @@ const Pattern& Signatures::GetQuestText() {
 
 const Pattern& Signatures::GetCornerText() {
     InitializeSignatures();
+    auto it = s_signatures.find("corner_text_trigger");
+    if (it != s_signatures.end()) {
+        return it->second;
+    }
     return s_signatures["corner_text"];
 }
 

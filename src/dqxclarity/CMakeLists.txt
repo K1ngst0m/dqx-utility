@@ -19,6 +19,7 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/process/PostLoginDetector.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/Codegen.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/DialogHook.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hooking/CornerTextHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/QuestHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityDetour.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityMonitor.cpp

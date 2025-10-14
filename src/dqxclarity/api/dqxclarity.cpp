@@ -4,6 +4,7 @@
 #include "../memory/IProcessMemory.hpp"
 #include "../process/ProcessFinder.hpp"
 #include "../hooking/DialogHook.hpp"
+#include "../hooking/CornerTextHook.hpp"
 #include "../hooking/QuestHook.hpp"
 #include "../hooking/IntegrityDetour.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
@@ -24,6 +25,7 @@ struct Engine::Impl {
   std::shared_ptr<IProcessMemory> memory;
   std::unique_ptr<DialogHook> hook;
   std::unique_ptr<QuestHook> quest_hook;
+  std::unique_ptr<CornerTextHook> corner_hook;
   std::unique_ptr<class IntegrityDetour> integrity;
 
   SpscRing<DialogMessage, 1024> ring;
@@ -123,6 +125,16 @@ bool Engine::start_hook(StartPolicy policy) {
     impl_->quest_hook.reset();
   }
 
+  impl_->corner_hook = std::make_unique<dqxclarity::CornerTextHook>(impl_->memory);
+  impl_->corner_hook->SetVerbose(impl_->cfg.verbose);
+  impl_->corner_hook->SetLogger(impl_->log);
+  impl_->corner_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
+  impl_->corner_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+  if (impl_->corner_hook && !impl_->corner_hook->InstallHook(/*enable_patch=*/false)) {
+    if (impl_->log.warn) impl_->log.warn("Failed to prepare corner text hook; continuing without capture");
+    impl_->corner_hook.reset();
+  }
+
   // Install integrity detour and configure it to restore dialog hook bytes during checks
   impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
   impl_->integrity->SetVerbose(impl_->cfg.verbose);
@@ -135,12 +147,19 @@ bool Engine::start_hook(StartPolicy policy) {
   if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0) {
     impl_->integrity->AddRestoreTarget(impl_->quest_hook->GetHookAddress(), impl_->quest_hook->GetOriginalBytes());
   }
+  if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0) {
+    impl_->integrity->AddRestoreTarget(impl_->corner_hook->GetHookAddress(), impl_->corner_hook->GetOriginalBytes());
+  }
   if (!impl_->integrity->Install()) {
     if (impl_->log.error) impl_->log.error("Failed to install integrity detour");
     impl_->integrity.reset();
     if (impl_->quest_hook) {
       impl_->quest_hook->RemoveHook();
       impl_->quest_hook.reset();
+    }
+    if (impl_->corner_hook) {
+      impl_->corner_hook->RemoveHook();
+      impl_->corner_hook.reset();
     }
     impl_->hook.reset();
     impl_->memory.reset();
@@ -153,6 +172,7 @@ bool Engine::start_hook(StartPolicy policy) {
   if (enable_patch_now) {
     if (impl_->hook) (void)impl_->hook->EnablePatch();
     if (impl_->quest_hook) (void)impl_->quest_hook->EnablePatch();
+    if (impl_->corner_hook) (void)impl_->corner_hook->EnablePatch();
   }
 
   // Proactive verification after immediate enable
@@ -174,6 +194,14 @@ bool Engine::start_hook(StartPolicy policy) {
           (void)impl_->quest_hook->ReapplyPatch();
         }
       }
+      if (impl_->corner_hook) {
+        if (!impl_->corner_hook->IsPatched()) {
+          if (impl_->log.warn) impl_->log.warn("Post-enable verify: corner text hook not present; reapplying once");
+          (void)impl_->corner_hook->ReapplyPatch();
+        } else {
+          if (impl_->log.info) impl_->log.info("Post-enable verify: corner text hook present");
+        }
+      }
     }).detach();
   }
 
@@ -193,6 +221,10 @@ bool Engine::start_hook(StartPolicy policy) {
             (void)impl_->quest_hook->EnablePatch();
             if (impl_->log.info) impl_->log.info("Quest hook enabled after first integrity run");
           }
+          if (impl_->corner_hook) {
+            (void)impl_->corner_hook->EnablePatch();
+            if (impl_->log.info) impl_->log.info("Corner text hook enabled after first integrity run");
+          }
         } else {
           if (impl_->hook) {
             (void)impl_->hook->ReapplyPatch();
@@ -201,6 +233,10 @@ bool Engine::start_hook(StartPolicy policy) {
           if (impl_->quest_hook) {
             (void)impl_->quest_hook->ReapplyPatch();
             if (impl_->log.info) impl_->log.info("Quest hook re-applied after integrity");
+          }
+          if (impl_->corner_hook) {
+            (void)impl_->corner_hook->ReapplyPatch();
+            if (impl_->log.info) impl_->log.info("Corner text hook re-applied after integrity");
           }
         }
       }
@@ -211,6 +247,9 @@ bool Engine::start_hook(StartPolicy policy) {
     }
     if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0) {
       impl_->monitor->AddRestoreTarget(impl_->quest_hook->GetHookAddress(), impl_->quest_hook->GetOriginalBytes());
+    }
+    if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0) {
+      impl_->monitor->AddRestoreTarget(impl_->corner_hook->GetHookAddress(), impl_->corner_hook->GetOriginalBytes());
     }
     (void)impl_->monitor->start();
   }
@@ -248,6 +287,9 @@ bool Engine::start_hook(StartPolicy policy) {
           impl_->quest_valid = true;
         }
       }
+      if (impl_->corner_hook) {
+        (void)impl_->corner_hook->PollCornerText();
+      }
       std::this_thread::sleep_for(100ms);
     }
   });
@@ -275,6 +317,10 @@ bool Engine::stop_hook() {
   if (impl_->quest_hook) {
     impl_->quest_hook->RemoveHook();
     impl_->quest_hook.reset();
+  }
+  if (impl_->corner_hook) {
+    impl_->corner_hook->RemoveHook();
+    impl_->corner_hook.reset();
   }
   if (impl_->hook) {
     impl_->hook->RemoveHook();

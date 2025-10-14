@@ -9,6 +9,7 @@ integrity_check  = "89 54 24 FC 8D 64 24 FC 89 4C 24 FC 8D 64 24 FC 8D 64 24 FC 
 network_text     = "51 51 8B C4 89 10 8B CF"
 quest_text       = "8D 8E 78 04 00 00 E8 ?? ?? ?? ?? 5F"
 corner_text      = "8B D0 8D 5A 01 66 90 8A 0A 42 84 C9 75 F9 2B D3 0F"
+corner_text_trigger = "8B D0 8D 5A 01 66 90 8A 0A 42 84 C9 75 F9 2B D3 0F"
 
 # UTF-8 bytes for "動画配信の際はサーバー"
 notice_string    = "E5 8B 95 E7 94 BB E9 85 8D E4 BF A1 E3 81 AE E9 9A 9B E3 81 AF E3 82 B5 E3 83 BC E3 83 90 E3 83 BC"
