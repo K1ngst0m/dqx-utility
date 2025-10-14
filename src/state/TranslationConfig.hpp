@@ -36,6 +36,8 @@ struct TranslationConfig
 
     bool translate_enabled;
     bool auto_apply_changes;
+    bool include_dialog_stream;
+    bool include_corner_stream;
     TranslationBackend translation_backend;
     TargetLang target_lang_enum;
     std::array<char, URLSize>   openai_base_url{};
@@ -63,6 +65,8 @@ struct TranslationConfig
     {
         translate_enabled = false;
         auto_apply_changes = true;
+        include_dialog_stream = true;
+        include_corner_stream = true;
         translation_backend = TranslationBackend::OpenAI;
         target_lang_enum = TargetLang::EN_US;
         
@@ -94,6 +98,8 @@ struct TranslationConfig
     {
         translate_enabled = other.translate_enabled;
         auto_apply_changes = other.auto_apply_changes;
+        include_dialog_stream = other.include_dialog_stream;
+        include_corner_stream = other.include_corner_stream;
         translation_backend = other.translation_backend;
         target_lang_enum = other.target_lang_enum;
         openai_base_url = other.openai_base_url;

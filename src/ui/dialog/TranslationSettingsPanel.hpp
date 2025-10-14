@@ -60,6 +60,7 @@ private:
     bool auto_apply_changed_ = false;
     bool backend_changed_ = false;
     bool lang_changed_ = false;
+    bool stream_filters_changed_ = false;
     bool skip_status_frame_ = false;
     bool pending_auto_apply_ = false;
     float auto_apply_elapsed_ = 0.0f;

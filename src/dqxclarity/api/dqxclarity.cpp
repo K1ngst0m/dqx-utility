@@ -306,7 +306,7 @@ bool Engine::start_hook(StartPolicy policy) {
           stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
           stream_item.type = DialogStreamType::CornerText;
           stream_item.text = captured;
-          stream_item.speaker = "Corner";
+          stream_item.speaker.clear();
           impl_->stream_ring.try_push(std::move(stream_item));
         }
       }

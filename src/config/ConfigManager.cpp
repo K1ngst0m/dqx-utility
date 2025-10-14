@@ -62,6 +62,8 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     translation.insert("use_global_translation", state.use_global_translation);
     translation.insert("translate_enabled", state.translation_config().translate_enabled);
     translation.insert("auto_apply_changes", state.translation_config().auto_apply_changes);
+    translation.insert("include_dialog_stream", state.translation_config().include_dialog_stream);
+    translation.insert("include_corner_stream", state.translation_config().include_corner_stream);
     translation.insert("translation_backend", static_cast<int>(state.translation_config().translation_backend));
 
     std::string target_lang;
@@ -146,6 +148,10 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
             state.translation_config().translate_enabled = *v;
         if (auto v = (*translation_tbl)["auto_apply_changes"].value<bool>())
             state.translation_config().auto_apply_changes = *v;
+        if (auto v = (*translation_tbl)["include_dialog_stream"].value<bool>())
+            state.translation_config().include_dialog_stream = *v;
+        if (auto v = (*translation_tbl)["include_corner_stream"].value<bool>())
+            state.translation_config().include_corner_stream = *v;
         if (auto v = (*translation_tbl)["translation_backend"].value<int>())
             state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
         if (auto v = (*translation_tbl)["target_lang"].value<std::string>())
@@ -234,6 +240,8 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
     if (auto v = t["use_global_translation"].value<bool>()) state.use_global_translation = *v;
     if (auto v = t["translate_enabled"].value<bool>()) state.translation_config().translate_enabled = *v;
     if (auto v = t["auto_apply_changes"].value<bool>()) state.translation_config().auto_apply_changes = *v;
+    if (auto v = t["include_dialog_stream"].value<bool>()) state.translation_config().include_dialog_stream = *v;
+    if (auto v = t["include_corner_stream"].value<bool>()) state.translation_config().include_corner_stream = *v;
     if (auto v = t["translation_backend"].value<int>())
         state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
 
@@ -464,6 +472,8 @@ bool ConfigManager::saveAll()
     toml::table translation;
     translation.insert("translate_enabled", global_translation_config_.translate_enabled);
     translation.insert("auto_apply_changes", global_translation_config_.auto_apply_changes);
+    translation.insert("include_dialog_stream", global_translation_config_.include_dialog_stream);
+    translation.insert("include_corner_stream", global_translation_config_.include_corner_stream);
     translation.insert("translation_backend", static_cast<int>(global_translation_config_.translation_backend));
     std::string global_target_lang;
     switch (global_translation_config_.target_lang_enum)
@@ -609,6 +619,8 @@ bool ConfigManager::loadAndApply()
             {
                 if (auto v = (*trans)["translate_enabled"].value<bool>()) global_translation_config_.translate_enabled = *v;
                 if (auto v = (*trans)["auto_apply_changes"].value<bool>()) global_translation_config_.auto_apply_changes = *v;
+                if (auto v = (*trans)["include_dialog_stream"].value<bool>()) global_translation_config_.include_dialog_stream = *v;
+                if (auto v = (*trans)["include_corner_stream"].value<bool>()) global_translation_config_.include_corner_stream = *v;
                 if (auto v = (*trans)["translation_backend"].value<int>())
                     global_translation_config_.translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
                 if (auto v = (*trans)["target_lang"].value<std::string>())

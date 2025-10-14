@@ -202,11 +202,16 @@ enable = "启用翻译"
 auto_apply = "自动应用更改"
 use_global = "使用全局翻译设置"
 use_global_hint = "（取消勾选以单独自定义窗口）"
+include_dialog = "包含对话文本"
+include_corner = "包含随行人物对话"
 
 [dialog.placeholder]
 waiting = "正在初始化对话系统……"
 ready = "对话系统已就绪。"
 failed = "对话系统初始化失败。请检查 Hook 状态和日志。"
+
+[dialog.corner]
+speaker = "随行人物对话"
 
 [dialog.translate.backend]
 label = "后端"

@@ -298,6 +298,9 @@ void DialogWindow::applyPending()
     };
 
     // Pull new dialog messages from in-process backlog
+    const TranslationConfig& config = activeTranslationConfig();
+    const std::string corner_speaker_label = ui::LocalizedOrFallback("dialog.corner.speaker", "Follower Dialogue");
+
     if (auto* launcher = DQXClarityService_Get())
     {
         std::vector<dqxclarity::DialogStreamItem> items;
@@ -305,12 +308,9 @@ void DialogWindow::applyPending()
         {
             for (auto& item : items)
             {
-                bool allow_type = false;
-                switch (item.type)
-                {
-                case dqxclarity::DialogStreamType::Dialog: allow_type = show_dialog_stream_; break;
-                case dqxclarity::DialogStreamType::CornerText: allow_type = show_corner_stream_; break;
-                }
+                bool allow_type = (item.type == dqxclarity::DialogStreamType::Dialog)
+                    ? config.include_dialog_stream
+                    : config.include_corner_stream;
 
                 bool hasValidText = !item.text.empty() && !is_blank(item.text);
                 bool hasValidSpeaker = !item.speaker.empty() && item.speaker != "No_NPC";
@@ -320,15 +320,11 @@ void DialogWindow::applyPending()
                     PendingMsg pm;
                     pm.type = item.type;
                     pm.text = std::move(item.text);
-                    pm.lang.clear();
                     pm.speaker = std::move(item.speaker);
                     pm.seq = item.seq;
                     pending_.push(std::move(pm));
                 }
-                else if (item.seq > last_applied_seq_)
-                {
-                    last_applied_seq_ = item.seq;
-                }
+                last_applied_seq_ = std::max(last_applied_seq_, item.seq);
             }
         }
     }
@@ -340,7 +336,6 @@ void DialogWindow::applyPending()
     if (local.empty())
         return;
 
-    const TranslationConfig& config = activeTranslationConfig();
     if (config.translate_enabled) {
         if (!translator_ || !translator_->isReady()) {
             initTranslatorIfEnabled();
@@ -350,28 +345,28 @@ void DialogWindow::applyPending()
     appended_since_last_frame_ = true;
     for (auto& m : local)
     {
-        if (m.type == dqxclarity::DialogStreamType::CornerText)
+        std::string text_to_process = m.text;
+        if (text_to_process.empty()) {
+            text_to_process = " ";
+        }
+
+        std::string processed_text = (m.type == dqxclarity::DialogStreamType::CornerText)
+            ? text_to_process
+            : text_pipeline_->process(text_to_process);
+
+        if (processed_text.empty())
         {
-            std::string display_text = m.text.empty() ? std::string(" ") : m.text;
-            std::string display_speaker = m.speaker.empty() ? std::string("Corner") : m.speaker;
-            appendSegmentInternal(display_speaker, display_text);
-            if (m.seq > 0) last_applied_seq_ = m.seq;
+            last_applied_seq_ = std::max(last_applied_seq_, m.seq);
             continue;
         }
 
-        // Handle empty text for NPC-only messages
-        std::string text_to_process = m.text.empty() ? " " : m.text;
-
-        std::string processed_text = text_pipeline_->process(text_to_process);
-        if (processed_text.empty())
-        {
-            if (m.seq > 0) last_applied_seq_ = m.seq;
-            continue;
+        std::string speaker = m.speaker;
+        if (speaker.empty() && m.type == dqxclarity::DialogStreamType::CornerText) {
+            speaker = corner_speaker_label;
         }
 
         if (config.translate_enabled)
         {
-
             auto backend_before = config.translation_backend;
             auto submit = session_.submit(
                 processed_text,
@@ -390,8 +385,8 @@ void DialogWindow::applyPending()
 
             if (submit.kind == TranslateSession::SubmitKind::Cached)
             {
-                appendSegmentInternal(m.speaker, submit.text);
-                if (m.seq > 0) last_applied_seq_ = m.seq;
+                appendSegmentInternal(speaker, submit.text);
+                last_applied_seq_ = std::max(last_applied_seq_, m.seq);
                 continue;
             }
 
@@ -411,24 +406,19 @@ void DialogWindow::applyPending()
             {
                 std::string placeholder = waiting_text_for_lang(config.target_lang_enum);
                 placeholder += animator_.waitSuffix();
-                int idx = appendSegmentInternal(m.speaker, placeholder);
+                int idx = appendSegmentInternal(speaker, placeholder);
                 if (job_id != 0)
                 {
                     pending_segment_by_job_[job_id] = idx;
                 }
             }
 
-            if (m.seq > 0) last_applied_seq_ = m.seq;
+            last_applied_seq_ = std::max(last_applied_seq_, m.seq);
         }
         else
         {
-            std::string text_to_copy = m.text.empty() ? " " : m.text;
-            appendSegmentInternal(m.speaker, text_to_copy);
-        }
-        if (m.seq > 0)
-        {
-            last_applied_seq_ = m.seq;
-            // No ack needed in in-process mode
+            appendSegmentInternal(speaker, text_to_process);
+            last_applied_seq_ = std::max(last_applied_seq_, m.seq);
         }
     }
 }
@@ -663,11 +653,6 @@ void DialogWindow::renderDialog()
 
         const float wrap_width = std::max(40.0f, state_.ui_state().width - state_.ui_state().padding.x * 2.0f);
 
-        if (ImGui::Checkbox("Dialog", &show_dialog_stream_)) {}
-        ImGui::SameLine();
-        if (ImGui::Checkbox("Corner Text", &show_corner_stream_)) {}
-        ImGui::Spacing();
-        
         // Check if window is docked (must be called inside Begin/End)
         bool is_docked = ImGui::IsWindowDocked();
         state_.ui_state().is_docked = is_docked;

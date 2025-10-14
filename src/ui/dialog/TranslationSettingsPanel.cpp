@@ -73,7 +73,7 @@ void TranslationSettingsPanel::render(
     bool config_changed = renderBackendSpecificConfig(config);
 
     bool any_field_changed = enable_changed_ || auto_apply_changed_ || backend_changed_ ||
-                             lang_changed_ || config_changed || selector_changed;
+                             lang_changed_ || stream_filters_changed_ || config_changed || selector_changed;
 
     if (using_global_config_ && any_field_changed)
     {
@@ -168,8 +168,14 @@ void TranslationSettingsPanel::render(
 
 bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
 {
+    stream_filters_changed_ = false;
     enable_changed_ = ImGui::Checkbox(i18n::get("dialog.translate.enable"), &config.translate_enabled);
     auto_apply_changed_ = ImGui::Checkbox(i18n::get("dialog.translate.auto_apply"), &config.auto_apply_changes);
+    ImGui::Spacing();
+
+    bool include_dialog_changed = ImGui::Checkbox(i18n::get("dialog.translate.include_dialog"), &config.include_dialog_stream);
+    bool include_corner_changed = ImGui::Checkbox(i18n::get("dialog.translate.include_corner"), &config.include_corner_stream);
+    stream_filters_changed_ = include_dialog_changed || include_corner_changed;
     ImGui::Spacing();
     
     ImGui::TextUnformatted(i18n::get("dialog.translate.backend.label"));
@@ -203,7 +209,7 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
         config.target_lang_enum = static_cast<TranslationConfig::TargetLang>(current_lang);
     }
     
-    return enable_changed_ || auto_apply_changed_ || backend_changed_ || lang_changed_;
+    return enable_changed_ || auto_apply_changed_ || backend_changed_ || lang_changed_ || stream_filters_changed_;
 }
 
 bool TranslationSettingsPanel::renderBackendSpecificConfig(TranslationConfig& config)

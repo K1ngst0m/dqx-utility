@@ -54,7 +54,6 @@ private:
     struct PendingMsg {
         dqxclarity::DialogStreamType type = dqxclarity::DialogStreamType::Dialog;
         std::string text;
-        std::string lang;
         std::string speaker;
         std::uint64_t seq = 0;
     };
@@ -131,8 +130,5 @@ private:
 
     std::uint64_t observed_global_translation_version_ = 0;
     bool last_used_global_translation_ = false;
-
-    bool show_dialog_stream_ = true;
-    bool show_corner_stream_ = true;
 
 };
