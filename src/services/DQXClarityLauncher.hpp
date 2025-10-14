@@ -3,6 +3,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <atomic>
 
 namespace dqxclarity { struct DialogMessage; struct QuestMessage; enum class Status; struct Config; }
 
@@ -55,5 +56,7 @@ public:
 
 private:
     struct Impl;
+    static std::atomic<Impl*> s_active_impl;
+    static void CrashCleanupThunk();
     std::unique_ptr<Impl> pimpl_;
 };

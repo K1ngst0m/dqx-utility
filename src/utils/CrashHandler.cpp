@@ -5,6 +5,8 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
+#include <exception>
+#include <atomic>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -13,8 +15,36 @@
 #include <filesystem>
 #include <ctime>
 #include <iostream>
+#include <cstdlib>
+
+static std::atomic<std::atomic<bool>*> g_fatal_flag{nullptr};
+static std::atomic<void(*)()> g_fatal_cleanup{nullptr};
+static std::terminate_handler g_prev_terminate = nullptr;
 
 static thread_local const char* g_current_operation = nullptr;
+
+static void NotifyFatalObserver()
+{
+    if (auto* flag = g_fatal_flag.load(std::memory_order_acquire))
+    {
+        flag->store(true, std::memory_order_relaxed);
+    }
+}
+
+static void CrashTerminateHandler()
+{
+    NotifyFatalObserver();
+    if (auto fn = g_fatal_cleanup.load(std::memory_order_acquire))
+    {
+        try { fn(); } catch (...) {}
+    }
+    if (g_prev_terminate)
+    {
+        g_prev_terminate();
+        return;
+    }
+    std::abort();
+}
 
 static const char* ExceptionCodeToString(DWORD code)
 {
@@ -46,6 +76,11 @@ static const char* ExceptionCodeToString(DWORD code)
 
 static LONG WINAPI CrashHandlerFunction(EXCEPTION_POINTERS* ex)
 {
+    NotifyFatalObserver();
+    if (auto fn = g_fatal_cleanup.load(std::memory_order_acquire))
+    {
+        try { fn(); } catch (...) {}
+    }
     // Basic header
     PLOG_FATAL << "=== APPLICATION CRASHED ===";
     DWORD code = ex->ExceptionRecord->ExceptionCode;
@@ -233,6 +268,7 @@ void utils::CrashHandler::Initialize()
 {
 #ifdef _WIN32
     SetUnhandledExceptionFilter(CrashHandlerFunction);
+    g_prev_terminate = std::set_terminate(CrashTerminateHandler);
     PLOG_INFO << "Crash handler installed";
 #endif
 }
@@ -241,5 +277,19 @@ void utils::CrashHandler::SetContext(const char* operation)
 {
 #ifdef _WIN32
     g_current_operation = operation;
+#endif
+}
+
+void utils::CrashHandler::RegisterFatalFlag(std::atomic<bool>* flag)
+{
+#ifdef _WIN32
+    g_fatal_flag.store(flag, std::memory_order_release);
+#endif
+}
+
+void utils::CrashHandler::RegisterFatalCleanup(void (*fn)())
+{
+#ifdef _WIN32
+    g_fatal_cleanup.store(fn, std::memory_order_release);
 #endif
 }

@@ -4,6 +4,7 @@
 #include <plog/Log.h>
 
 #include "../utils/ErrorReporter.hpp"
+#include "../utils/CrashHandler.hpp"
 
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "dqxclarity/api/dialog_message.hpp"
@@ -15,6 +16,7 @@
 #include <chrono>
 #include <thread>
 #include <mutex>
+#include <exception>
 
 // Private implementation details
 struct DQXClarityLauncher::Impl
@@ -27,6 +29,12 @@ struct DQXClarityLauncher::Impl
     bool waiting_delay = false;
     std::chrono::steady_clock::time_point detect_tp{};
     int delay_ms = 5000; // default 5s; make configurable later
+
+    std::thread watchdog;
+    std::atomic<bool> watchdog_stop{false};
+    std::atomic<std::uint64_t> heartbeat_seq{0};
+    std::atomic<bool> fatal_signal{false};
+    std::atomic<bool> stop_in_progress{false};
 
     // Notice wait worker
     std::thread notice_worker;
@@ -78,16 +86,41 @@ struct DQXClarityLauncher::Impl
 
     bool stopHookLocked()
     {
-        std::lock_guard<std::mutex> lock(engine_mutex);
-        bool ok = engine.stop_hook();
-        if (ok) {
-            std::lock_guard<std::mutex> qlock(quest_mutex);
-            quest_valid = false;
-        }
-        if (ok) {
-            clearLastErrorMessage();
-        } else if (last_error_message.empty()) {
-            setLastErrorMessage("Failed to stop hook.");
+        bool expected = false;
+        if (!stop_in_progress.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
+            return true;
+
+        struct StopReset {
+            std::atomic<bool>& flag;
+            ~StopReset() { flag.store(false, std::memory_order_release); }
+        } reset{stop_in_progress};
+
+        bool ok = true;
+        try {
+            std::lock_guard<std::mutex> lock(engine_mutex);
+            auto status = engine.status();
+            if (status == dqxclarity::Status::Stopped) {
+                clearLastErrorMessage();
+                return true;
+            }
+            ok = engine.stop_hook();
+            if (ok) {
+                std::lock_guard<std::mutex> qlock(quest_mutex);
+                quest_valid = false;
+            }
+            if (ok) {
+                clearLastErrorMessage();
+            } else if (last_error_message.empty()) {
+                setLastErrorMessage("Failed to stop hook.");
+            }
+        } catch (const std::exception& ex) {
+            ok = false;
+            PLOG_ERROR << "Exception during stopHookLocked: " << ex.what();
+            setLastErrorMessage("Exception during stop hook.");
+        } catch (...) {
+            ok = false;
+            PLOG_ERROR << "Unknown exception during stopHookLocked";
+            setLastErrorMessage("Unknown exception during stop hook.");
         }
         return ok;
     }
@@ -119,6 +152,17 @@ struct DQXClarityLauncher::Impl
     }
 };
 
+std::atomic<DQXClarityLauncher::Impl*> DQXClarityLauncher::s_active_impl{nullptr};
+
+void DQXClarityLauncher::CrashCleanupThunk()
+{
+    if (auto* impl = s_active_impl.load(std::memory_order_acquire))
+    {
+        impl->fatal_signal.store(true, std::memory_order_release);
+        (void)impl->stopHookLocked();
+    }
+}
+
 DQXClarityLauncher::DQXClarityLauncher()
     : pimpl_(std::make_unique<Impl>())
 {
@@ -137,12 +181,16 @@ DQXClarityLauncher::DQXClarityLauncher()
     };
     pimpl_->engine.initialize(pimpl_->engine_cfg, std::move(log));
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
+    s_active_impl.store(pimpl_.get(), std::memory_order_release);
+    utils::CrashHandler::RegisterFatalFlag(&pimpl_->fatal_signal);
+    utils::CrashHandler::RegisterFatalCleanup(CrashCleanupThunk);
 
     // Start controller monitor thread
     pimpl_->monitor = std::thread([this]{
         using namespace std::chrono;
         bool initialized = false;
         while (!pimpl_->stop_flag.load()) {
+            pimpl_->heartbeat_seq.fetch_add(1, std::memory_order_relaxed);
             if (!initialized) {
                 pimpl_->process_running_at_start = isDQXGameRunning();
                 initialized = true;
@@ -250,11 +298,45 @@ DQXClarityLauncher::DQXClarityLauncher()
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     });
+
+    pimpl_->watchdog = std::thread([this]{
+        using namespace std::chrono;
+        std::uint64_t last_seq = pimpl_->heartbeat_seq.load(std::memory_order_relaxed);
+        int stagnant_ticks = 0;
+        while (!pimpl_->watchdog_stop.load(std::memory_order_acquire)) {
+            if (pimpl_->stop_flag.load(std::memory_order_acquire))
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            const auto seq = pimpl_->heartbeat_seq.load(std::memory_order_relaxed);
+            if (seq == last_seq) {
+                if (stagnant_ticks < 6) ++stagnant_ticks;
+            } else {
+                stagnant_ticks = 0;
+                last_seq = seq;
+            }
+            const bool fatal = pimpl_->fatal_signal.load(std::memory_order_acquire);
+            const bool stalled = stagnant_ticks >= 6;
+            auto st = pimpl_->engine.status();
+            if ((fatal || stalled) && (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting || st == dqxclarity::Status::Stopping)) {
+                PLOG_FATAL << "Watchdog detected " << (fatal ? "fatal signal" : "heartbeat stall") << "; stopping hook";
+                (void)pimpl_->stopHookLocked();
+                if (fatal)
+                    break;
+                stagnant_ticks = 0;
+                last_seq = seq;
+            }
+            if (fatal)
+                break;
+        }
+    });
 }
 
 DQXClarityLauncher::~DQXClarityLauncher()
 {
     shutdown();
+    utils::CrashHandler::RegisterFatalCleanup(nullptr);
+    utils::CrashHandler::RegisterFatalFlag(nullptr);
+    s_active_impl.store(nullptr, std::memory_order_release);
 }
 
 bool DQXClarityLauncher::copyDialogsSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogMessage>& out) const
@@ -342,10 +424,15 @@ void DQXClarityLauncher::shutdown()
     }
 
     pimpl_->stop_flag.store(true);
+    pimpl_->watchdog_stop.store(true, std::memory_order_release);
     (void)stop();
 
     if (pimpl_->monitor.joinable()) {
         pimpl_->monitor.join();
+    }
+
+    if (pimpl_->watchdog.joinable()) {
+        pimpl_->watchdog.join();
     }
 
     if (pimpl_->notice_worker.joinable()) {
@@ -394,5 +481,4 @@ std::string DQXClarityLauncher::getLastErrorMessage() const
 {
     return pimpl_->getLastErrorMessage();
 }
-
 
