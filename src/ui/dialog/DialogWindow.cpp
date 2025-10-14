@@ -110,6 +110,53 @@ namespace
         return text;
     }
 
+    bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string& reason)
+    {
+        using translate::Backend;
+        switch (cfg.backend)
+        {
+        case Backend::OpenAI:
+            if (cfg.api_key.empty() || cfg.model.empty() || cfg.base_url.empty())
+            {
+                reason = "OpenAI configuration requires base URL, model, and API key.";
+                return true;
+            }
+            break;
+        case Backend::Google:
+            break;
+        case Backend::ZhipuGLM:
+            if (cfg.api_key.empty())
+            {
+                reason = "ZhipuGLM configuration requires an API key.";
+                return true;
+            }
+            break;
+        case Backend::QwenMT:
+            if (cfg.api_key.empty())
+            {
+                reason = "Qwen MT configuration requires an API key.";
+                return true;
+            }
+            break;
+        case Backend::Niutrans:
+            if (cfg.api_key.empty())
+            {
+                reason = "Niutrans configuration requires an API key.";
+                return true;
+            }
+            break;
+        case Backend::Youdao:
+            if (cfg.api_key.empty() || cfg.api_secret.empty())
+            {
+                reason = "Youdao configuration requires app key and app secret.";
+                return true;
+            }
+            break;
+        default:
+            break;
+        }
+        return false;
+    }
 }
 
 
@@ -790,6 +837,23 @@ void DialogWindow::initTranslatorIfEnabled()
 
     translate::BackendConfig cfg = translate::BackendConfig::from(config);
 
+    std::string incomplete_reason;
+    if (translatorConfigIncomplete(cfg, incomplete_reason))
+    {
+        if (!translator_error_reported_)
+        {
+            utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
+                                              utils::ErrorSeverity::Info,
+                                              "Translator disabled: configuration incomplete",
+                                              incomplete_reason);
+            translator_error_reported_ = true;
+        }
+        resetTranslatorState();
+        cached_translator_config_ = translate::BackendConfig{};
+        translator_error_reported_ = true;
+        return;
+    }
+
     bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
     bool same_config = same_backend &&
                        cfg.base_url == cached_translator_config_.base_url &&
@@ -830,8 +894,9 @@ void DialogWindow::initTranslatorIfEnabled()
         if (!translator_error_reported_)
         {
             utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
-                "Translator failed to initialize",
-                details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
+                                              utils::ErrorSeverity::Warning,
+                                              "Translator failed to initialize",
+                                              details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
             translator_error_reported_ = true;
         }
         resetTranslatorState();
@@ -850,8 +915,9 @@ void DialogWindow::initTranslatorIfEnabled()
             if (const char* last = translator_ ? translator_->lastError() : nullptr)
                 details = last;
             utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
-                "Translator backend is not ready",
-                details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
+                                              utils::ErrorSeverity::Warning,
+                                              "Translator backend is not ready",
+                                              details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
             translator_error_reported_ = true;
         }
     }

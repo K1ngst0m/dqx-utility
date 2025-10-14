@@ -12,6 +12,7 @@
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "ui/Localization.hpp"
 #include "ui/DockState.hpp"
+#include "utils/ErrorReporter.hpp"
 
 #include <algorithm>
 #include <imgui.h>
@@ -20,6 +21,8 @@
 #include <sstream>
 #include <filesystem>
 #include <vector>
+#include <map>
+#include <unordered_set>
 
 namespace
 {
@@ -45,6 +48,30 @@ namespace
             }
         }
         return "";
+    }
+
+    const char* severityBadge(utils::ErrorSeverity severity)
+    {
+        switch (severity)
+        {
+        case utils::ErrorSeverity::Info:    return "[i]";
+        case utils::ErrorSeverity::Warning: return "[!]";
+        case utils::ErrorSeverity::Error:   return "[x]";
+        case utils::ErrorSeverity::Fatal:   return "[!!]";
+        default:                            return "";
+        }
+    }
+
+    ImVec4 severityColor(utils::ErrorSeverity severity)
+    {
+        switch (severity)
+        {
+        case utils::ErrorSeverity::Info:    return ImVec4(0.35f, 0.65f, 0.95f, 1.0f);
+        case utils::ErrorSeverity::Warning: return UITheme::warningColor();
+        case utils::ErrorSeverity::Error:   return UITheme::errorColor();
+        case utils::ErrorSeverity::Fatal:   return ImVec4(1.0f, 0.3f, 0.2f, 1.0f);
+        default:                            return UITheme::disabledColor();
+        }
     }
 
     const char* addButtonLabel(UIWindowType type)
@@ -417,6 +444,8 @@ void GlobalSettingsPanel::renderDebugSection()
         }
     }
 
+    renderProblemsPanel();
+
     ImGui::SeparatorText(i18n::get("settings.logs"));
 
     // Refresh log content every 2 seconds
@@ -438,6 +467,123 @@ void GlobalSettingsPanel::renderDebugSection()
         ImGuiInputTextFlags_ReadOnly
     );
     
+}
+
+void GlobalSettingsPanel::renderProblemsPanel()
+{
+    ImGui::SeparatorText("Problems");
+
+    auto history = utils::ErrorReporter::GetHistorySnapshot();
+
+    if (ImGui::Button("Clear All##problems_clear"))
+    {
+        utils::ErrorReporter::ClearHistory();
+        history.clear();
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%zu entries", history.size());
+
+    if (history.empty())
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled("No issues reported.");
+        return;
+    }
+
+    std::map<utils::ErrorCategory, std::vector<const utils::ErrorReport*>> grouped;
+    for (const auto& report : history)
+    {
+        grouped[report.category].push_back(&report);
+    }
+
+    constexpr std::array<utils::ErrorCategory, 7> kOrderedCategories = {
+        utils::ErrorCategory::Initialization,
+        utils::ErrorCategory::MemoryHook,
+        utils::ErrorCategory::ProcessDetection,
+        utils::ErrorCategory::Configuration,
+        utils::ErrorCategory::IPC,
+        utils::ErrorCategory::Translation,
+        utils::ErrorCategory::Unknown
+    };
+
+    std::unordered_set<utils::ErrorCategory> rendered;
+
+    const auto renderCategory = [&](utils::ErrorCategory category, const std::vector<const utils::ErrorReport*>& items)
+    {
+        if (items.empty())
+            return;
+
+        std::string header = utils::ErrorReporter::CategoryToString(category);
+        header += " (" + std::to_string(items.size()) + ")";
+        if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp;
+            std::string table_id = "ProblemsTable_" + std::to_string(static_cast<int>(category));
+            if (ImGui::BeginTable(table_id.c_str(), 4, table_flags))
+            {
+                ImGui::TableSetupColumn("Severity", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed, 135.0f);
+                ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+
+                int idx = 0;
+                for (const auto* entry : items)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::PushID(idx++);
+
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextColored(severityColor(entry->severity), "%s", severityBadge(entry->severity));
+
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(entry->timestamp.c_str());
+
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::TextWrapped("%s", entry->user_message.c_str());
+                    if (!entry->technical_details.empty() && ImGui::IsItemHovered())
+                    {
+                        ImGui::BeginTooltip();
+                        ImGui::TextUnformatted(entry->technical_details.c_str());
+                        ImGui::EndTooltip();
+                    }
+
+                    ImGui::TableSetColumnIndex(3);
+                    if (ImGui::SmallButton("Copy"))
+                    {
+                        std::string clip = "[" + entry->timestamp + "] " + entry->user_message;
+                        if (!entry->technical_details.empty())
+                        {
+                            clip += " | ";
+                            clip += entry->technical_details;
+                        }
+                        ImGui::SetClipboardText(clip.c_str());
+                    }
+
+                    ImGui::PopID();
+                }
+
+                ImGui::EndTable();
+            }
+        }
+        rendered.insert(category);
+    };
+
+    for (auto category : kOrderedCategories)
+    {
+        auto it = grouped.find(category);
+        if (it != grouped.end())
+        {
+            renderCategory(category, it->second);
+        }
+    }
+
+    for (const auto& [category, items] : grouped)
+    {
+        if (rendered.count(category) == 0)
+        {
+            renderCategory(category, items);
+        }
+    }
 }
 
 std::string GlobalSettingsPanel::readLogFile(const std::string& path, size_t max_lines)

@@ -97,6 +97,7 @@ bool Application::initializeLogging()
                                             "Unable to prepare log directory",
                                             dir_ec.message());
     }
+    utils::ErrorReporter::InitializeLogFile("logs/error.log");
     processing::Diagnostics::InitializeLogger();
 
     bool append_logs = true;
@@ -311,14 +312,7 @@ void Application::renderFrame()
     if (show_settings_)
         settings_panel_->render(show_settings_);
 
-    if (utils::ErrorReporter::HasPendingErrors())
-    {
-        auto errors = utils::ErrorReporter::GetPendingErrors();
-        error_dialog_->Show(errors);
-    }
-
-    if (error_dialog_->Render())
-        quit_requested_ = true;
+    utils::ErrorReporter::FlushPendingToHistory();
 
     DockState::ConsumeReDock();
     context_->renderVignette();

@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <thread>
+#include <mutex>
 
 namespace dqxclarity {
 
@@ -23,7 +24,30 @@ public:
         , on_integrity_(std::move(on_integrity)) {}
 
     void AddRestoreTarget(uintptr_t addr, const std::vector<uint8_t>& bytes) {
+        std::lock_guard<std::mutex> lock(restore_mutex_);
+        for (auto& site : restore_) {
+            if (site.addr == addr) {
+                site.bytes = bytes;
+                return;
+            }
+        }
         restore_.push_back({addr, bytes});
+    }
+
+    void UpdateRestoreTarget(uintptr_t addr, const std::vector<uint8_t>& bytes) {
+        AddRestoreTarget(addr, bytes);
+    }
+
+    void MoveRestoreTarget(uintptr_t old_addr, uintptr_t new_addr, const std::vector<uint8_t>& bytes) {
+        std::lock_guard<std::mutex> lock(restore_mutex_);
+        for (auto& site : restore_) {
+            if (site.addr == old_addr) {
+                site.addr = new_addr;
+                site.bytes = bytes;
+                return;
+            }
+        }
+        restore_.push_back({new_addr, bytes});
     }
 
     bool start();
@@ -36,6 +60,7 @@ private:
     std::function<void(bool)> on_integrity_;
 
     std::vector<RestoreSite> restore_;
+    mutable std::mutex restore_mutex_;
 
     std::thread worker_;
     std::atomic<bool> stop_{false};

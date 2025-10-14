@@ -23,6 +23,7 @@ private:
     void renderInstanceSelector();
     void renderDQXClaritySection();
     void renderDebugSection();
+    void renderProblemsPanel();
     
     std::string readLogFile(const std::string& path, size_t max_lines = 1000);
 

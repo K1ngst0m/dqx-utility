@@ -4,6 +4,8 @@
 #include "Codegen.hpp"
 #include <iostream>
 #include <cstdio>
+#include <sstream>
+#include <algorithm>
 
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -104,6 +106,12 @@ bool DialogHook::InstallHook(bool enable_patch) {
 }
 
 bool DialogHook::EnablePatch() {
+    if (!RefreshOriginalBytes()) {
+        std::cout << "Failed to refresh dialog hook bytes before patch\n";
+        if (m_logger.error) m_logger.error("Failed to refresh dialog hook bytes before patch");
+        return false;
+    }
+
     if (!PatchOriginalFunction()) {
         std::cout << "Failed to patch original function\n";
         if (m_logger.error) m_logger.error("Failed to patch dialog function");
@@ -339,6 +347,11 @@ bool DialogHook::PatchOriginalFunction() {
 }
 
 bool DialogHook::ReapplyPatch() {
+    if (!RefreshOriginalBytes()) {
+        if (m_logger.error) m_logger.error("Failed to refresh dialog hook bytes before reapply");
+        return false;
+    }
+
     if (!m_is_installed) {
         // Detour memory still present; just re-patch original site
         // We consider it okay to reapply regardless
@@ -508,6 +521,100 @@ void DialogHook::EmitRegisterBackup(std::vector<uint8_t>& code)
     
     const auto& generated = builder.code();
     code.insert(code.end(), generated.begin(), generated.end());
+}
+
+bool DialogHook::RefreshOriginalBytes() {
+    if (m_memory == nullptr) {
+        return false;
+    }
+
+    if (IsPatched()) {
+        return true;
+    }
+
+    const auto& pattern = Signatures::GetDialogTrigger();
+
+    auto matches_at = [&](uintptr_t addr) -> bool {
+        if (addr == 0) return false;
+        std::vector<uint8_t> buf(pattern.Size());
+        if (!m_memory->ReadMemory(addr, buf.data(), buf.size())) return false;
+        for (size_t i = 0; i < pattern.Size(); ++i) {
+            if (!pattern.mask[i]) continue;
+            if (buf[i] != pattern.bytes[i]) return false;
+        }
+        return true;
+    };
+
+    uintptr_t located_addr = 0;
+    if (matches_at(m_hook_address)) {
+        located_addr = m_hook_address;
+    } else {
+        PatternFinder finder(m_memory);
+        if (auto addr = finder.FindWithFallback(pattern, "DQXGame.exe")) {
+            located_addr = *addr;
+        }
+    }
+
+    if (located_addr == 0) {
+        if (m_logger.error) m_logger.error("Dialog hook signature missing when refreshing");
+        return false;
+    }
+
+    const bool address_changed = (located_addr != m_hook_address);
+    uintptr_t previous_addr = m_hook_address;
+    m_hook_address = located_addr;
+
+    size_t new_len = m_instr_safe ? ComputeStolenLength() : static_cast<size_t>(10);
+    if (new_len < 5) new_len = 10;
+
+    std::vector<uint8_t> latest(new_len);
+    if (!m_memory->ReadMemory(m_hook_address, latest.data(), latest.size())) {
+        return false;
+    }
+
+    bool bytes_changed = m_original_bytes.size() != latest.size();
+    if (!bytes_changed && !m_original_bytes.empty()) {
+        bytes_changed = !std::equal(latest.begin(), latest.end(), m_original_bytes.begin());
+    }
+
+    if (!address_changed && !bytes_changed) {
+        return true;
+    }
+
+    if (bytes_changed && !m_original_bytes.empty()) {
+        size_t mismatch = 0;
+        size_t limit = m_original_bytes.size();
+        if (latest.size() < limit) limit = latest.size();
+        while (mismatch < limit && m_original_bytes[mismatch] == latest[mismatch]) {
+            ++mismatch;
+        }
+        std::ostringstream oss;
+        oss << "Dialog hook prologue changed; mismatch index=" << mismatch;
+        if (m_logger.warn) m_logger.warn(oss.str());
+        if (m_verbose) {
+            std::cout << oss.str() << "\n";
+            std::cout << "Old: ";
+            for (auto b : m_original_bytes) printf("%02X ", b);
+            std::cout << "\nNew: ";
+            for (auto b : latest) printf("%02X ", b);
+            std::cout << "\n";
+        }
+    }
+
+    m_original_bytes = std::move(latest);
+
+    if (!WriteDetourCode()) {
+        return false;
+    }
+
+    if (m_original_bytes_cb) {
+        m_original_bytes_cb(m_hook_address, m_original_bytes);
+    }
+    if (address_changed && m_site_changed_cb) {
+        m_site_changed_cb(previous_addr, m_hook_address, m_original_bytes);
+    }
+
+    return true;
 }
 
 void DialogHook::EmitRegisterRestore(std::vector<uint8_t>& code)

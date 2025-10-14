@@ -10,6 +10,7 @@
 #include <string>
 #include <cstdint>
 #include <sstream>
+#include <functional>
 
 namespace dqxclarity {
 
@@ -34,6 +35,10 @@ public:
     void SetVerbose(bool enabled) { m_verbose = enabled; }
     void SetConsoleOutput(bool enabled) { m_console_output = enabled; }
     void SetConsole(ConsolePtr console) { m_console = std::move(console); }
+    using OriginalBytesCallback = std::function<void(uintptr_t, const std::vector<uint8_t>&)>;
+    void SetOriginalBytesChangedCallback(OriginalBytesCallback cb) { m_original_bytes_cb = std::move(cb); }
+    using HookSiteChangedCallback = std::function<void(uintptr_t, uintptr_t, const std::vector<uint8_t>&)>;
+    void SetHookSiteChangedCallback(HookSiteChangedCallback cb) { m_site_changed_cb = std::move(cb); }
 
     void SetInstructionSafeSteal(bool enabled) { m_instr_safe = enabled; }
     void SetReadbackBytes(size_t n) { m_readback_n = n; }
@@ -90,6 +95,11 @@ private:
     void EmitNewDataFlag(std::vector<uint8_t>& code);
     void EmitStolenInstructions(std::vector<uint8_t>& code);
     void EmitReturnJump(std::vector<uint8_t>& code);
+
+    bool RefreshOriginalBytes();
+
+    OriginalBytesCallback m_original_bytes_cb;
+    HookSiteChangedCallback m_site_changed_cb;
 };
 
 } // namespace dqxclarity

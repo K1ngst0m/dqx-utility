@@ -4,6 +4,7 @@
 #include <vector>
 #include <mutex>
 #include <chrono>
+#include <cstddef>
 
 namespace utils {
 
@@ -113,6 +114,26 @@ public:
     static void ClearErrors();
 
     /**
+     * @brief Move pending errors into history and write them to the diagnostic log.
+     */
+    static void FlushPendingToHistory();
+
+    /**
+     * @brief Snapshot of all recorded errors across the session.
+     */
+    static std::vector<ErrorReport> GetHistorySnapshot();
+
+    /**
+     * @brief Clear accumulated history and pending entries.
+     */
+    static void ClearHistory();
+
+    /**
+     * @brief Initialize the error log file path and emit a run separator.
+     */
+    static void InitializeLogFile(const std::string& path);
+
+    /**
      * @brief Get string representation of error category
      */
     static std::string CategoryToString(ErrorCategory category);
@@ -130,7 +151,14 @@ public:
 private:
     static std::mutex s_mutex;
     static std::vector<ErrorReport> s_error_queue;
+    static std::vector<ErrorReport> s_error_history;
+    static std::string s_log_path;
+    static bool s_log_initialized;
     static constexpr size_t MAX_QUEUE_SIZE = 100;
+    static constexpr size_t MAX_HISTORY_SIZE = 500;
+
+    static void AppendToHistoryLocked(const ErrorReport& report);
+    static void WriteToLogFile(const ErrorReport& report);
 };
 
 } // namespace utils

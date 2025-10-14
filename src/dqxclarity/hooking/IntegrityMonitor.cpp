@@ -16,7 +16,12 @@ bool IntegrityMonitor::start() {
             uint8_t flag = 0;
             if (memory_->ReadMemory(state_addr_, &flag, 1) && flag == 1) {
                 // Out-of-process restore of hook sites immediately on signal
-                for (const auto& site : restore_) {
+                std::vector<RestoreSite> restore_copy;
+                {
+                    std::lock_guard<std::mutex> lock(restore_mutex_);
+                    restore_copy = restore_;
+                }
+                for (const auto& site : restore_copy) {
                     if (!site.bytes.empty()) {
                         (void)memory_->WriteMemory(site.addr, site.bytes.data(), site.bytes.size());
                     }

@@ -87,6 +87,22 @@ bool Engine::start_hook(StartPolicy policy) {
   impl_->hook->SetLogger(impl_->log);
   impl_->hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
   impl_->hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+  impl_->hook->SetOriginalBytesChangedCallback([this](uintptr_t addr, const std::vector<uint8_t>& bytes){
+    if (impl_->integrity) {
+      impl_->integrity->UpdateRestoreTarget(addr, bytes);
+    }
+    if (impl_->monitor) {
+      impl_->monitor->UpdateRestoreTarget(addr, bytes);
+    }
+  });
+  impl_->hook->SetHookSiteChangedCallback([this](uintptr_t old_addr, uintptr_t new_addr, const std::vector<uint8_t>& bytes){
+    if (impl_->integrity) {
+      impl_->integrity->MoveRestoreTarget(old_addr, new_addr, bytes);
+    }
+    if (impl_->monitor) {
+      impl_->monitor->MoveRestoreTarget(old_addr, new_addr, bytes);
+    }
+  });
   if (!impl_->hook->InstallHook(/*enable_patch=*/false)) {
     if (impl_->log.error) impl_->log.error("Failed to prepare dialog hook");
     impl_->hook.reset();

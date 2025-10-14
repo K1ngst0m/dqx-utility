@@ -3,12 +3,16 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <fstream>
 
 namespace utils {
 
 // Static member initialization
 std::mutex ErrorReporter::s_mutex;
 std::vector<ErrorReport> ErrorReporter::s_error_queue;
+std::vector<ErrorReport> ErrorReporter::s_error_history;
+std::string ErrorReporter::s_log_path;
+bool ErrorReporter::s_log_initialized = false;
 
 // ErrorReport constructor
 ErrorReport::ErrorReport(ErrorCategory cat, ErrorSeverity sev, std::string user_msg, std::string tech_details)
@@ -93,6 +97,10 @@ std::vector<ErrorReport> ErrorReporter::GetPendingErrors()
 {
     std::lock_guard<std::mutex> lock(s_mutex);
     std::vector<ErrorReport> errors = s_error_queue;
+    for (const auto& report : errors)
+    {
+        AppendToHistoryLocked(report);
+    }
     s_error_queue.clear();
     return errors;
 }
@@ -111,6 +119,44 @@ void ErrorReporter::ClearErrors()
 {
     std::lock_guard<std::mutex> lock(s_mutex);
     s_error_queue.clear();
+}
+
+void ErrorReporter::FlushPendingToHistory()
+{
+    std::lock_guard<std::mutex> lock(s_mutex);
+    if (s_error_queue.empty())
+        return;
+
+    for (const auto& report : s_error_queue)
+    {
+        AppendToHistoryLocked(report);
+    }
+    s_error_queue.clear();
+}
+
+std::vector<ErrorReport> ErrorReporter::GetHistorySnapshot()
+{
+    std::lock_guard<std::mutex> lock(s_mutex);
+    return s_error_history;
+}
+
+void ErrorReporter::ClearHistory()
+{
+    std::lock_guard<std::mutex> lock(s_mutex);
+    s_error_queue.clear();
+    s_error_history.clear();
+}
+
+void ErrorReporter::InitializeLogFile(const std::string& path)
+{
+    std::lock_guard<std::mutex> lock(s_mutex);
+    s_log_path = path;
+    std::ofstream ofs(s_log_path, std::ios::app);
+    if (ofs)
+    {
+        ofs << "\n=== Run started " << GetTimestamp() << " ===\n";
+        s_log_initialized = true;
+    }
 }
 
 std::string ErrorReporter::CategoryToString(ErrorCategory category)
@@ -154,6 +200,37 @@ std::string ErrorReporter::GetTimestamp()
     ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
 #endif
     return ss.str();
+}
+
+void ErrorReporter::AppendToHistoryLocked(const ErrorReport& report)
+{
+    if (s_error_history.size() >= MAX_HISTORY_SIZE)
+    {
+        const size_t remove_count = s_error_history.size() - MAX_HISTORY_SIZE + 1;
+        s_error_history.erase(s_error_history.begin(), s_error_history.begin() + static_cast<std::ptrdiff_t>(remove_count));
+    }
+    s_error_history.push_back(report);
+    WriteToLogFile(report);
+}
+
+void ErrorReporter::WriteToLogFile(const ErrorReport& report)
+{
+    if (s_log_path.empty())
+        return;
+
+    std::ofstream ofs(s_log_path, std::ios::app);
+    if (!ofs)
+        return;
+
+    ofs << "[" << report.timestamp << "]"
+        << " [" << CategoryToString(report.category) << "]"
+        << " [" << SeverityToString(report.severity) << "] "
+        << report.user_message;
+    if (!report.technical_details.empty())
+    {
+        ofs << " | " << report.technical_details;
+    }
+    ofs << '\n';
 }
 
 } // namespace utils

@@ -418,6 +418,54 @@ std::string buildRewardDisplay(const std::vector<RewardEntry>& base_entries, con
     return result;
 }
 
+bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string& reason)
+{
+    using translate::Backend;
+    switch (cfg.backend)
+    {
+    case Backend::OpenAI:
+        if (cfg.api_key.empty() || cfg.model.empty() || cfg.base_url.empty())
+        {
+            reason = "OpenAI configuration requires base URL, model, and API key.";
+            return true;
+        }
+        break;
+    case Backend::Google:
+        break;
+    case Backend::ZhipuGLM:
+        if (cfg.api_key.empty())
+        {
+            reason = "ZhipuGLM configuration requires an API key.";
+            return true;
+        }
+        break;
+    case Backend::QwenMT:
+        if (cfg.api_key.empty())
+        {
+            reason = "Qwen MT configuration requires an API key.";
+            return true;
+        }
+        break;
+    case Backend::Niutrans:
+        if (cfg.api_key.empty())
+        {
+            reason = "Niutrans configuration requires an API key.";
+            return true;
+        }
+        break;
+    case Backend::Youdao:
+        if (cfg.api_key.empty() || cfg.api_secret.empty())
+        {
+            reason = "Youdao configuration requires app key and app secret.";
+            return true;
+        }
+        break;
+    default:
+        break;
+    }
+    return false;
+}
+
 } // namespace
 
 QuestWindow::QuestWindow(FontManager& font_manager, const std::string& name)
@@ -1033,6 +1081,23 @@ void QuestWindow::initTranslatorIfEnabled()
     }
 
     translate::BackendConfig cfg = translate::BackendConfig::from(config);
+    std::string incomplete_reason;
+    if (translatorConfigIncomplete(cfg, incomplete_reason))
+    {
+        if (!translator_error_reported_)
+        {
+            utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
+                                              utils::ErrorSeverity::Info,
+                                              "Quest translator disabled: configuration incomplete",
+                                              incomplete_reason);
+            translator_error_reported_ = true;
+        }
+        resetTranslatorState();
+        cached_config_ = translate::BackendConfig{};
+        translator_error_reported_ = true;
+        return;
+    }
+
     bool same_backend = translator_initialized_ && translator_ && cfg.backend == cached_backend_;
     bool same_config = same_backend &&
                        cfg.base_url == cached_config_.base_url &&
@@ -1065,8 +1130,9 @@ void QuestWindow::initTranslatorIfEnabled()
         }
         if (!translator_error_reported_) {
             utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
-                "Quest translator failed to initialize",
-                details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
+                                              utils::ErrorSeverity::Warning,
+                                              "Quest translator failed to initialize",
+                                              details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
             translator_error_reported_ = true;
         }
         resetTranslatorState();
@@ -1074,16 +1140,19 @@ void QuestWindow::initTranslatorIfEnabled()
     }
 
     if (!translator_->isReady()) {
-        resetTranslatorState();
-        PLOG_WARNING << "Quest translator not ready after init for backend " << static_cast<int>(cfg.backend);
-        if (!translator_error_reported_)
-        {
-            std::string details;
-            if (const char* last = translator_->lastError())
+        std::string details;
+        if (!translator_error_reported_) {
+            if (const char* last = translator_->lastError()) {
                 details = last;
+            }
+        }
+        PLOG_WARNING << "Quest translator not ready after init for backend " << static_cast<int>(cfg.backend);
+        resetTranslatorState();
+        if (!translator_error_reported_) {
             utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
-                "Quest translator backend is not ready",
-                details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
+                                              utils::ErrorSeverity::Warning,
+                                              "Quest translator backend is not ready",
+                                              details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
             translator_error_reported_ = true;
         }
     } else {

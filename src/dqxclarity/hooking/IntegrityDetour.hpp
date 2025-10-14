@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <mutex>
 
 namespace dqxclarity {
 
@@ -35,7 +36,30 @@ public:
     // Provide a list of hook sites to temporarily restore during integrity.
     // Each call adds one site with its original bytes.
     void AddRestoreTarget(uintptr_t address, const std::vector<uint8_t>& original_bytes) {
+        std::lock_guard<std::mutex> lock(m_restore_mutex);
+        for (auto& site : m_restore_sites) {
+            if (site.address == address) {
+                site.bytes = original_bytes;
+                return;
+            }
+        }
         m_restore_sites.push_back({address, original_bytes});
+    }
+
+    void UpdateRestoreTarget(uintptr_t address, const std::vector<uint8_t>& original_bytes) {
+        AddRestoreTarget(address, original_bytes);
+    }
+
+    void MoveRestoreTarget(uintptr_t old_address, uintptr_t new_address, const std::vector<uint8_t>& original_bytes) {
+        std::lock_guard<std::mutex> lock(m_restore_mutex);
+        for (auto& site : m_restore_sites) {
+            if (site.address == old_address) {
+                site.address = new_address;
+                site.bytes = original_bytes;
+                return;
+            }
+        }
+        m_restore_sites.push_back({new_address, original_bytes});
     }
 
 private:
@@ -56,6 +80,7 @@ private:
 
     std::vector<uint8_t> m_original_bytes; // stolen original bytes (instruction-safe)
     std::vector<RestoreSite> m_restore_sites; // hook sites to temporarily restore
+    mutable std::mutex m_restore_mutex;
 
     bool FindIntegrityAddress(uintptr_t& out_addr);
     bool BuildAndWriteTrampoline();
