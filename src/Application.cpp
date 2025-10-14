@@ -89,7 +89,14 @@ bool Application::initializeLogging()
 {
     PROFILE_SCOPE_FUNCTION();
 
-    std::filesystem::create_directories("logs");
+    std::error_code dir_ec;
+    std::filesystem::create_directories("logs", dir_ec);
+    if (dir_ec)
+    {
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
+                                            "Unable to prepare log directory",
+                                            dir_ec.message());
+    }
     processing::Diagnostics::InitializeLogger();
 
     bool append_logs = true;
@@ -103,8 +110,14 @@ bool Application::initializeLogging()
                 }
             }
         }
+    } catch (const std::exception& ex) {
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+                                            "Failed to read logging preferences",
+                                            ex.what());
     } catch (...) {
-        // Ignore parse errors during early init
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+                                            "Failed to read logging preferences",
+                                            "Unknown exception while parsing config.toml");
     }
 
     for (int i = 1; i < argc_; ++i) {
@@ -176,7 +189,12 @@ void Application::initializeConfig()
 
     config_->setRegistry(registry_.get());
     config_->setForceVerboseLogging(force_verbose_pipeline_);
-    config_->loadAtStartup();
+    if (!config_->loadAtStartup())
+    {
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+                                            "Failed to load configuration",
+                                            config_->lastError());
+    }
 
     i18n::init(config_->getUILanguageCode());
 
@@ -321,13 +339,22 @@ void Application::handleQuitRequests()
             dqxc->shutdown();
             DQXClarityService_Set(nullptr);
         }
-        config_->saveAll();
+        if (config_ && !config_->saveAll())
+        {
+            utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
+                                              "Failed to save configuration on exit",
+                                              config_->lastError());
+        }
         running_ = false;
     }
 }
 
 void Application::cleanup()
 {
-    if (config_)
-        config_->saveAll();
+    if (config_ && !config_->saveAll())
+    {
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
+                                          "Failed to save configuration during cleanup",
+                                          config_->lastError());
+    }
 }

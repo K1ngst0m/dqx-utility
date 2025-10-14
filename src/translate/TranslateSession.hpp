@@ -10,6 +10,7 @@
 #include "state/TranslationConfig.hpp"
 #include "translate/ITranslator.hpp"
 #include "translate/TranslationRequestBuilder.hpp"
+#include "../utils/ErrorReporter.hpp"
 
 class TranslateSession {
 public:
@@ -56,12 +57,18 @@ public:
         auto req = translate::build_translation_request(processed_text, "auto", target_code, static_cast<int>(backend));
 
         if (!translator || !translator->isReady()) {
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Translator backend is not ready",
+                std::string("Backend ") + std::to_string(static_cast<int>(backend)));
             return SubmitResult{SubmitKind::DroppedNotReady, 0, {}};
         }
 
         std::uint64_t jid = 0;
         bool ok = translator->translate(req.translatable_text, req.source_lang, req.target_lang, jid);
         if (!ok || jid == 0) {
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Failed to queue translation request",
+                std::string("Backend ") + std::to_string(static_cast<int>(backend)));
             return SubmitResult{SubmitKind::DroppedNotReady, 0, {}};
         }
         job_[jid] = JobInfo{std::move(key)};

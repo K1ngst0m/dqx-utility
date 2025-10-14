@@ -83,6 +83,7 @@ private:
     translate::Backend cached_backend_ = translate::Backend::OpenAI;
     translate::BackendConfig cached_config_{};
     bool translator_initialized_ = false;
+    bool translator_error_reported_ = false;
     std::array<FieldStatus, 5> field_status_{};
     std::unordered_map<std::uint64_t, QuestField> job_lookup_;
     bool testing_connection_ = false;

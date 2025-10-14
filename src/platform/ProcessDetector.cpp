@@ -1,5 +1,9 @@
 #include "ProcessDetector.hpp"
 #include "WineDetector.hpp"
+#include "../utils/ErrorReporter.hpp"
+
+#include <plog/Log.h>
+#include <atomic>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -25,11 +29,26 @@ bool ProcessDetector::isProcessRunning(const std::string& processName)
 }
 
 #ifdef _WIN32
+namespace {
+    std::atomic<bool> g_snapshot_warning_reported{false};
+    std::atomic<bool> g_process_iter_warning_reported{false};
+}
+
 bool ProcessDetector::isProcessRunningWindows(const std::string& processName)
 {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE)
+    {
+        if (!g_snapshot_warning_reported.exchange(true))
+        {
+            DWORD err = GetLastError();
+            PLOG_WARNING << "CreateToolhelp32Snapshot failed: " << err;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
+                "Process scan failed",
+                std::string("CreateToolhelp32Snapshot error ") + std::to_string(err));
+        }
         return false;
+    }
 
     PROCESSENTRY32 entry;
     entry.dwSize = sizeof(entry);
@@ -37,6 +56,14 @@ bool ProcessDetector::isProcessRunningWindows(const std::string& processName)
     if (!Process32First(snapshot, &entry))
     {
         CloseHandle(snapshot);
+        if (!g_process_iter_warning_reported.exchange(true))
+        {
+            DWORD err = GetLastError();
+            PLOG_WARNING << "Process32First failed: " << err;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
+                "Process scan failed",
+                std::string("Process32First error ") + std::to_string(err));
+        }
         return false;
     }
 
@@ -61,12 +88,24 @@ bool ProcessDetector::isProcessRunningWindows(const std::string& processName)
     return false;
 }
 #else
+namespace {
+    std::atomic<bool> g_procdir_warning_reported{false};
+}
+
 bool ProcessDetector::isProcessRunningUnix(const std::string& processName)
 {
     std::filesystem::path proc_dir("/proc");
     
     if (!std::filesystem::exists(proc_dir))
+    {
+        if (!g_procdir_warning_reported.exchange(true))
+        {
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
+                "Process scan unavailable",
+                "/proc directory not found");
+        }
         return false;
+    }
 
     for (const auto& entry : std::filesystem::directory_iterator(proc_dir))
     {

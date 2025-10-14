@@ -21,6 +21,7 @@ public:
 
 private:
     void assignFontToDialogs(ImFont* font, bool custom);
+    ImFont* tryLoadFont(const char* path, bool& custom_loaded);
     ImFont* loadFontFromPath(const char* path, bool& custom_loaded);
     ImFont* loadFallbackFont(bool& custom_loaded);
 

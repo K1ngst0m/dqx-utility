@@ -9,6 +9,7 @@
 #include <exception>
 
 #include "../utils/Profile.hpp"
+#include "../utils/ErrorReporter.hpp"
 
 namespace processing {
 
@@ -37,6 +38,9 @@ text_processing::StageResult<T> run_stage(const std::string& stage_name, Fn&& fn
         auto end = high_resolution_clock::now();
         auto dur = duration_cast<std::chrono::microseconds>(end - start);
         PLOG_ERROR_(Diagnostics::kLogInstance) << "Stage '" << stage_name << "' failed in " << dur.count() << "us: " << ex.what();
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+            "Text pipeline stage failed",
+            stage_name + ": " + ex.what());
         return text_processing::StageResult<T>::failure(ex.what(), dur, stage_name);
     }
     catch (...)
@@ -44,6 +48,9 @@ text_processing::StageResult<T> run_stage(const std::string& stage_name, Fn&& fn
         auto end = high_resolution_clock::now();
         auto dur = duration_cast<std::chrono::microseconds>(end - start);
         PLOG_ERROR_(Diagnostics::kLogInstance) << "Stage '" << stage_name << "' failed with unknown exception in " << dur.count() << "us";
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+            "Text pipeline stage failed",
+            stage_name + ": unknown exception");
         return text_processing::StageResult<T>::failure("unknown exception", dur, stage_name);
     }
 }

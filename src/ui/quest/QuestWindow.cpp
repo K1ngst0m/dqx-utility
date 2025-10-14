@@ -22,6 +22,8 @@
 #include <vector>
 #include <plog/Log.h>
 
+#include "../../utils/ErrorReporter.hpp"
+
 
 namespace {
 
@@ -1026,6 +1028,7 @@ void QuestWindow::initTranslatorIfEnabled()
     const TranslationConfig& config = activeTranslationConfig();
     if (!config.translate_enabled) {
         resetTranslatorState();
+        translator_error_reported_ = false;
         return;
     }
 
@@ -1038,7 +1041,8 @@ void QuestWindow::initTranslatorIfEnabled()
                        cfg.api_secret == cached_config_.api_secret &&
                        cfg.target_lang == cached_config_.target_lang;
 
-    if (same_config && translator_->isReady()) {
+    if (same_config && translator_ && translator_->isReady()) {
+        translator_error_reported_ = false;
         return;
     }
 
@@ -1049,10 +1053,21 @@ void QuestWindow::initTranslatorIfEnabled()
 
     translator_ = translate::createTranslator(cfg.backend);
     if (!translator_ || !translator_->init(cfg)) {
+        std::string details;
         if (translator_) {
             PLOG_WARNING << "Quest translator init failed for backend " << static_cast<int>(cfg.backend);
+            if (const char* last = translator_->lastError())
+                details = last;
+            translator_->shutdown();
+            translator_.reset();
         } else {
             PLOG_WARNING << "Quest translator creation failed for backend " << static_cast<int>(cfg.backend);
+        }
+        if (!translator_error_reported_) {
+            utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
+                "Quest translator failed to initialize",
+                details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
+            translator_error_reported_ = true;
         }
         resetTranslatorState();
         return;
@@ -1061,10 +1076,21 @@ void QuestWindow::initTranslatorIfEnabled()
     if (!translator_->isReady()) {
         resetTranslatorState();
         PLOG_WARNING << "Quest translator not ready after init for backend " << static_cast<int>(cfg.backend);
+        if (!translator_error_reported_)
+        {
+            std::string details;
+            if (const char* last = translator_->lastError())
+                details = last;
+            utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
+                "Quest translator backend is not ready",
+                details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
+            translator_error_reported_ = true;
+        }
     } else {
         translator_initialized_ = true;
         cached_backend_ = cfg.backend;
         cached_config_ = cfg;
+        translator_error_reported_ = false;
     }
 }
 
@@ -1357,6 +1383,7 @@ void QuestWindow::resetTranslatorState()
         translator_.reset();
     }
     translator_initialized_ = false;
+    translator_error_reported_ = false;
     cached_backend_ = translate::Backend::OpenAI;
     cached_config_ = {};
     job_lookup_.clear();

@@ -3,6 +3,7 @@
 #include <cpr/cpr.h>
 #include <plog/Log.h>
 #include "HttpCommon.hpp"
+#include "../utils/ErrorReporter.hpp"
 
 #include <algorithm>
 #include <array>
@@ -34,6 +35,16 @@ constexpr std::array<std::uint32_t, 64> kSha256Table = {
     0x19a4c116u, 0x1e376c08u, 0x2748774cu, 0x34b0bcb5u, 0x391c0cb3u, 0x4ed8aa4au, 0x5b9cca4fu, 0x682e6ff3u,
     0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u, 0xc67178f2u
 };
+
+inline void report_youdao_error(std::string& last_error, const char* user_message, const std::string& details)
+{
+    if (details.empty())
+        return;
+    if (last_error == details)
+        return;
+    last_error = details;
+    utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation, user_message, details);
+}
 
 inline std::uint32_t rotr(std::uint32_t x, std::uint32_t n)
 {
@@ -305,7 +316,7 @@ bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string&
     std::string to = mapTarget(dst_lang, Mode::Text);
     if (to.empty())
     {
-        last_error_ = "unsupported target language";
+        report_youdao_error(last_error_, "Youdao text translation unsupported target", "unsupported target language");
         return false;
     }
 
@@ -328,12 +339,21 @@ bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string&
     auto response = translate::post_form(url, fields, scfg);
     if (!response.error.empty())
     {
-        last_error_ = response.error;
+        if (last_error_ != response.error)
+        {
+            PLOG_WARNING << "Youdao text request failed: " << response.error;
+        }
+        report_youdao_error(last_error_, "Youdao text request failed", response.error);
         return false;
     }
     if (response.status_code < 200 || response.status_code >= 300)
     {
-        last_error_ = std::string("http ") + std::to_string(response.status_code);
+        std::string err_detail = std::string("http ") + std::to_string(response.status_code) + ": " + response.text;
+        if (last_error_ != err_detail)
+        {
+            PLOG_WARNING << "Youdao text request failed with status " << response.status_code << ": " << response.text;
+        }
+        report_youdao_error(last_error_, "Youdao text HTTP error", err_detail);
         return false;
     }
 
@@ -349,7 +369,7 @@ bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::s
     std::string to = mapTarget(dst_lang, Mode::LargeModel);
     if (to.empty())
     {
-        last_error_ = "unsupported target language";
+        report_youdao_error(last_error_, "Youdao large model unsupported target", "unsupported target language");
         return false;
     }
 
@@ -389,12 +409,21 @@ bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::s
     auto response = translate::post_form(url, fields, scfg, headers);
     if (!response.error.empty())
     {
-        last_error_ = response.error;
+        if (last_error_ != response.error)
+        {
+            PLOG_WARNING << "Youdao large model request failed: " << response.error;
+        }
+        report_youdao_error(last_error_, "Youdao large model request failed", response.error);
         return false;
     }
     if (response.status_code < 200 || response.status_code >= 300)
     {
-        last_error_ = std::string("http ") + std::to_string(response.status_code);
+        std::string err_detail = std::string("http ") + std::to_string(response.status_code) + ": " + response.text;
+        if (last_error_ != err_detail)
+        {
+            PLOG_WARNING << "Youdao large model request failed with status " << response.status_code << ": " << response.text;
+        }
+        report_youdao_error(last_error_, "Youdao large model HTTP error", err_detail);
         return false;
     }
 
@@ -411,7 +440,7 @@ bool YoudaoTranslator::parseTextResponse(const std::string& body, std::string& o
         if (error_code != "0")
         {
             PLOG_DEBUG << "Youdao text response error " << error_code << ": " << body;
-            last_error_ = "error code " + error_code;
+            report_youdao_error(last_error_, "Youdao text response error", std::string("error code ") + error_code);
             return false;
         }
     }
@@ -420,19 +449,19 @@ bool YoudaoTranslator::parseTextResponse(const std::string& body, std::string& o
     std::size_t pos = body.find(key);
     if (pos == std::string::npos)
     {
-        last_error_ = "missing translation field";
+        report_youdao_error(last_error_, "Youdao text response parse failed", "missing translation field");
         return false;
     }
     pos = body.find('[', pos);
     if (pos == std::string::npos)
     {
-        last_error_ = "missing translation array";
+        report_youdao_error(last_error_, "Youdao text response parse failed", "missing translation array");
         return false;
     }
     pos = body.find('"', pos);
     if (pos == std::string::npos)
     {
-        last_error_ = "empty translation";
+        report_youdao_error(last_error_, "Youdao text response parse failed", "empty translation");
         return false;
     }
     std::size_t end = pos + 1;
@@ -464,7 +493,7 @@ bool YoudaoTranslator::parseTextResponse(const std::string& body, std::string& o
     }
     if (value.empty())
     {
-        last_error_ = "empty translation";
+        report_youdao_error(last_error_, "Youdao text response parse failed", "empty translation");
         return false;
     }
     out_text = std::move(value);
@@ -536,12 +565,13 @@ bool YoudaoTranslator::parseLargeModelResponse(const std::string& body, std::str
     }
     if (!err_code.empty())
     {
-        last_error_ = err_code + ": " + err_message;
+        std::string detail = err_code + ": " + err_message;
+        report_youdao_error(last_error_, "Youdao large model response error", detail);
         return false;
     }
 
     PLOG_DEBUG << "Youdao large model response produced empty result: " << body;
-    last_error_ = "empty result";
+    report_youdao_error(last_error_, "Youdao large model response parse failed", "empty result");
     return false;
 }
 

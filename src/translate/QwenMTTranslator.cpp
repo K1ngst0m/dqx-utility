@@ -3,6 +3,7 @@
 #include <cpr/cpr.h>
 #include <plog/Log.h>
 #include "HttpCommon.hpp"
+#include "../utils/ErrorReporter.hpp"
 
 using namespace translate;
 
@@ -159,6 +160,9 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Qwen-MT request failed: " << err_msg;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Qwen-MT request failed",
+                err_msg);
         }
         return false;
     }
@@ -169,6 +173,9 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Qwen-MT request failed with status " << r.status_code << ": " << r.text;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Qwen-MT HTTP error",
+                std::to_string(r.status_code) + ": " + r.text);
         }
         return false;
     }

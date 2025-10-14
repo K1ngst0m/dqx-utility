@@ -2,6 +2,7 @@
 
 #include <imgui.h>
 #include <plog/Log.h>
+#include "../../utils/ErrorReporter.hpp"
 #include "../DockState.hpp"
 #include "../CommonUIComponents.hpp"
 
@@ -783,6 +784,7 @@ void DialogWindow::initTranslatorIfEnabled()
     {
         resetTranslatorState();
         cached_translator_config_ = translate::BackendConfig{};
+        translator_error_reported_ = false;
         return;
     }
 
@@ -798,6 +800,7 @@ void DialogWindow::initTranslatorIfEnabled()
 
     if (same_config && translator_ && translator_->isReady())
     {
+        translator_error_reported_ = false;
         return;
     }
 
@@ -810,13 +813,26 @@ void DialogWindow::initTranslatorIfEnabled()
     translator_ = translate::createTranslator(cfg.backend);
     if (!translator_ || !translator_->init(cfg))
     {
+        std::string details;
         if (translator_)
         {
             PLOG_WARNING << "Translator init failed for backend " << static_cast<int>(cfg.backend);
+            if (const char* last = translator_->lastError())
+                details = last;
+            translator_->shutdown();
+            translator_.reset();
         }
         else
         {
             PLOG_WARNING << "Translator factory returned null for backend " << static_cast<int>(cfg.backend);
+        }
+
+        if (!translator_error_reported_)
+        {
+            utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
+                "Translator failed to initialize",
+                details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
+            translator_error_reported_ = true;
         }
         resetTranslatorState();
         cached_translator_config_ = translate::BackendConfig{};
@@ -828,6 +844,16 @@ void DialogWindow::initTranslatorIfEnabled()
         PLOG_WARNING << "Translator not ready after init for backend " << static_cast<int>(cfg.backend);
         resetTranslatorState();
         cached_translator_config_ = translate::BackendConfig{};
+        if (!translator_error_reported_)
+        {
+            std::string details;
+            if (const char* last = translator_ ? translator_->lastError() : nullptr)
+                details = last;
+            utils::ErrorReporter::ReportError(utils::ErrorCategory::Translation,
+                "Translator backend is not ready",
+                details.empty() ? (std::string("Backend index: ") + std::to_string(static_cast<int>(cfg.backend))) : details);
+            translator_error_reported_ = true;
+        }
     }
     else
     {
@@ -835,6 +861,7 @@ void DialogWindow::initTranslatorIfEnabled()
         cached_translator_config_ = cfg;
         cached_backend_ = cfg.backend;
         translator_initialized_ = true;
+        translator_error_reported_ = false;
     }
 }
 
@@ -881,6 +908,7 @@ void DialogWindow::resetTranslatorState()
     translator_initialized_ = false;
     cached_translator_config_ = translate::BackendConfig{};
     cached_backend_ = translate::Backend::OpenAI;
+    translator_error_reported_ = false;
     pending_segment_by_job_.clear();
     failed_segments_.clear();
     failed_original_text_.clear();

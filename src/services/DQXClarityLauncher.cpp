@@ -3,6 +3,8 @@
 
 #include <plog/Log.h>
 
+#include "../utils/ErrorReporter.hpp"
+
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "dqxclarity/api/dialog_message.hpp"
 #include "dqxclarity/api/quest_message.hpp"
@@ -42,6 +44,7 @@ struct DQXClarityLauncher::Impl
 
     mutable std::mutex error_mutex;
     std::string last_error_message;
+    std::atomic<bool> process_warning_reported{false};
 
     // Backlog for UI consumers to read with per-window seq cursors
     mutable std::mutex backlog_mutex;
@@ -62,7 +65,15 @@ struct DQXClarityLauncher::Impl
     {
         std::lock_guard<std::mutex> lock(engine_mutex);
         clearLastErrorMessage();
-        return engine.start_hook(policy);
+        bool ok = engine.start_hook(policy);
+        if (!ok && last_error_message.empty())
+        {
+            std::string policy_name = (policy == dqxclarity::Engine::StartPolicy::EnableImmediately)
+                ? "EnableImmediately"
+                : (policy == dqxclarity::Engine::StartPolicy::DeferUntilIntegrity ? "DeferUntilIntegrity" : "Unknown");
+            setLastErrorMessage("Failed to start hook (" + policy_name + ").");
+        }
+        return ok;
     }
 
     bool stopHookLocked()
@@ -75,6 +86,8 @@ struct DQXClarityLauncher::Impl
         }
         if (ok) {
             clearLastErrorMessage();
+        } else if (last_error_message.empty()) {
+            setLastErrorMessage("Failed to stop hook.");
         }
         return ok;
     }
@@ -82,7 +95,15 @@ struct DQXClarityLauncher::Impl
     void setLastErrorMessage(const std::string& msg)
     {
         std::lock_guard<std::mutex> lock(error_mutex);
+        if (last_error_message == msg)
+            return;
         last_error_message = msg;
+        if (!last_error_message.empty())
+        {
+            utils::ErrorReporter::ReportError(utils::ErrorCategory::MemoryHook,
+                "Clarity hook encountered an error",
+                last_error_message);
+        }
     }
 
     std::string getLastErrorMessage() const
@@ -130,6 +151,7 @@ DQXClarityLauncher::DQXClarityLauncher()
             auto st = pimpl_->engine.status();
             if (st == dqxclarity::Status::Hooked) {
                 pimpl_->clearLastErrorMessage();
+                pimpl_->process_warning_reported.store(false, std::memory_order_relaxed);
             }
             if (game_running) {
                 if (st == dqxclarity::Status::Stopped || st == dqxclarity::Status::Error) {
@@ -265,6 +287,12 @@ bool DQXClarityLauncher::launch()
     if (!isDQXGameRunning())
     {
         PLOG_WARNING << "Cannot start: DQXGame.exe is not running";
+        if (!pimpl_->process_warning_reported.exchange(true, std::memory_order_relaxed))
+        {
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
+                "Cannot start Clarity hook",
+                "DQXGame.exe is not running.");
+        }
         return false;
     }
     PLOG_INFO << "Start requested";
@@ -277,7 +305,12 @@ bool DQXClarityLauncher::launch()
         pimpl_->cancel_post_login.store(true);
         pimpl_->post_login_worker.join();
     }
-    return pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
+    bool ok = pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
+    if (!ok && pimpl_->getLastErrorMessage().empty())
+    {
+        pimpl_->setLastErrorMessage("Failed to start hook (EnableImmediately).");
+    }
+    return ok;
 }
 
 bool DQXClarityLauncher::stop()
@@ -292,7 +325,12 @@ bool DQXClarityLauncher::stop()
     if (pimpl_->post_login_worker.joinable()) {
         pimpl_->post_login_worker.join();
     }
-    return pimpl_->stopHookLocked();
+    bool ok = pimpl_->stopHookLocked();
+    if (!ok && pimpl_->getLastErrorMessage().empty())
+    {
+        pimpl_->setLastErrorMessage("Failed to stop hook.");
+    }
+    return ok;
 }
 
 void DQXClarityLauncher::shutdown()

@@ -3,6 +3,7 @@
 #include <cpr/cpr.h>
 #include <plog/Log.h>
 #include "HttpCommon.hpp"
+#include "../utils/ErrorReporter.hpp"
 
 using namespace translate;
 
@@ -141,6 +142,9 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Niutrans request failed: " << err_msg;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Niutrans request failed",
+                err_msg);
         }
         return false;
     }
@@ -151,6 +155,9 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Niutrans request failed with status " << resp.status_code << ": " << resp.text;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Niutrans HTTP error",
+                std::to_string(resp.status_code) + ": " + resp.text);
         }
         return false;
     }
@@ -165,7 +172,24 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
         {
             size_t c = resp.text.find(':', em); if (c != std::string::npos) {
                 ++c; while (c < resp.text.size() && (resp.text[c]==' '||resp.text[c]=='\t')) ++c;
-                if (c<resp.text.size() && resp.text[c]=='"') { ++c; std::string msg; while (c<resp.text.size()) { char ch=resp.text[c++]; if (ch=='\\' && c<resp.text.size()) { msg.push_back(resp.text[c++]); } else if (ch=='"') break; else msg.push_back(ch);} last_error_ = msg; }
+                if (c<resp.text.size() && resp.text[c]=='"') {
+                    ++c;
+                    std::string msg;
+                    while (c<resp.text.size()) {
+                        char ch=resp.text[c++];
+                        if (ch=='\\' && c<resp.text.size()) { msg.push_back(resp.text[c++]); }
+                        else if (ch=='"') break;
+                        else msg.push_back(ch);
+                    }
+                    if (!msg.empty() && last_error_ != msg)
+                    {
+                        last_error_ = msg;
+                        PLOG_WARNING << "Niutrans returned error: " << msg;
+                        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                            "Niutrans reported error",
+                            msg);
+                    }
+                }
             }
         }
         return false;

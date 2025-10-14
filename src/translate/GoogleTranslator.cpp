@@ -3,6 +3,7 @@
 #include <cpr/cpr.h>
 #include <plog/Log.h>
 #include "HttpCommon.hpp"
+#include "../utils/ErrorReporter.hpp"
 
 using namespace translate;
 
@@ -178,6 +179,9 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate paid API request failed: " << err_msg;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Google Translate paid API request failed",
+                err_msg);
         }
         return false;
     }
@@ -188,6 +192,9 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate paid API failed with status " << r.status_code << ": " << r.text;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Google Translate paid API HTTP error",
+                std::to_string(r.status_code) + ": " + r.text);
         }
         return false;
     }
@@ -200,6 +207,9 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate paid API response parse failed: " << r.text;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Google Translate paid API response parse failed",
+                r.text);
         }
         return false;
     }
@@ -224,6 +234,9 @@ bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& sr
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate free API request failed: " << err_msg;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Google Translate free API request failed",
+                err_msg);
         }
         return false;
     }
@@ -234,6 +247,9 @@ bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& sr
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate free API failed with status " << r.status_code << ": " << r.text;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Google Translate free API HTTP error",
+                std::to_string(r.status_code) + ": " + r.text);
         }
         return false;
     }
@@ -246,6 +262,9 @@ bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& sr
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate free API response parse failed: " << r.text;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "Google Translate free API response parse failed",
+                r.text);
         }
         return false;
     }

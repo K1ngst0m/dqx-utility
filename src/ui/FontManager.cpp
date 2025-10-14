@@ -1,5 +1,6 @@
 #include "FontManager.hpp"
 #include "utils/CrashHandler.hpp"
+#include "utils/ErrorReporter.hpp"
 
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <imgui.h>
@@ -8,6 +9,9 @@
 #include <algorithm>
 #include <array>
 #include <filesystem>
+#include <mutex>
+#include <string>
+#include <vector>
 
 namespace
 {
@@ -22,6 +26,20 @@ namespace
         "/Library/Fonts/Arial Unicode.ttf",
         "C:/Windows/Fonts/msgothic.ttc"
     };
+
+    std::once_flag g_default_font_once;
+
+    std::string JoinList(const std::vector<std::string>& entries)
+    {
+        std::string result;
+        for (size_t i = 0; i < entries.size(); ++i)
+        {
+            if (i)
+                result += ", ";
+            result += entries[i];
+        }
+        return result;
+    }
 }
 
 // Prepares font storage tied to the ImGui IO context.
@@ -106,18 +124,12 @@ void FontManager::assignFontToDialogs(ImFont* font, bool custom)
     }
 }
 
-// Loads font from a specific path when available.
-ImFont* FontManager::loadFontFromPath(const char* path, bool& custom_loaded)
+// Loads a font without user-facing reporting; used by both direct and fallback loading paths.
+ImFont* FontManager::tryLoadFont(const char* path, bool& custom_loaded)
 {
     custom_loaded = false;
     if (!path || !path[0])
         return nullptr;
-
-    if (!std::filesystem::exists(path))
-    {
-        PLOG_WARNING << "Font path not found: " << path;
-        return nullptr;
-    }
 
     ImFontConfig config;
     config.OversampleH = 3;
@@ -148,18 +160,81 @@ ImFont* FontManager::loadFontFromPath(const char* path, bool& custom_loaded)
     return font;
 }
 
+// Loads font from a specific path when available and reports failures to the user.
+ImFont* FontManager::loadFontFromPath(const char* path, bool& custom_loaded)
+{
+    custom_loaded = false;
+    if (!path || !path[0])
+        return nullptr;
+
+    if (!std::filesystem::exists(path))
+    {
+        PLOG_WARNING << "Font path not found: " << path;
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
+            "Font file not found",
+            std::string("Could not locate font at ") + path);
+        return nullptr;
+    }
+
+    ImFont* font = tryLoadFont(path, custom_loaded);
+    if (!font)
+    {
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
+            "Failed to load font",
+            std::string("ImGui could not load font from ") + path);
+    }
+    return font;
+}
+
 // Picks the first available candidate or the default font as fallback.
 ImFont* FontManager::loadFallbackFont(bool& custom_loaded)
 {
     custom_loaded = false;
+    std::vector<std::string> missing_paths;
+    std::vector<std::string> failed_paths;
+
     for (const char* candidate : kFontCandidates)
     {
-        ImFont* font = loadFontFromPath(candidate, custom_loaded);
+        if (!std::filesystem::exists(candidate))
+        {
+            missing_paths.emplace_back(candidate);
+            PLOG_WARNING << "Font path not found: " << candidate;
+            continue;
+        }
+
+        bool candidate_custom = false;
+        ImFont* font = tryLoadFont(candidate, candidate_custom);
         if (font)
+        {
+            custom_loaded = candidate_custom;
             return font;
+        }
+
+        failed_paths.emplace_back(candidate);
     }
 
     PLOG_WARNING << "Using ImGui default font; CJK glyphs may be missing.";
+    std::call_once(g_default_font_once, [missing_paths, failed_paths]{
+        std::string details;
+        if (!missing_paths.empty())
+        {
+            details += "Missing: " + JoinList(missing_paths);
+        }
+        if (!failed_paths.empty())
+        {
+            if (!details.empty())
+                details += " | ";
+            details += "Failed to load: " + JoinList(failed_paths);
+        }
+        if (details.empty())
+        {
+            details = "All bundled fonts failed to load; some glyphs may be missing.";
+        }
+
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
+            "Using fallback font",
+            details);
+    });
     ImGuiIO& io = ImGui::GetIO();
     ImFont* font = io.Fonts->AddFontDefault();
     io.Fonts->Build();

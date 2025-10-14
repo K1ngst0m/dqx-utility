@@ -97,6 +97,7 @@ private:
     translate::BackendConfig cached_translator_config_{};
     translate::Backend cached_backend_ = translate::Backend::OpenAI;
     bool translator_initialized_ = false;
+    bool translator_error_reported_ = false;
     bool placeholder_active_ = false;
     PlaceholderState placeholder_state_ = PlaceholderState::Waiting;
     std::string placeholder_base_text_;

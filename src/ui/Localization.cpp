@@ -6,6 +6,9 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <unordered_set>
+
+#include "../utils/ErrorReporter.hpp"
 
 namespace fs = std::filesystem;
 
@@ -16,6 +19,9 @@ namespace i18n
         std::unordered_map<std::string, std::string> s_cur;
         std::string s_lang = "en";
         std::mutex s_mutex;
+        std::mutex s_report_mutex;
+        std::unordered_set<std::string> s_missing_files;
+        std::unordered_set<std::string> s_parse_failures;
 
         void flatten_table(const toml::table& tbl, const std::string& prefix,
                            std::unordered_map<std::string, std::string>& out)
@@ -43,6 +49,15 @@ namespace i18n
             if (!fs::exists(p, ec))
             {
                 PLOG_WARNING << "i18n file not found: " << p.string();
+                {
+                    std::lock_guard<std::mutex> lock(s_report_mutex);
+                    if (s_missing_files.insert(p.string()).second)
+                    {
+                        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+                            "Missing localization file",
+                            p.string());
+                    }
+                }
                 return r;
             }
             try
@@ -53,6 +68,15 @@ namespace i18n
             catch (const toml::parse_error& pe)
             {
                 PLOG_WARNING << "Failed to parse i18n file '" << p.string() << "': " << pe.description();
+                {
+                    std::lock_guard<std::mutex> lock(s_report_mutex);
+                    if (s_parse_failures.insert(p.string()).second)
+                    {
+                        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+                            "Failed to parse localization file",
+                            std::string(pe.description()));
+                    }
+                }
             }
             return r;
         }

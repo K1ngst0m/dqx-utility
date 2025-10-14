@@ -3,6 +3,7 @@
 #include <cpr/cpr.h>
 #include <plog/Log.h>
 #include "HttpCommon.hpp"
+#include "../utils/ErrorReporter.hpp"
 
 using namespace translate;
 
@@ -200,6 +201,9 @@ bool ZhipuGLMTranslator::doRequest(const std::string& text, const std::string& t
         {
             last_error_ = err_msg;
             PLOG_WARNING << "ZhipuGLM request failed: " << err_msg;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "ZhipuGLM request failed",
+                err_msg);
         }
         return false;
     }
@@ -210,6 +214,9 @@ bool ZhipuGLMTranslator::doRequest(const std::string& text, const std::string& t
         {
             last_error_ = err_msg;
             PLOG_WARNING << "ZhipuGLM request failed with status " << r.status_code << ": " << r.text;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "ZhipuGLM HTTP error",
+                std::to_string(r.status_code) + ": " + r.text);
         }
         return false;
     }
@@ -222,6 +229,9 @@ bool ZhipuGLMTranslator::doRequest(const std::string& text, const std::string& t
         {
             last_error_ = err_msg;
             PLOG_WARNING << "ZhipuGLM response parse failed: " << r.text;
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
+                "ZhipuGLM response parse failed",
+                r.text);
         }
         return false;
     }

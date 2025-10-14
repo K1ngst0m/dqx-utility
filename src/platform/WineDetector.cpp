@@ -4,7 +4,39 @@
 #include <fstream>
 #include <vector>
 #include <algorithm>
+#include <mutex>
+#include <unordered_set>
 #include <plog/Log.h>
+
+#include "../utils/ErrorReporter.hpp"
+
+namespace
+{
+    std::mutex g_wine_report_mutex;
+    std::unordered_set<std::string> g_no_process_reported;
+    std::unordered_set<std::string> g_multiple_process_reported;
+    std::unordered_set<int> g_env_fail_reported;
+    std::unordered_set<std::string> g_no_wine_reported;
+    std::unordered_set<std::string> g_invalid_prefix_reported;
+
+    void report_wine_warning(std::unordered_set<std::string>& bucket, const std::string& key, const char* user_message, const std::string& details)
+    {
+        std::lock_guard<std::mutex> lock(g_wine_report_mutex);
+        if (bucket.insert(key).second)
+        {
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection, user_message, details);
+        }
+    }
+
+    void report_wine_warning(std::unordered_set<int>& bucket, int key, const char* user_message, const std::string& details)
+    {
+        std::lock_guard<std::mutex> lock(g_wine_report_mutex);
+        if (bucket.insert(key).second)
+        {
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection, user_message, details);
+        }
+    }
+}
 
 std::optional<WineEnvironment> WineDetector::detectWineEnvironment(const std::string& processName)
 {
@@ -31,11 +63,20 @@ std::optional<WineEnvironment> WineDetector::detectWineEnvironment(const std::st
     if (wine_env.wine_prefix.empty())
     {
         PLOG_WARNING << "No Wine environment detected for process " << processName;
+        report_wine_warning(g_no_wine_reported, processName,
+            "Wine environment not detected",
+            processName);
         return std::nullopt;
     }
     
     // Step 4: Validate Wine prefix
     wine_env.validated = validateWinePrefix(wine_env.wine_prefix);
+    if (!wine_env.validated)
+    {
+        report_wine_warning(g_invalid_prefix_reported, wine_env.wine_prefix,
+            "Wine prefix validation failed",
+            wine_env.wine_prefix);
+    }
     
     PLOG_INFO << "Wine detection for " << processName << ": prefix=" << wine_env.wine_prefix 
               << ", binary=" << wine_env.wine_binary << ", method=" << wine_env.detection_method
@@ -81,6 +122,9 @@ std::optional<int> WineDetector::findSingleProcessByName(const std::string& proc
     if (matching_pids.empty())
     {
         PLOG_WARNING << "No processes found matching " << processName;
+        report_wine_warning(g_no_process_reported, processName,
+            "Wine process not found",
+            processName);
         return std::nullopt;
     }
     
@@ -88,6 +132,9 @@ std::optional<int> WineDetector::findSingleProcessByName(const std::string& proc
     {
         PLOG_ERROR << "Multiple processes found matching " << processName << " (count: " 
                    << matching_pids.size() << "). Wine detection requires single instance.";
+        report_wine_warning(g_multiple_process_reported, processName,
+            "Multiple game processes detected",
+            processName + " count=" + std::to_string(matching_pids.size()));
         return std::nullopt;
     }
     
@@ -102,7 +149,12 @@ std::unordered_map<std::string, std::string> WineDetector::readProcessEnvironmen
     std::ifstream environ_file(environ_path, std::ios::binary);
     
     if (!environ_file.is_open())
+    {
+        report_wine_warning(g_env_fail_reported, pid,
+            "Failed to read process environment",
+            environ_path.string());
         return env;
+    }
     
     std::string buffer((std::istreambuf_iterator<char>(environ_file)), std::istreambuf_iterator<char>());
     

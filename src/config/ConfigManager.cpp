@@ -314,6 +314,9 @@ bool ConfigManager::saveAll()
     if (!registry_)
     {
         last_error_ = "No registry assigned";
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
+            "Unable to save configuration",
+            "Window registry was not available while saving settings.");
         return false;
     }
 
@@ -580,6 +583,12 @@ bool ConfigManager::loadAndApply()
                 {
                     dialog_configs.emplace_back(std::move(name), std::move(state));
                 }
+                else
+                {
+                    utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+                        "Skipped invalid dialog window in configuration",
+                        "Missing name for dialog entry in config file.");
+                }
             }
 
             if (!dialog_configs.empty())
@@ -656,7 +665,12 @@ bool ConfigManager::loadAndApply()
             quest_state.applyDefaults();
             std::string quest_name;
             if (!tomlToDialogState(quest_tbl, quest_state, quest_name))
+            {
+                utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+                    "Skipped invalid quest window in configuration",
+                    "Missing name for quest entry in config file.");
                 return;
+            }
 
             auto quests = registry_->windowsByType(UIWindowType::Quest);
             QuestWindow* quest_window = nullptr;
@@ -741,6 +755,12 @@ void ConfigManager::pollAndApply()
         last_mtime_ = mtime;
         last_error_.clear();
         PLOG_INFO << "Config reloaded from " << config_path_;
+    }
+    else
+    {
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+            "Failed to reload configuration",
+            last_error_.empty() ? std::string("See logs for details") : last_error_);
     }
 }
 
