@@ -300,17 +300,34 @@ void DialogWindow::applyPending()
     // Pull new dialog messages from in-process backlog
     if (auto* launcher = DQXClarityService_Get())
     {
-        std::vector<dqxclarity::DialogMessage> msgs;
-        if (launcher->copyDialogsSince(last_applied_seq_, msgs))
+        std::vector<dqxclarity::DialogStreamItem> items;
+        if (launcher->copyDialogStreamSince(last_applied_seq_, items))
         {
-            for (auto& m : msgs)
+            for (auto& item : items)
             {
-                bool hasValidText = !m.text.empty() && !is_blank(m.text);
-                bool hasValidSpeaker = !m.speaker.empty() && m.speaker != "No_NPC";
-                if (hasValidText || hasValidSpeaker)
+                bool allow_type = false;
+                switch (item.type)
                 {
-                    PendingMsg pm; pm.text = std::move(m.text); pm.lang = std::move(m.lang); pm.speaker = std::move(m.speaker); pm.seq = m.seq;
+                case dqxclarity::DialogStreamType::Dialog: allow_type = show_dialog_stream_; break;
+                case dqxclarity::DialogStreamType::CornerText: allow_type = show_corner_stream_; break;
+                }
+
+                bool hasValidText = !item.text.empty() && !is_blank(item.text);
+                bool hasValidSpeaker = !item.speaker.empty() && item.speaker != "No_NPC";
+
+                if (allow_type && (hasValidText || hasValidSpeaker))
+                {
+                    PendingMsg pm;
+                    pm.type = item.type;
+                    pm.text = std::move(item.text);
+                    pm.lang.clear();
+                    pm.speaker = std::move(item.speaker);
+                    pm.seq = item.seq;
                     pending_.push(std::move(pm));
+                }
+                else if (item.seq > last_applied_seq_)
+                {
+                    last_applied_seq_ = item.seq;
                 }
             }
         }
@@ -333,6 +350,15 @@ void DialogWindow::applyPending()
     appended_since_last_frame_ = true;
     for (auto& m : local)
     {
+        if (m.type == dqxclarity::DialogStreamType::CornerText)
+        {
+            std::string display_text = m.text.empty() ? std::string(" ") : m.text;
+            std::string display_speaker = m.speaker.empty() ? std::string("Corner") : m.speaker;
+            appendSegmentInternal(display_speaker, display_text);
+            if (m.seq > 0) last_applied_seq_ = m.seq;
+            continue;
+        }
+
         // Handle empty text for NPC-only messages
         std::string text_to_process = m.text.empty() ? " " : m.text;
 
@@ -636,6 +662,11 @@ void DialogWindow::renderDialog()
         }
 
         const float wrap_width = std::max(40.0f, state_.ui_state().width - state_.ui_state().padding.x * 2.0f);
+
+        if (ImGui::Checkbox("Dialog", &show_dialog_stream_)) {}
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Corner Text", &show_corner_stream_)) {}
+        ImGui::Spacing();
         
         // Check if window is docked (must be called inside Begin/End)
         bool is_docked = ImGui::IsWindowDocked();

@@ -5,7 +5,7 @@
 #include <vector>
 #include <atomic>
 
-namespace dqxclarity { struct DialogMessage; struct QuestMessage; enum class Status; struct Config; }
+namespace dqxclarity { struct DialogMessage; struct DialogStreamItem; struct QuestMessage; enum class Status; struct Config; }
 
 enum class DQXClarityStatus
 {
@@ -45,6 +45,7 @@ public:
 
     // Copy messages with seq > since_seq into out (non-destructive snapshot)
     bool copyDialogsSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogMessage>& out) const;
+    bool copyDialogStreamSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogStreamItem>& out) const;
 
     bool getLatestQuest(dqxclarity::QuestMessage& out) const;
 

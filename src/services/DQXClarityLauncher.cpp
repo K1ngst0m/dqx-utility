@@ -8,6 +8,7 @@
 
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "dqxclarity/api/dialog_message.hpp"
+#include "dqxclarity/api/dialog_stream.hpp"
 #include "dqxclarity/api/quest_message.hpp"
 #include "dqxclarity/process/NoticeWaiter.hpp"
 #include "dqxclarity/process/PostLoginDetector.hpp"
@@ -58,6 +59,10 @@ struct DQXClarityLauncher::Impl
     mutable std::mutex backlog_mutex;
     std::vector<dqxclarity::DialogMessage> backlog;
     static constexpr std::size_t kMaxBacklog = 2048;
+
+    mutable std::mutex stream_mutex;
+    std::vector<dqxclarity::DialogStreamItem> stream_backlog;
+    static constexpr std::size_t kMaxStreamBacklog = 2048;
 
     mutable std::mutex quest_mutex;
     dqxclarity::QuestMessage latest_quest;
@@ -288,6 +293,17 @@ DQXClarityLauncher::DQXClarityLauncher()
                 }
             }
 
+            std::vector<dqxclarity::DialogStreamItem> stream_items;
+            if (pimpl_->engine.drainStream(stream_items) && !stream_items.empty()) {
+                std::lock_guard<std::mutex> lock(pimpl_->stream_mutex);
+                for (auto& item : stream_items) {
+                    pimpl_->stream_backlog.push_back(std::move(item));
+                    if (pimpl_->stream_backlog.size() > pimpl_->kMaxStreamBacklog) {
+                        pimpl_->stream_backlog.erase(pimpl_->stream_backlog.begin(), pimpl_->stream_backlog.begin() + (pimpl_->stream_backlog.size() - pimpl_->kMaxStreamBacklog));
+                    }
+                }
+            }
+
             dqxclarity::QuestMessage quest_snapshot;
             if (pimpl_->engine.latest_quest(quest_snapshot)) {
                 std::lock_guard<std::mutex> qlock(pimpl_->quest_mutex);
@@ -345,6 +361,16 @@ bool DQXClarityLauncher::copyDialogsSince(std::uint64_t since_seq, std::vector<d
     if (pimpl_->backlog.empty()) return false;
     for (const auto& m : pimpl_->backlog) {
         if (m.seq > since_seq) out.push_back(m);
+    }
+    return !out.empty();
+}
+
+bool DQXClarityLauncher::copyDialogStreamSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogStreamItem>& out) const
+{
+    std::lock_guard<std::mutex> lock(pimpl_->stream_mutex);
+    if (pimpl_->stream_backlog.empty()) return false;
+    for (const auto& item : pimpl_->stream_backlog) {
+        if (item.seq > since_seq) out.push_back(item);
     }
     return !out.empty();
 }

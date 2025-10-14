@@ -10,6 +10,7 @@ namespace dqxclarity {
 enum class Status { Stopped, Starting, Hooked, Stopping, Error };
 
 struct QuestMessage;
+struct DialogStreamItem;
 
 struct Config {
   bool verbose = false;
@@ -44,6 +45,7 @@ class Engine {
 
   // Drain all available dialog messages into out (single consumer)
   bool drain(std::vector<struct DialogMessage>& out);
+  bool drainStream(std::vector<struct DialogStreamItem>& out);
 
   bool latest_quest(struct QuestMessage& out) const;
 

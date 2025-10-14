@@ -9,6 +9,7 @@
 #include "../hooking/IntegrityDetour.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
 #include "dialog_message.hpp"
+#include "dialog_stream.hpp"
 #include "quest_message.hpp"
 #include "../util/SPSCRing.hpp"
 
@@ -30,6 +31,8 @@ struct Engine::Impl {
 
   SpscRing<DialogMessage, 1024> ring;
   std::atomic<std::uint64_t> seq{0};
+  SpscRing<DialogStreamItem, 1024> stream_ring;
+  std::atomic<std::uint64_t> stream_seq{0};
   std::thread poller;
   std::atomic<bool> poll_stop{false};
   std::unique_ptr<class IntegrityMonitor> monitor;
@@ -262,13 +265,22 @@ bool Engine::start_hook(StartPolicy policy) {
     using namespace std::chrono_literals;
     while (!impl_->poll_stop.load()) {
       if (impl_->hook && impl_->hook->PollDialogData()) {
-        DialogMessage msg;
-        msg.seq = ++impl_->seq;
-        msg.text = impl_->hook->GetLastDialogText();
-        msg.speaker = impl_->hook->GetLastNpcName();
-        msg.lang.clear();
-        if (!msg.text.empty()) {
+        std::string text = impl_->hook->GetLastDialogText();
+        std::string speaker = impl_->hook->GetLastNpcName();
+        if (!text.empty()) {
+          DialogMessage msg;
+          msg.seq = ++impl_->seq;
+          msg.text = text;
+          msg.speaker = speaker;
+          msg.lang.clear();
           impl_->ring.try_push(std::move(msg));
+
+          DialogStreamItem stream_item;
+          stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+          stream_item.type = DialogStreamType::Dialog;
+          stream_item.text = std::move(text);
+          stream_item.speaker = std::move(speaker);
+          impl_->stream_ring.try_push(std::move(stream_item));
         }
       }
       if (impl_->quest_hook && impl_->quest_hook->PollQuestData()) {
@@ -287,8 +299,16 @@ bool Engine::start_hook(StartPolicy policy) {
           impl_->quest_valid = true;
         }
       }
-      if (impl_->corner_hook) {
-        (void)impl_->corner_hook->PollCornerText();
+      if (impl_->corner_hook && impl_->corner_hook->PollCornerText()) {
+        const std::string& captured = impl_->corner_hook->GetLastText();
+        if (!captured.empty()) {
+          DialogStreamItem stream_item;
+          stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+          stream_item.type = DialogStreamType::CornerText;
+          stream_item.text = captured;
+          stream_item.speaker = "Corner";
+          impl_->stream_ring.try_push(std::move(stream_item));
+        }
       }
       std::this_thread::sleep_for(100ms);
     }
@@ -338,6 +358,10 @@ bool Engine::stop_hook() {
 
 bool Engine::drain(std::vector<DialogMessage>& out) {
   return impl_->ring.pop_all(out) > 0;
+}
+
+bool Engine::drainStream(std::vector<DialogStreamItem>& out) {
+  return impl_->stream_ring.pop_all(out) > 0;
 }
 
 bool Engine::latest_quest(QuestMessage& out) const {
