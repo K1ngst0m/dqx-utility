@@ -46,6 +46,39 @@ namespace
             active = false;
         }
     };
+
+    void sanitizeDialogState(DialogStateManager& state)
+    {
+        auto& ui = state.ui_state();
+        ui.window_size = ImVec2(ui.width, ui.height);
+        ui.pending_resize = true;
+        ui.pending_reposition = true;
+        ui.font = nullptr;
+        ui.font_base_size = 0.0f;
+    }
+
+    void applyStoredState(DialogWindow& window, const DialogStateManager& stored)
+    {
+        window.state() = stored;
+        window.reinitializePlaceholder();
+        sanitizeDialogState(window.state());
+        window.refreshFontBinding();
+        window.initTranslatorIfEnabled();
+    }
+
+    void applyStoredState(QuestWindow& window, const QuestStateManager& stored)
+    {
+        window.state() = stored;
+        window.state().quest.applyDefaults();
+        window.state().translated.applyDefaults();
+        window.state().original.applyDefaults();
+        window.state().translation_valid = false;
+        window.state().translation_failed = false;
+        window.state().translation_error.clear();
+        sanitizeDialogState(window.state());
+        window.refreshFontBinding();
+        window.initTranslatorIfEnabled();
+    }
 }
 
 static ConfigManager* g_cfg_mgr = nullptr;
@@ -331,18 +364,46 @@ void ConfigManager::setDefaultDialogEnabled(bool enabled)
 {
     if (default_dialog_enabled_ == enabled)
         return;
+    if (!enabled && registry_)
+    {
+        if (auto* current_default = registry_->defaultDialogWindow())
+        {
+            default_dialog_name_ = current_default->displayName();
+            default_dialog_state_ = current_default->state();
+            sanitizeDialogState(*default_dialog_state_);
+        }
+    }
     default_dialog_enabled_ = enabled;
-    if (!suppress_default_window_updates_)
-        enforceDefaultDialogState();
+    if (suppress_default_window_updates_)
+        return;
+
+    enforceDefaultDialogState();
+
+    if (registry_)
+        saveAll();
 }
 
 void ConfigManager::setDefaultQuestEnabled(bool enabled)
 {
     if (default_quest_enabled_ == enabled)
         return;
+    if (!enabled && registry_)
+    {
+        if (auto* current_default = registry_->defaultQuestWindow())
+        {
+            default_quest_name_ = current_default->displayName();
+            default_quest_state_ = current_default->state();
+            sanitizeDialogState(*default_quest_state_);
+        }
+    }
     default_quest_enabled_ = enabled;
-    if (!suppress_default_window_updates_)
-        enforceDefaultQuestState();
+    if (suppress_default_window_updates_)
+        return;
+
+    enforceDefaultQuestState();
+
+    if (registry_)
+        saveAll();
 }
 
 void ConfigManager::reconcileDefaultWindowStates()
@@ -370,15 +431,32 @@ void ConfigManager::enforceDefaultDialogState()
                 default_dialog_name_ = dialog.displayName();
             }
             registry_->markDialogAsDefault(dialog);
+            if (default_dialog_state_)
+            {
+                applyStoredState(dialog, *default_dialog_state_);
+            }
+            else
+            {
+                sanitizeDialogState(dialog.state());
+            }
+            current_default = &dialog;
         }
         else
         {
             default_dialog_name_ = current_default->displayName();
         }
+
+        if (current_default)
+        {
+            default_dialog_state_ = current_default->state();
+            sanitizeDialogState(*default_dialog_state_);
+        }
     }
     else if (current_default)
     {
         default_dialog_name_ = current_default->displayName();
+        default_dialog_state_ = current_default->state();
+        sanitizeDialogState(*default_dialog_state_);
         registry_->removeWindow(current_default);
     }
 }
@@ -403,15 +481,32 @@ void ConfigManager::enforceDefaultQuestState()
                 default_quest_name_ = quest.displayName();
             }
             registry_->markQuestAsDefault(quest);
+            if (default_quest_state_)
+            {
+                applyStoredState(quest, *default_quest_state_);
+            }
+            else
+            {
+                sanitizeDialogState(quest.state());
+            }
+            current_default = &quest;
         }
         else
         {
             default_quest_name_ = current_default->displayName();
         }
+
+        if (current_default)
+        {
+            default_quest_state_ = current_default->state();
+            sanitizeDialogState(*default_quest_state_);
+        }
     }
     else if (current_default)
     {
         default_quest_name_ = current_default->displayName();
+        default_quest_state_ = current_default->state();
+        sanitizeDialogState(*default_quest_state_);
         registry_->removeWindow(current_default);
     }
 }
@@ -518,8 +613,19 @@ bool ConfigManager::saveAll()
 
     root.insert("global", std::move(global));
 
+    if (auto* current_default_dialog = registry_->defaultDialogWindow())
+    {
+        default_dialog_name_ = current_default_dialog->displayName();
+        default_dialog_state_ = current_default_dialog->state();
+        sanitizeDialogState(*default_dialog_state_);
+    }
+
     auto windows = registry_->windowsByType(UIWindowType::Dialog);
     toml::array arr;
+    if (!default_dialog_enabled_ && default_dialog_state_ && !default_dialog_name_.empty())
+    {
+        arr.push_back(dialogStateToToml(default_dialog_name_, *default_dialog_state_));
+    }
     for (auto* w : windows)
     {
         auto* dw = dynamic_cast<DialogWindow*>(w);
@@ -529,21 +635,29 @@ bool ConfigManager::saveAll()
     }
     root.insert("dialogs", std::move(arr));
 
-    auto quest_windows = registry_->windowsByType(UIWindowType::Quest);
-    if (!quest_windows.empty())
+    if (auto* current_default_quest = registry_->defaultQuestWindow())
     {
-        toml::array quests_arr;
-        for (auto* w : quest_windows)
-        {
-            auto* qw = dynamic_cast<QuestWindow*>(w);
-            if (!qw)
-                continue;
-            quests_arr.push_back(dialogStateToToml(qw->displayName(), qw->state()));
-        }
-        if (!quests_arr.empty())
-        {
-            root.insert("quests", std::move(quests_arr));
-        }
+        default_quest_name_ = current_default_quest->displayName();
+        default_quest_state_ = current_default_quest->state();
+        sanitizeDialogState(*default_quest_state_);
+    }
+
+    auto quest_windows = registry_->windowsByType(UIWindowType::Quest);
+    toml::array quests_arr;
+    if (!default_quest_enabled_ && default_quest_state_ && !default_quest_name_.empty())
+    {
+        quests_arr.push_back(dialogStateToToml(default_quest_name_, *default_quest_state_));
+    }
+    for (auto* w : quest_windows)
+    {
+        auto* qw = dynamic_cast<QuestWindow*>(w);
+        if (!qw)
+            continue;
+        quests_arr.push_back(dialogStateToToml(qw->displayName(), qw->state()));
+    }
+    if (!quests_arr.empty())
+    {
+        root.insert("quests", std::move(quests_arr));
     }
 
     std::string tmp = config_path_ + ".tmp";
@@ -715,6 +829,7 @@ bool ConfigManager::loadAndApply()
         }
         applyVerboseSetting();
 
+        default_dialog_state_.reset();
         if (auto* arr = root["dialogs"].as_array())
         {
             std::vector<std::pair<std::string, DialogStateManager>> dialog_configs;
@@ -739,6 +854,10 @@ bool ConfigManager::loadAndApply()
 
             if (!dialog_configs.empty())
             {
+                default_dialog_name_ = dialog_configs.front().first;
+                default_dialog_state_ = dialog_configs.front().second;
+                sanitizeDialogState(*default_dialog_state_);
+
                 auto windows = registry_->windowsByType(UIWindowType::Dialog);
                 int have = static_cast<int>(windows.size());
                 int want = static_cast<int>(dialog_configs.size());
@@ -789,6 +908,8 @@ bool ConfigManager::loadAndApply()
             }
         }
 
+        default_quest_state_.reset();
+
         auto applyQuestConfig = [&](QuestWindow& quest_window, QuestStateManager& quest_state, const std::string& quest_name)
         {
             if (!quest_name.empty())
@@ -823,6 +944,13 @@ bool ConfigManager::loadAndApply()
                     "Skipped invalid quest window in configuration",
                     "Missing name for quest entry in config file.");
                 return;
+            }
+
+            if (index == 0)
+            {
+                default_quest_name_ = quest_name;
+                default_quest_state_ = quest_state;
+                sanitizeDialogState(*default_quest_state_);
             }
 
             auto quests = registry_->windowsByType(UIWindowType::Quest);

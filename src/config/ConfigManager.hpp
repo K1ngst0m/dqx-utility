@@ -2,8 +2,11 @@
 
 #include <string>
 #include <cstdint>
+#include <optional>
 #include <imgui.h>
 
+#include "../state/DialogStateManager.hpp"
+#include "../state/QuestStateManager.hpp"
 #include "../state/TranslationConfig.hpp"
 
 class WindowRegistry;
@@ -107,6 +110,8 @@ private:
     bool default_quest_enabled_ = true;
     std::string default_dialog_name_;
     std::string default_quest_name_;
+    std::optional<DialogStateManager> default_dialog_state_;
+    std::optional<QuestStateManager> default_quest_state_;
     bool suppress_default_window_updates_ = false;
     
     // Dialog fade settings

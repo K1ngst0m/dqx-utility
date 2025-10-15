@@ -32,6 +32,7 @@ mini = "迷你模式"
 global_settings = "全局设置"
 app_mode = "应用模式"
 quit = "退出"
+default_windows = "默认窗口"
 default_dialog = "默认对话窗口"
 default_quest = "默认任务窗口"
 

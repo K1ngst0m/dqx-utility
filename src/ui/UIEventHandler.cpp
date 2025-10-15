@@ -124,18 +124,24 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
 
         if (auto* cm = ConfigManager_Get())
         {
-            bool dialog_enabled = cm->isDefaultDialogEnabled();
-            std::string dialog_label = ui::LocalizedOrFallback("menu.default_dialog", "Default dialog window");
-            if (ImGui::MenuItem(dialog_label.c_str(), nullptr, dialog_enabled))
+            std::string defaults_menu_label = ui::LocalizedOrFallback("menu.default_windows", "Default windows");
+            if (ImGui::BeginMenu(defaults_menu_label.c_str()))
             {
-                cm->setDefaultDialogEnabled(!dialog_enabled);
-            }
+                bool dialog_enabled = cm->isDefaultDialogEnabled();
+                std::string dialog_label = ui::LocalizedOrFallback("menu.default_dialog", "Default dialog window");
+                if (ImGui::MenuItem(dialog_label.c_str(), nullptr, dialog_enabled))
+                {
+                    cm->setDefaultDialogEnabled(!dialog_enabled);
+                }
 
-            bool quest_enabled = cm->isDefaultQuestEnabled();
-            std::string quest_label = ui::LocalizedOrFallback("menu.default_quest", "Default quest window");
-            if (ImGui::MenuItem(quest_label.c_str(), nullptr, quest_enabled))
-            {
-                cm->setDefaultQuestEnabled(!quest_enabled);
+                bool quest_enabled = cm->isDefaultQuestEnabled();
+                std::string quest_label = ui::LocalizedOrFallback("menu.default_quest", "Default quest window");
+                if (ImGui::MenuItem(quest_label.c_str(), nullptr, quest_enabled))
+                {
+                    cm->setDefaultQuestEnabled(!quest_enabled);
+                }
+
+                ImGui::EndMenu();
             }
         }
 

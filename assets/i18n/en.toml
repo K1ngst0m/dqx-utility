@@ -32,6 +32,7 @@ mini = "Mini Mode"
 global_settings = "Global Settings"
 app_mode = "App Mode"
 quit = "Quit"
+default_windows = "Default windows"
 default_dialog = "Default dialog window"
 default_quest = "Default quest window"
 
