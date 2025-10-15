@@ -69,6 +69,9 @@ void Signatures::InitializeSignatures() {
         s_signatures["network_text"] = Pattern::FromString(
             "51 51 8B C4 89 10 8B CF"
         );
+        s_signatures["network_text_trigger"] = Pattern::FromString(
+            "8B CA 8D 71 ?? 8A 01 41 84 C0 75 F9 EB 20"
+        );
         s_signatures["quest_text"] = Pattern::FromString(
             "8D 8E 78 04 00 00 E8 ?? ?? ?? ?? 5F"
         );
@@ -101,6 +104,10 @@ const Pattern& Signatures::GetIntegrityCheck() {
 
 const Pattern& Signatures::GetNetworkText() {
     InitializeSignatures();
+    auto it = s_signatures.find("network_text_trigger");
+    if (it != s_signatures.end()) {
+        return it->second;
+    }
     return s_signatures["network_text"];
 }
 

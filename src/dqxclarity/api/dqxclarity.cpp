@@ -5,6 +5,7 @@
 #include "../process/ProcessFinder.hpp"
 #include "../hooking/DialogHook.hpp"
 #include "../hooking/CornerTextHook.hpp"
+#include "../hooking/NetworkTextHook.hpp"
 #include "../hooking/QuestHook.hpp"
 #include "../hooking/IntegrityDetour.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
@@ -26,6 +27,7 @@ struct Engine::Impl {
   std::shared_ptr<IProcessMemory> memory;
   std::unique_ptr<DialogHook> hook;
   std::unique_ptr<QuestHook> quest_hook;
+  std::unique_ptr<NetworkTextHook> network_hook;
   std::unique_ptr<CornerTextHook> corner_hook;
   std::unique_ptr<class IntegrityDetour> integrity;
 
@@ -128,6 +130,19 @@ bool Engine::start_hook(StartPolicy policy) {
     impl_->quest_hook.reset();
   }
 
+  // temporarily disabled due to unused
+#if 0
+  impl_->network_hook = std::make_unique<dqxclarity::NetworkTextHook>(impl_->memory);
+  impl_->network_hook->SetVerbose(impl_->cfg.verbose);
+  impl_->network_hook->SetLogger(impl_->log);
+  impl_->network_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
+  impl_->network_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+  if (impl_->network_hook && !impl_->network_hook->InstallHook(/*enable_patch=*/false)) {
+    if (impl_->log.warn) impl_->log.warn("Failed to prepare network text hook; continuing without capture");
+    impl_->network_hook.reset();
+  }
+#endif
+
   impl_->corner_hook = std::make_unique<dqxclarity::CornerTextHook>(impl_->memory);
   impl_->corner_hook->SetVerbose(impl_->cfg.verbose);
   impl_->corner_hook->SetLogger(impl_->log);
@@ -150,6 +165,9 @@ bool Engine::start_hook(StartPolicy policy) {
   if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0) {
     impl_->integrity->AddRestoreTarget(impl_->quest_hook->GetHookAddress(), impl_->quest_hook->GetOriginalBytes());
   }
+  if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0) {
+    impl_->integrity->AddRestoreTarget(impl_->network_hook->GetHookAddress(), impl_->network_hook->GetOriginalBytes());
+  }
   if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0) {
     impl_->integrity->AddRestoreTarget(impl_->corner_hook->GetHookAddress(), impl_->corner_hook->GetOriginalBytes());
   }
@@ -159,6 +177,10 @@ bool Engine::start_hook(StartPolicy policy) {
     if (impl_->quest_hook) {
       impl_->quest_hook->RemoveHook();
       impl_->quest_hook.reset();
+    }
+    if (impl_->network_hook) {
+      impl_->network_hook->RemoveHook();
+      impl_->network_hook.reset();
     }
     if (impl_->corner_hook) {
       impl_->corner_hook->RemoveHook();
@@ -175,6 +197,7 @@ bool Engine::start_hook(StartPolicy policy) {
   if (enable_patch_now) {
     if (impl_->hook) (void)impl_->hook->EnablePatch();
     if (impl_->quest_hook) (void)impl_->quest_hook->EnablePatch();
+    if (impl_->network_hook) (void)impl_->network_hook->EnablePatch();
     if (impl_->corner_hook) (void)impl_->corner_hook->EnablePatch();
   }
 
@@ -195,6 +218,14 @@ bool Engine::start_hook(StartPolicy policy) {
         if (!impl_->quest_hook->IsPatched()) {
           if (impl_->log.warn) impl_->log.warn("Post-enable verify: quest hook not present; reapplying once");
           (void)impl_->quest_hook->ReapplyPatch();
+        }
+      }
+      if (impl_->network_hook) {
+        if (!impl_->network_hook->IsPatched()) {
+          if (impl_->log.warn) impl_->log.warn("Post-enable verify: network text hook not present; reapplying once");
+          (void)impl_->network_hook->ReapplyPatch();
+        } else {
+          if (impl_->log.info) impl_->log.info("Post-enable verify: network text hook present");
         }
       }
       if (impl_->corner_hook) {
@@ -224,6 +255,10 @@ bool Engine::start_hook(StartPolicy policy) {
             (void)impl_->quest_hook->EnablePatch();
             if (impl_->log.info) impl_->log.info("Quest hook enabled after first integrity run");
           }
+          if (impl_->network_hook) {
+            (void)impl_->network_hook->EnablePatch();
+            if (impl_->log.info) impl_->log.info("Network text hook enabled after first integrity run");
+          }
           if (impl_->corner_hook) {
             (void)impl_->corner_hook->EnablePatch();
             if (impl_->log.info) impl_->log.info("Corner text hook enabled after first integrity run");
@@ -236,6 +271,10 @@ bool Engine::start_hook(StartPolicy policy) {
           if (impl_->quest_hook) {
             (void)impl_->quest_hook->ReapplyPatch();
             if (impl_->log.info) impl_->log.info("Quest hook re-applied after integrity");
+          }
+          if (impl_->network_hook) {
+            (void)impl_->network_hook->ReapplyPatch();
+            if (impl_->log.info) impl_->log.info("Network text hook re-applied after integrity");
           }
           if (impl_->corner_hook) {
             (void)impl_->corner_hook->ReapplyPatch();
@@ -250,6 +289,9 @@ bool Engine::start_hook(StartPolicy policy) {
     }
     if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0) {
       impl_->monitor->AddRestoreTarget(impl_->quest_hook->GetHookAddress(), impl_->quest_hook->GetOriginalBytes());
+    }
+    if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0) {
+      impl_->monitor->AddRestoreTarget(impl_->network_hook->GetHookAddress(), impl_->network_hook->GetOriginalBytes());
     }
     if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0) {
       impl_->monitor->AddRestoreTarget(impl_->corner_hook->GetHookAddress(), impl_->corner_hook->GetOriginalBytes());
@@ -299,6 +341,9 @@ bool Engine::start_hook(StartPolicy policy) {
           impl_->quest_valid = true;
         }
       }
+      if (impl_->network_hook) {
+        (void)impl_->network_hook->PollNetworkText();
+      }
       if (impl_->corner_hook && impl_->corner_hook->PollCornerText()) {
         const std::string& captured = impl_->corner_hook->GetLastText();
         if (!captured.empty()) {
@@ -337,6 +382,10 @@ bool Engine::stop_hook() {
   if (impl_->quest_hook) {
     impl_->quest_hook->RemoveHook();
     impl_->quest_hook.reset();
+  }
+  if (impl_->network_hook) {
+    impl_->network_hook->RemoveHook();
+    impl_->network_hook.reset();
   }
   if (impl_->corner_hook) {
     impl_->corner_hook->RemoveHook();
