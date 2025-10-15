@@ -21,7 +21,7 @@ namespace {
 constexpr ImVec4 kOkColor{52.0f / 255.0f, 168.0f / 255.0f, 83.0f / 255.0f, 1.0f};
 constexpr ImVec4 kWarningColor{211.0f / 255.0f, 168.0f / 255.0f, 0.0f, 1.0f};
 constexpr ImVec4 kErrorColor{229.0f / 255.0f, 57.0f / 255.0f, 53.0f / 255.0f, 1.0f};
-constexpr float kFadeDelaySeconds = 15.0f;
+constexpr float kFadeDelaySeconds = 8.0f;
 constexpr float kFadeDurationSeconds = 1.5f;
 
 std::string trimWhitespace(std::string text)
