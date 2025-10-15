@@ -116,8 +116,9 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
                     cm->setAppMode(ConfigManager::AppMode::Normal);
                 if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, mode == ConfigManager::AppMode::Borderless))
                     cm->setAppMode(ConfigManager::AppMode::Borderless);
-                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, mode == ConfigManager::AppMode::Mini))
-                    cm->setAppMode(ConfigManager::AppMode::Mini);
+                // Temporarily disable Mini mode due to unresolved issues
+                // if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, mode == ConfigManager::AppMode::Mini))
+                //     cm->setAppMode(ConfigManager::AppMode::Mini);
             }
             ImGui::EndMenu();
         }
