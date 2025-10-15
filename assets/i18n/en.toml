@@ -292,6 +292,10 @@ fatal_title = "DQX Utility - Fatal Error"
 technical_details = "Technical Details:"
 exit_line = "The application will now exit."
 check_logs = "Please check logs/run.log for more information."
+single_instance_message = "DQX Utility is already running."
+single_instance_detail = "You can only run one copy of DQX Utility at a time."
+single_instance_generic = "Couldn't start DQX Utility."
+single_instance_generic_detail = "Another copy may already be running."
 
 [app.init]
 graphics_failed = "Failed to initialize graphics system"

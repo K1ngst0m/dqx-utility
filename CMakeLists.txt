@@ -101,6 +101,7 @@ set(DQX_CORE_SOURCES
   src/ui/help/HelpWindow.cpp
   src/ui/help/HelpWindow.hpp
   src/platform/ProcessDetector.cpp
+  src/platform/SingleInstanceGuard.cpp
   src/platform/ProcessLocaleChecker.cpp
   src/platform/WineDetector.cpp
   src/services/DQXClarityLauncher.cpp

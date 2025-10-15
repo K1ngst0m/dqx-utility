@@ -15,6 +15,8 @@
 #include "services/DQXClarityService.hpp"
 #include "processing/Diagnostics.hpp"
 #include "utils/Profile.hpp"
+#include "platform/SingleInstanceGuard.hpp"
+#include "utils/NativeMessageBox.hpp"
 
 #include <plog/Log.h>
 #include <plog/Init.h>
@@ -24,6 +26,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cstring>
+#include <string>
 #include <toml++/toml.h>
 
 #ifdef _WIN32
@@ -65,6 +68,35 @@ bool Application::initialize()
     PROFILE_SCOPE_FUNCTION();
 
     utils::CrashHandler::Initialize();
+
+    // Ensure localization strings are available before any early error dialogs.
+    i18n::init("en");
+
+    instance_guard_ = SingleInstanceGuard::Acquire();
+#ifdef _WIN32
+    if (!instance_guard_)
+    {
+        DWORD err = GetLastError();
+        if (err == ERROR_ALREADY_EXISTS)
+        {
+            utils::NativeMessageBox::ShowFatalError(i18n::get_str("error.native.single_instance_message"),
+                                                   i18n::get_str("error.native.single_instance_detail"));
+        }
+        else
+        {
+            utils::NativeMessageBox::ShowFatalError(i18n::get_str("error.native.single_instance_generic"),
+                                                   i18n::get_str("error.native.single_instance_generic_detail"));
+        }
+        return false;
+    }
+#else
+    if (!instance_guard_)
+    {
+        utils::NativeMessageBox::ShowFatalError(i18n::get_str("error.native.single_instance_message"),
+                                               i18n::get_str("error.native.single_instance_detail"));
+        return false;
+    }
+#endif
 
     if (!initializeLogging())
         return false;

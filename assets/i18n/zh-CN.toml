@@ -289,6 +289,10 @@ fatal_title = "DQX 工具 - 致命错误"
 technical_details = "技术细节："
 exit_line = "程序即将退出。"
 check_logs = "请查看 logs/run.log 获取更多信息。"
+single_instance_message = "DQX Utility 已在运行。"
+single_instance_detail = "一次只能运行一个 DQX Utility 实例。"
+single_instance_generic = "无法启动 DQX Utility。"
+single_instance_generic_detail = "可能已经有另一个实例在运行。"
 
 [app.init]
 graphics_failed = "无法初始化图形系统"

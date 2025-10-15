@@ -9,6 +9,7 @@ class WindowRegistry;
 class ConfigManager;
 class GlobalSettingsPanel;
 class ErrorDialog;
+class SingleInstanceGuard;
 
 namespace ui {
 class UIEventHandler;
@@ -44,6 +45,7 @@ private:
     std::unique_ptr<ConfigManager> config_;
     std::unique_ptr<GlobalSettingsPanel> settings_panel_;
     std::unique_ptr<ErrorDialog> error_dialog_;
+    std::unique_ptr<SingleInstanceGuard> instance_guard_;
     
     std::unique_ptr<ui::UIEventHandler> event_handler_;
     std::unique_ptr<ui::MiniModeManager> mini_manager_;
