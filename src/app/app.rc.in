@@ -9,7 +9,7 @@
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_ICON1               ICON                    "../assets/icon.ico"
+IDI_ICON1               ICON                    "@ASSET_DIR@/icon.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -17,8 +17,8 @@ IDI_ICON1               ICON                    "../assets/icon.ico"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,1,0,0
- PRODUCTVERSION 0,1,0,0
+ FILEVERSION @APP_VERSION_COMMA@
+ PRODUCTVERSION @APP_VERSION_COMMA@
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -35,12 +35,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "DQX Utility"
             VALUE "FileDescription", "Dragon Quest X Utility"
-            VALUE "FileVersion", "0.1.0.0"
+            VALUE "FileVersion", "@APP_VERSION_STRING@"
             VALUE "InternalName", "dqx-utility"
             VALUE "LegalCopyright", "Copyright (C) 2025"
             VALUE "OriginalFilename", "dqx-utility.exe"
             VALUE "ProductName", "DQX Utility"
-            VALUE "ProductVersion", "0.1.0.0"
+            VALUE "ProductVersion", "@APP_VERSION_STRING@"
         END
     END
     BLOCK "VarFileInfo"
