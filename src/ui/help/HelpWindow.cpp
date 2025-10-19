@@ -2,7 +2,7 @@
 
 #include "../FontManager.hpp"
 #include "../UITheme.hpp"
-#include "../CommonUIComponents.hpp"
+#include "../UIHelper.hpp"
 #include "../DockState.hpp"
 #include "../Localization.hpp"
 #include "../../config/ConfigManager.hpp"

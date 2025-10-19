@@ -23,15 +23,15 @@ public:
     Application(int argc, char** argv);
     ~Application();
 
-    bool initialize();
     int run();
 
 private:
+    bool initialize();
     void setupManagers();
     void initializeConfig();
     void mainLoop();
     void handleModeChanges();
-    void renderFrame();
+    void renderFrame(float deltaTime);
     void handleQuitRequests();
     void cleanup();
 

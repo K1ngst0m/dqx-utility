@@ -12,7 +12,7 @@
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "ui/Localization.hpp"
 #include "ui/DockState.hpp"
-#include "CommonUIComponents.hpp"
+#include "UIHelper.hpp"
 #include "utils/ErrorReporter.hpp"
 
 #include <algorithm>

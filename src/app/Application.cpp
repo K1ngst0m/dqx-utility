@@ -247,7 +247,10 @@ void Application::initializeConfig()
 int Application::run()
 {
     PROFILE_THREAD_NAME("MainThread");
-
+    if (!initialize())
+    {
+        return -1;
+    }
     mainLoop();
     return 0;
 }
@@ -271,13 +274,8 @@ void Application::mainLoop()
                 quit_requested_ = true;
         }
 
-        if (!running_)
-            break;
-
-        context_->updateVignette(delta_time);
-
         handleModeChanges();
-        renderFrame();
+        renderFrame(delta_time);
         handleQuitRequests();
     }
 }
@@ -300,30 +298,37 @@ void Application::handleModeChanges()
     }
 }
 
-void Application::renderFrame()
+void Application::renderFrame(float deltaTime)
 {
     PROFILE_SCOPE_FUNCTION();
 
     context_->beginFrame();
-
-    ImGuiID dockspace_id = 0;
-    auto current_mode = config_->getAppMode();
-    if (current_mode == ConfigManager::AppMode::Mini)
-        dockspace_id = mini_manager_->SetupDockspace();
-    DockState::SetDockspace(dockspace_id);
-
-    for (auto& window : registry_->windows())
+    
+    // mini mode processing
     {
-        if (window)
-            window->render();
+        ImGuiID dockspace_id = 0;
+        auto current_mode = config_->getAppMode();
+        if (current_mode == ConfigManager::AppMode::Mini)
+            dockspace_id = mini_manager_->SetupDockspace();
+        DockState::SetDockspace(dockspace_id);
+        if (current_mode == ConfigManager::AppMode::Mini)
+            mini_manager_->HandleAltDrag();
+        DockState::ConsumeReDock();
     }
 
-    registry_->processRemovals();
+    // window instances rendering   
+    {
+        for (auto& window : registry_->windows())
+        {
+            if (window)
+            {
+                window->render();
+            }
+        }
+        registry_->processRemovals();
+    }
 
-    if (current_mode == ConfigManager::AppMode::Mini)
-        mini_manager_->HandleAltDrag();
 
-    event_handler_->HandleTransparentAreaClick();
     event_handler_->RenderGlobalContextMenu(show_settings_, quit_requested_);
 
     if (config_->isGlobalSettingsRequested())
@@ -338,15 +343,20 @@ void Application::renderFrame()
     }
 
     if (show_settings_)
+    {
         settings_panel_->render(show_settings_);
+    }
+
+    // empty space click event handling
+    {
+        event_handler_->HandleTransparentAreaClick();
+        context_->updateVignette(deltaTime);
+        context_->renderVignette();
+        context_->endFrame();
+    }
+    // SDL_Delay(16);
 
     utils::ErrorReporter::FlushPendingToHistory();
-
-    DockState::ConsumeReDock();
-    context_->renderVignette();
-    context_->endFrame();
-    SDL_Delay(16);
-
     PROFILE_FRAME_MARK();
 }
 

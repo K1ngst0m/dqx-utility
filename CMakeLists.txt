@@ -82,7 +82,7 @@ set(DQX_CORE_SOURCES
   src/app/Application.cpp
   src/ui/AppContext.cpp
   src/ui/dialog/DialogWindow.cpp
-  src/ui/CommonUIComponents.hpp
+  src/ui/UIHelper.hpp
   src/ui/FontManager.cpp
   src/ui/GlobalSettingsPanel.cpp
   src/ui/WindowRegistry.cpp

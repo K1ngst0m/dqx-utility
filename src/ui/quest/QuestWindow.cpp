@@ -2,7 +2,7 @@
 
 #include <imgui.h>
 
-#include "../CommonUIComponents.hpp"
+#include "../UIHelper.hpp"
 #include "../Localization.hpp"
 #include "../UITheme.hpp"
 #include "../DockState.hpp"
@@ -26,8 +26,6 @@
 
 
 namespace {
-
-// removed legacy buildTranslatorConfig; use translate::BackendConfig::from
 
 const std::string kFullWidthSpace = "\xE3\x80\x80"; // full-width space
 const std::string kBullet = "\xE3\x83\xBB";         // ・

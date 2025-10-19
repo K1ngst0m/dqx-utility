@@ -6,7 +6,7 @@
 #include "help/HelpWindow.hpp"
 #include "config/ConfigManager.hpp"
 #include "Localization.hpp"
-#include "CommonUIComponents.hpp"
+#include "UIHelper.hpp"
 
 #include <string>
 

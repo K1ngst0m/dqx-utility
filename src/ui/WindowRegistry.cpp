@@ -3,7 +3,7 @@
 #include "dialog/DialogWindow.hpp"
 #include "quest/QuestWindow.hpp"
 #include "help/HelpWindow.hpp"
-#include "CommonUIComponents.hpp"
+#include "UIHelper.hpp"
 #include "FontManager.hpp"
 #include "ui/Localization.hpp"
 

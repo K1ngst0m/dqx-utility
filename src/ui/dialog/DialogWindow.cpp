@@ -4,7 +4,7 @@
 #include <plog/Log.h>
 #include "../../utils/ErrorReporter.hpp"
 #include "../DockState.hpp"
-#include "../CommonUIComponents.hpp"
+#include "../UIHelper.hpp"
 
 #include <algorithm>
 #include <cfloat>
