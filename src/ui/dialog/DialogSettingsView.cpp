@@ -79,6 +79,7 @@ void DialogSettingsView::render(
         ImGui::Spacing();
     }
 
+    #if DQXU_ENABLE_DEBUG_SECTIONS
     if (ImGui::CollapsingHeader(i18n::get("dialog.debug.title")))
     {
         ImGui::Indent();
@@ -86,6 +87,7 @@ void DialogSettingsView::render(
         ImGui::Unindent();
         ImGui::Spacing();
     }
+    #endif
 
 }
 

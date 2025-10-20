@@ -76,7 +76,6 @@ private:
 
     void renderAppearanceSection();
     void renderTranslateSection();
-    void renderDebugSection();
     void applyPending();
     const TranslationConfig& activeTranslationConfig() const;
     bool usingGlobalTranslation() const;

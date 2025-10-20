@@ -6,8 +6,9 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(CompilerFlags)
 
-option(ENABLE_PROFILING "Enable profiling instrumentation" ON)
+option(ENABLE_PROFILING "Enable profiling instrumentation" OFF)
 option(BUILD_DQXCLARITY_CLI "Build DQXClarity C++ CLI executable" OFF)
+option(ENABLE_DEBUG_SECTION "Enable debugging sections in the UI" OFF)
 add_subdirectory(src/dqxclarity)
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
@@ -149,6 +150,10 @@ if(ENABLE_PROFILING)
 endif()
 target_include_directories(dqx_core PUBLIC ${tomlplusplus_SOURCE_DIR}/include ${plog_SOURCE_DIR}/include)
 target_compile_definitions(dqx_core PRIVATE PLOG_CHAR_IS_UTF8=1)
+
+if (ENABLE_DEBUG_SECTION)
+  target_compile_definitions(dqx_core PRIVATE DQXU_ENABLE_DEBUG_SECTION)
+endif()
 
 add_executable(dqx_utility
   src/main.cpp

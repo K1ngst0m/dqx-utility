@@ -162,11 +162,13 @@ void GlobalSettingsPanel::render(bool& open)
         renderAppearanceSection();
 
         renderWindowManagementSection();
-        
+
+        #ifdef DQXU_ENABLE_DEBUG_SECTIONS
         if (ImGui::CollapsingHeader(i18n::get("settings.sections.debug")))
         {
             renderDebugSection();
         }
+        #endif
     }
     ImGui::End();
 
