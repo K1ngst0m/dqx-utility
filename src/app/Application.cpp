@@ -268,10 +268,21 @@ void Application::mainLoop()
         last_time_ = current_time;
 
         SDL_Event event;
-        while (SDL_PollEvent(&event))
+        bool has_events = false;
+        
+        // Wait for first event with timeout
+        if (SDL_WaitEventTimeout(&event, 16))
         {
+            has_events = true;
             if (context_->processEvent(event))
                 quit_requested_ = true;
+            
+            // Poll remaining events without blocking
+            while (SDL_PollEvent(&event))
+            {
+                if (context_->processEvent(event))
+                    quit_requested_ = true;
+            }
         }
 
         handleModeChanges();
@@ -354,7 +365,6 @@ void Application::renderFrame(float deltaTime)
         context_->renderVignette();
         context_->endFrame();
     }
-    // SDL_Delay(16);
 
     utils::ErrorReporter::FlushPendingToHistory();
     PROFILE_FRAME_MARK();

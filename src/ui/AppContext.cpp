@@ -345,6 +345,11 @@ bool AppContext::createRenderer()
         return false;
     }
     
+    if (!SDL_SetRenderVSync(renderer_, 1))
+    {
+        PLOG_WARNING << "Failed to enable VSync: " << SDL_GetError() << " (will continue without VSync)";
+    }
+    
     updateRendererScale();
     SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
     return true;
