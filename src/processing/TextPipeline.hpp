@@ -2,7 +2,7 @@
 
 #include <memory>
 #include <string>
-#include "../translate/UnknownLabelRepository.hpp"
+#include "UnknownLabelRepository.hpp"
 
 namespace processing {
 

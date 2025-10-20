@@ -35,10 +35,9 @@ set(MAIN_TRANSLATOR_SOURCES
   src/translate/NiutransTranslator.hpp
   src/translate/YoudaoTranslator.cpp
   src/translate/YoudaoTranslator.hpp
-  src/translate/HttpCommon.cpp
-  src/translate/HttpCommon.hpp
   src/translate/TranslatorConfigBuilder.cpp
   src/translate/TranslatorFactory.cpp
+  src/translate/TranslationRequestBuilder.cpp
 )
 
 if(WIN32)
@@ -111,10 +110,9 @@ set(DQX_CORE_SOURCES
   src/ui/Localization.cpp
   src/ui/DockState.cpp
   ${MAIN_TRANSLATOR_SOURCES}
-  src/translate/LabelProcessor.cpp
-  src/translate/LabelProcessor.hpp
-  src/translate/TranslationRequestBuilder.cpp
-  src/translate/UnknownLabelRepository.cpp
+  src/processing/LabelProcessor.cpp
+  src/processing/LabelProcessor.hpp
+  src/processing/UnknownLabelRepository.cpp
   src/processing/TextPipeline.cpp
   src/processing/Diagnostics.cpp
   src/processing/TextNormalizer.cpp
@@ -129,6 +127,8 @@ set(DQX_CORE_SOURCES
   src/utils/NativeMessageBox.hpp
   src/utils/CrashHandler.cpp
   src/utils/CrashHandler.hpp
+  src/utils/HttpCommon.cpp
+  src/utils/HttpCommon.hpp
   src/ui/ErrorDialog.cpp
   src/ui/ErrorDialog.hpp
 )

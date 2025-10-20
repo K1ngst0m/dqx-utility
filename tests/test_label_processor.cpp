@@ -1,5 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
-#include "translate/LabelProcessor.hpp"
+#include "processing/LabelProcessor.hpp"
 
 TEST_CASE("LabelProcessor replaces <br> with newline and formats select blocks", "[label_processor]")
 {

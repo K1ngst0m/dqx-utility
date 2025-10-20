@@ -2,7 +2,7 @@
 
 #include <cpr/cpr.h>
 #include <plog/Log.h>
-#include "HttpCommon.hpp"
+#include "../utils/HttpCommon.hpp"
 #include "../utils/ErrorReporter.hpp"
 
 #include <algorithm>

@@ -3,7 +3,7 @@
 #include <cpr/cpr.h>
 #include <plog/Log.h>
 #include <chrono>
-#include "HttpCommon.hpp"
+#include "../utils/HttpCommon.hpp"
 #include "../utils/ErrorReporter.hpp"
 
 namespace {

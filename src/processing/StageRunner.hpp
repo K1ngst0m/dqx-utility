@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../processing/TextProcessingTypes.hpp"
+#include "TextProcessingTypes.hpp"
 #include "Diagnostics.hpp"
 #include <chrono>
 #include <string>

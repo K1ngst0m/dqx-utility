@@ -1,6 +1,6 @@
 #include "LabelProcessor.hpp"
 #include "LabelPatterns.hpp"
-#include "../processing/StageRunner.hpp"
+#include "StageRunner.hpp"
 
 #include <algorithm>
 #include <regex>
