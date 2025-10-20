@@ -12,17 +12,16 @@ public:
     static constexpr int kLogInstance = 1;
 
     static void InitializeLogger();
-    static void SetVerbose(bool enabled);
-    static bool IsVerbose();
+    static void SetVerbose(bool enabled) noexcept;
+    [[nodiscard]] static bool IsVerbose() noexcept;
 
-    static void SetMaxPreview(std::size_t bytes);
-    static std::size_t MaxPreview();
+    static void SetMaxPreview(std::size_t bytes) noexcept;
+    [[nodiscard]] static std::size_t MaxPreview() noexcept;
 
-    static std::string Preview(std::string_view text);
+    [[nodiscard]] static std::string Preview(std::string_view text);
 
 private:
     static void sanitize(std::string& text);
-    static void ensureLogger();
     static std::atomic<bool> verbose_;
     static std::atomic<std::size_t> max_preview_;
 };

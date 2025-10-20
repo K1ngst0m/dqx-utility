@@ -11,8 +11,7 @@ public:
     explicit TextPipeline(UnknownLabelRepository* repo = nullptr);
     ~TextPipeline();
 
-    // Process raw dialog text and return text ready for translation submission
-    std::string process(const std::string& input);
+    [[nodiscard]] std::string process(const std::string& input);
 
 private:
     struct Impl;

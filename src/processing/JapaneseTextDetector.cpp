@@ -7,29 +7,29 @@ namespace processing {
 
 namespace {
 
-bool isHiragana(uint32_t cp)
+constexpr bool isHiragana(uint32_t cp) noexcept
 {
     return cp >= 0x3040u && cp <= 0x309Fu;
 }
 
-bool isKatakana(uint32_t cp)
+constexpr bool isKatakana(uint32_t cp) noexcept
 {
     return (cp >= 0x30A0u && cp <= 0x30FFu) || (cp >= 0x31F0u && cp <= 0x31FFu);
 }
 
-bool isHalfwidthKatakana(uint32_t cp)
+constexpr bool isHalfwidthKatakana(uint32_t cp) noexcept
 {
     return cp >= 0xFF66u && cp <= 0xFF9Fu;
 }
 
-bool isCjkUnified(uint32_t cp)
+constexpr bool isCjkUnified(uint32_t cp) noexcept
 {
     return (cp >= 0x4E00u && cp <= 0x9FFFu) ||
            (cp >= 0x3400u && cp <= 0x4DBFu) ||
            (cp >= 0xF900u && cp <= 0xFAFFu);
 }
 
-bool isJapaneseSpecificPunctuation(uint32_t cp)
+constexpr bool isJapaneseSpecificPunctuation(uint32_t cp) noexcept
 {
     switch (cp)
     {

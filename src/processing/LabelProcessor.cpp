@@ -50,38 +50,34 @@ std::string LabelProcessor::processText(const std::string& input)
 
 std::string LabelProcessor::processKnownLabels(const std::string& input)
 {
-    std::string result = input;
-
-    // replace <br> with newline
-    result = std::regex_replace(result, label_rules::br_pattern, "\n");
-
-    // process select sections (<select_nc> ... <select_end>)
-    std::smatch match;
-    while (std::regex_search(result, match, label_rules::select_nc_pattern))
-    {
-        std::string processed = processSelectSection(match[1].str());
-        result.replace(match.position(), match.length(), processed);
-    }
-
-    // process select_se_off sections
-    while (std::regex_search(result, match, label_rules::select_se_off_pattern))
-    {
-        std::string processed = processSelectSection(match[1].str());
-        result.replace(match.position(), match.length(), processed);
-    }
-
+    std::string result = std::regex_replace(input, label_rules::br_pattern, "\n");
+    
+    auto process_select_pattern = [this](std::string& text, const std::regex& pattern) {
+        std::string output;
+        std::sregex_iterator iter(text.begin(), text.end(), pattern);
+        std::sregex_iterator end;
+        
+        size_t last_pos = 0;
+        for (; iter != end; ++iter) {
+            output.append(text, last_pos, iter->position() - last_pos);
+            output.append(processSelectSection((*iter)[1].str()));
+            last_pos = iter->position() + iter->length();
+        }
+        output.append(text, last_pos, std::string::npos);
+        return output;
+    };
+    
+    result = process_select_pattern(result, label_rules::select_nc_pattern);
+    result = process_select_pattern(result, label_rules::select_se_off_pattern);
+    
     return result;
 }
 
 std::string LabelProcessor::processIgnoredLabels(const std::string& input)
 {
-    std::string result = input;
-
-    // remove speed tags and attribute blocks via precompiled patterns
-    result = std::regex_replace(result, label_rules::speed_pattern, "");
+    std::string result = std::regex_replace(input, label_rules::speed_pattern, "");
     result = std::regex_replace(result, label_rules::attr_pattern, "");
 
-    // remove simple ignored literal labels (fast string operations)
     static const std::vector<std::string> ignored_literals = {
         "<close>", "<break>", "<bw_break>", "<end>", "<icon_exc>", "<left>"
     };
@@ -90,9 +86,7 @@ std::string LabelProcessor::processIgnoredLabels(const std::string& input)
     {
         size_t pos = 0;
         while ((pos = result.find(lit, pos)) != std::string::npos)
-        {
             result.erase(pos, lit.size());
-        }
     }
 
     return result;
@@ -100,23 +94,38 @@ std::string LabelProcessor::processIgnoredLabels(const std::string& input)
 
 std::string LabelProcessor::trackUnknownLabels(const std::string& input)
 {
-    std::string result = input;
-    std::vector<std::string> labels = extractLabels(result);
+    std::vector<std::string> labels = extractLabels(input);
+    std::unordered_set<std::string> unknown_to_remove;
 
     for (const auto& label : labels)
     {
         if (!isKnownLabel(label) && !isIgnoredLabel(label))
         {
-            // record unknown label
             unknown_labels_.insert(label);
+            unknown_to_remove.insert(label);
+        }
+    }
 
-            // remove all literal occurrences of the label (avoid regex overhead)
-            size_t pos = 0;
-            while ((pos = result.find(label, pos)) != std::string::npos)
+    if (unknown_to_remove.empty())
+        return input;
+
+    std::string result;
+    result.reserve(input.size());
+    
+    for (size_t i = 0; i < input.size(); )
+    {
+        bool found_label = false;
+        for (const auto& label : unknown_to_remove)
+        {
+            if (input.compare(i, label.size(), label) == 0)
             {
-                result.erase(pos, label.size());
+                i += label.size();
+                found_label = true;
+                break;
             }
         }
+        if (!found_label)
+            result.push_back(input[i++]);
     }
 
     return result;

@@ -11,10 +11,9 @@ public:
     explicit LabelProcessor(UnknownLabelRepository* repo = nullptr);
     ~LabelProcessor();
 
-    std::string processText(const std::string& input);
+    [[nodiscard]] std::string processText(const std::string& input);
     
-    // Persistence is delegated to UnknownLabelRepository now.
-    const std::unordered_set<std::string>& getUnknownLabels() const { return unknown_labels_; }
+    [[nodiscard]] const std::unordered_set<std::string>& getUnknownLabels() const noexcept { return unknown_labels_; }
 
 private:
     std::string processKnownLabels(const std::string& input);
