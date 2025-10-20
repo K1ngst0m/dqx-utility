@@ -4,14 +4,8 @@ endif()
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(_OS_ARCH "windows-x64")
-  set(_SDL3_ARCH "x64")
 else()
   set(_OS_ARCH "windows-x86")
-  set(_SDL3_ARCH "x86")
-endif()
-
-if(DEFINED SDL3_SOURCE_DIR)
-  set(_SDL3_DLL_SRC "${SDL3_SOURCE_DIR}/lib/${_SDL3_ARCH}/SDL3.dll")
 endif()
 
 set(_PACK_EN_DIR    "${CMAKE_BINARY_DIR}/_portable_pack_en")
@@ -22,12 +16,12 @@ function(_stage_package STAGE_DIR LANG_TEMPLATE)
   add_custom_command(OUTPUT "${STAGE_DIR}/.staged"
     COMMAND ${CMAKE_COMMAND} -E remove_directory "${STAGE_DIR}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${STAGE_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqx_utility>" "${STAGE_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqxu_app>" "${STAGE_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "${STAGE_DIR}/assets"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_SDL3_DLL_SRC}" "${STAGE_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:SDL3::SDL3>" "${STAGE_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/assets/templates/${LANG_TEMPLATE}" "${STAGE_DIR}/config.toml"
     COMMAND ${CMAKE_COMMAND} -E touch "${STAGE_DIR}/.staged"
-    DEPENDS dqx_utility
+    DEPENDS dqxu_app
     COMMENT "Staging ${STAGE_DIR}"
   )
 endfunction()
@@ -36,14 +30,14 @@ function(_stage_package_all STAGE_DIR)
   add_custom_command(OUTPUT "${STAGE_DIR}/.staged"
     COMMAND ${CMAKE_COMMAND} -E remove_directory "${STAGE_DIR}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${STAGE_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqx_utility>" "${STAGE_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:dqxu_app>" "${STAGE_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "${STAGE_DIR}/assets"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_SDL3_DLL_SRC}" "${STAGE_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:SDL3::SDL3>" "${STAGE_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/assets/templates/config.en.toml" "${STAGE_DIR}/config.en.toml"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/assets/templates/config.zh-CN.toml" "${STAGE_DIR}/config.zh-CN.toml"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/assets/templates/config.en.toml" "${STAGE_DIR}/config.toml"
     COMMAND ${CMAKE_COMMAND} -E touch "${STAGE_DIR}/.staged"
-    DEPENDS dqx_utility
+    DEPENDS dqxu_app
     COMMENT "Staging all-language package"
   )
 endfunction()
