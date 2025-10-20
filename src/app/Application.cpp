@@ -61,42 +61,20 @@ Application::Application(int argc, char** argv)
 {
 }
 
-Application::~Application() { cleanup(); }
+Application::~Application()
+{
+    cleanup();
+}
 
 bool Application::initialize()
 {
     PROFILE_SCOPE_FUNCTION();
 
     utils::CrashHandler::Initialize();
-
-    // Ensure localization strings are available before any early error dialogs.
     i18n::init("en");
 
-    instance_guard_ = SingleInstanceGuard::Acquire();
-#ifdef _WIN32
-    if (!instance_guard_)
-    {
-        DWORD err = GetLastError();
-        if (err == ERROR_ALREADY_EXISTS)
-        {
-            utils::NativeMessageBox::ShowFatalError(i18n::get_str("error.native.single_instance_message"),
-                                                   i18n::get_str("error.native.single_instance_detail"));
-        }
-        else
-        {
-            utils::NativeMessageBox::ShowFatalError(i18n::get_str("error.native.single_instance_generic"),
-                                                   i18n::get_str("error.native.single_instance_generic_detail"));
-        }
+    if (!checkSingleInstance())
         return false;
-    }
-#else
-    if (!instance_guard_)
-    {
-        utils::NativeMessageBox::ShowFatalError(i18n::get_str("error.native.single_instance_message"),
-                                               i18n::get_str("error.native.single_instance_detail"));
-        return false;
-    }
-#endif
 
     if (!initializeLogging())
         return false;
@@ -132,34 +110,7 @@ bool Application::initializeLogging()
     utils::ErrorReporter::InitializeLogFile("logs/error.log");
     processing::Diagnostics::InitializeLogger();
 
-    bool append_logs = true;
-    try {
-        std::ifstream ifs("config.toml");
-        if (ifs) {
-            toml::table cfg = toml::parse(ifs);
-            if (auto* global = cfg["global"].as_table()) {
-                if (auto value = (*global)["append_logs"].value<bool>()) {
-                    append_logs = *value;
-                }
-            }
-        }
-    } catch (const std::exception& ex) {
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
-                                            "Failed to read logging preferences",
-                                            ex.what());
-    } catch (...) {
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
-                                            "Failed to read logging preferences",
-                                            "Unknown exception while parsing config.toml");
-    }
-
-    for (int i = 1; i < argc_; ++i) {
-        if (std::strcmp(argv_[i], "--append-logs") == 0) {
-            append_logs = true;
-        } else if (std::strcmp(argv_[i], "--verbose") == 0) {
-            force_verbose_pipeline_ = true;
-        }
-    }
+    parseCommandLineArgs();
 
     static plog::RollingFileAppender<plog::TxtFormatter> file_appender("logs/run.log", 1024 * 1024 * 10, 3);
     static plog::ConsoleAppender<plog::TxtFormatter> console_appender;
@@ -167,7 +118,6 @@ bool Application::initializeLogging()
     if (auto logger = plog::get())
         logger->addAppender(&console_appender);
 
-    (void)append_logs;
     return true;
 }
 
@@ -263,28 +213,8 @@ void Application::mainLoop()
     {
         PROFILE_SCOPE_CUSTOM("MainLoopTick");
 
-        Uint64 current_time = SDL_GetTicks();
-        float delta_time = (current_time - last_time_) / 1000.0f;
-        last_time_ = current_time;
-
-        SDL_Event event;
-        bool has_events = false;
-        
-        // Wait for first event with timeout
-        if (SDL_WaitEventTimeout(&event, 16))
-        {
-            has_events = true;
-            if (context_->processEvent(event))
-                quit_requested_ = true;
-            
-            // Poll remaining events without blocking
-            while (SDL_PollEvent(&event))
-            {
-                if (context_->processEvent(event))
-                    quit_requested_ = true;
-            }
-        }
-
+        float delta_time = calculateDeltaTime();
+        processEvents();
         handleModeChanges();
         renderFrame(delta_time);
         handleQuitRequests();
@@ -315,56 +245,17 @@ void Application::renderFrame(float deltaTime)
 
     context_->beginFrame();
     
-    // mini mode processing
-    {
-        ImGuiID dockspace_id = 0;
-        auto current_mode = config_->getAppMode();
-        if (current_mode == ConfigManager::AppMode::Mini)
-            dockspace_id = mini_manager_->SetupDockspace();
-        DockState::SetDockspace(dockspace_id);
-        if (current_mode == ConfigManager::AppMode::Mini)
-            mini_manager_->HandleAltDrag();
-        DockState::ConsumeReDock();
-    }
-
-    // window instances rendering   
-    {
-        for (auto& window : registry_->windows())
-        {
-            if (window)
-            {
-                window->render();
-            }
-        }
-        registry_->processRemovals();
-    }
-
-
-    event_handler_->RenderGlobalContextMenu(show_settings_, quit_requested_);
-
-    if (config_->isGlobalSettingsRequested())
-    {
-        show_settings_ = true;
-        config_->consumeGlobalSettingsRequest();
-    }
-    if (config_->isQuitRequested())
-    {
-        quit_requested_ = true;
-        config_->consumeQuitRequest();
-    }
-
+    setupMiniModeDockspace();
+    renderWindows();
+    handleUIRequests();
+    
     if (show_settings_)
-    {
         settings_panel_->render(show_settings_);
-    }
 
-    // empty space click event handling
-    {
-        event_handler_->HandleTransparentAreaClick();
-        context_->updateVignette(deltaTime);
-        context_->renderVignette();
-        context_->endFrame();
-    }
+    event_handler_->HandleTransparentAreaClick();
+    context_->updateVignette(deltaTime);
+    context_->renderVignette();
+    context_->endFrame();
 
     utils::ErrorReporter::FlushPendingToHistory();
     PROFILE_FRAME_MARK();
@@ -374,29 +265,132 @@ void Application::handleQuitRequests()
 {
     PROFILE_SCOPE_FUNCTION();
 
-    if (quit_requested_)
+    if (!quit_requested_)
+        return;
+
+    if (auto* dqxc = DQXClarityService_Get())
     {
-        if (auto* dqxc = DQXClarityService_Get())
-        {
-            dqxc->shutdown();
-            DQXClarityService_Set(nullptr);
-        }
-        if (config_ && !config_->saveAll())
-        {
-            utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
-                                              "Failed to save configuration on exit",
-                                              config_->lastError());
-        }
-        running_ = false;
+        dqxc->shutdown();
+        DQXClarityService_Set(nullptr);
     }
+    
+    saveConfig();
+    running_ = false;
 }
 
 void Application::cleanup()
 {
+    saveConfig();
+}
+
+bool Application::checkSingleInstance()
+{
+    instance_guard_ = SingleInstanceGuard::Acquire();
+    if (instance_guard_)
+        return true;
+
+#ifdef _WIN32
+    DWORD err = GetLastError();
+    const char* msg_key = (err == ERROR_ALREADY_EXISTS)
+        ? "error.native.single_instance_message"
+        : "error.native.single_instance_generic";
+    const char* detail_key = (err == ERROR_ALREADY_EXISTS)
+        ? "error.native.single_instance_detail"
+        : "error.native.single_instance_generic_detail";
+    
+    utils::NativeMessageBox::ShowFatalError(i18n::get_str(msg_key), i18n::get_str(detail_key));
+#else
+    utils::NativeMessageBox::ShowFatalError(
+        i18n::get_str("error.native.single_instance_message"),
+        i18n::get_str("error.native.single_instance_detail"));
+#endif
+    return false;
+}
+
+void Application::parseCommandLineArgs()
+{
+    for (int i = 1; i < argc_; ++i)
+    {
+        if (std::strcmp(argv_[i], "--verbose") == 0)
+            force_verbose_pipeline_ = true;
+    }
+}
+
+float Application::calculateDeltaTime()
+{
+    Uint64 current_time = SDL_GetTicks();
+    float delta_time = (current_time - last_time_) / 1000.0f;
+    last_time_ = current_time;
+    return delta_time;
+}
+
+void Application::processEvents()
+{
+    SDL_Event event;
+    
+    if (SDL_WaitEventTimeout(&event, 16))
+    {
+        if (context_->processEvent(event))
+            quit_requested_ = true;
+        
+        while (SDL_PollEvent(&event))
+        {
+            if (context_->processEvent(event))
+                quit_requested_ = true;
+        }
+    }
+}
+
+void Application::setupMiniModeDockspace()
+{
+    auto current_mode = config_->getAppMode();
+    ImGuiID dockspace_id = 0;
+    
+    if (current_mode == ConfigManager::AppMode::Mini)
+    {
+        dockspace_id = mini_manager_->SetupDockspace();
+        DockState::SetDockspace(dockspace_id);
+        mini_manager_->HandleAltDrag();
+    }
+    else
+    {
+        DockState::SetDockspace(0);
+    }
+    
+    DockState::ConsumeReDock();
+}
+
+void Application::renderWindows()
+{
+    for (auto& window : registry_->windows())
+        window->render();
+    
+    registry_->processRemovals();
+}
+
+void Application::handleUIRequests()
+{
+    event_handler_->RenderGlobalContextMenu(show_settings_, quit_requested_);
+
+    if (config_->isGlobalSettingsRequested())
+    {
+        show_settings_ = true;
+        config_->consumeGlobalSettingsRequest();
+    }
+    
+    if (config_->isQuitRequested())
+    {
+        quit_requested_ = true;
+        config_->consumeQuitRequest();
+    }
+}
+
+void Application::saveConfig()
+{
     if (config_ && !config_->saveAll())
     {
         utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
-                                          "Failed to save configuration during cleanup",
+                                          "Failed to save configuration",
                                           config_->lastError());
     }
 }

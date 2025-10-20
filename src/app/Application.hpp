@@ -27,17 +27,28 @@ public:
 
 private:
     bool initialize();
-    void setupManagers();
-    void initializeConfig();
-    void mainLoop();
-    void handleModeChanges();
-    void renderFrame(float deltaTime);
-    void handleQuitRequests();
-    void cleanup();
-
     bool initializeLogging();
     void initializeConsole();
     void setupSDLLogging();
+    void setupManagers();
+    void initializeConfig();
+    
+    void mainLoop();
+    float calculateDeltaTime();
+    void processEvents();
+    void handleModeChanges();
+    
+    void renderFrame(float deltaTime);
+    void setupMiniModeDockspace();
+    void renderWindows();
+    void handleUIRequests();
+    
+    void handleQuitRequests();
+    void cleanup();
+    
+    bool checkSingleInstance();
+    void parseCommandLineArgs();
+    void saveConfig();
 
     std::unique_ptr<AppContext> context_;
     std::unique_ptr<FontManager> font_manager_;
