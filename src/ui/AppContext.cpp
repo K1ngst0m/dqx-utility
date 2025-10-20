@@ -283,35 +283,6 @@ void AppContext::setWindowSize(int w, int h)
     SDL_SetWindowSize(window_, w, h);
 }
 
-void AppContext::setWindowPosition(int x, int y)
-{
-    if (!window_) return;
-    SDL_SetWindowPosition(window_, x, y);
-}
-
-void AppContext::getWindowPosition(int& x, int& y)
-{
-    if (!window_) { x = y = 0; return; }
-    SDL_GetWindowPosition(window_, &x, &y);
-}
-
-void AppContext::getWindowSize(int& w, int& h)
-{
-    if (!window_) { w = h = 0; return; }
-    SDL_GetWindowSize(window_, &w, &h);
-}
-
-#ifdef _WIN32
-static HWND get_hwnd_from_sdl(SDL_Window* w)
-{
-    if (!w) return nullptr;
-    SDL_PropertiesID props = SDL_GetWindowProperties(w);
-    void* hwnd_ptr = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
-    return reinterpret_cast<HWND>(hwnd_ptr);
-}
-
-#endif
-
 bool AppContext::initializeSDL()
 {
     if (!SDL_Init(SDL_INIT_VIDEO))

@@ -30,11 +30,6 @@ public:
     void restoreWindow();
     void setWindowSize(int w, int h);
 
-    // Move window on screen
-    void setWindowPosition(int x, int y);
-    void getWindowPosition(int& x, int& y);
-    void getWindowSize(int& w, int& h);
-
 private:
     void updateRendererScale();
     
