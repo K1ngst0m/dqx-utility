@@ -281,7 +281,7 @@ bool OpenAITranslator::doRequest(const std::string& text, const std::string& tar
     else if (target_lang == "zh-tw") target_name = "Traditional Chinese";
     else target_name = target_lang;
     
-    std::string sys = "Translate the following game dialog to " + target_name + ". Keep the speaker's tone and game style. Preserve any <...> tags exactly. Do not add or remove content.";
+    std::string sys = "Translate the following game dialog to " + target_name + ". Keep the speaker's tone and game style. Do not add or remove content.";
     std::string user = text;
 
     std::string body;

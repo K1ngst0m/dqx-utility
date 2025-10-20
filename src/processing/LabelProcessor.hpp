@@ -1,9 +1,15 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
 #include "UnknownLabelRepository.hpp"
+
+// Forward declaration
+namespace label_processing {
+    class LabelRegistry;
+}
 
 class LabelProcessor
 {
@@ -17,7 +23,8 @@ public:
 
 private:
     std::string processKnownLabels(const std::string& input);
-    std::string processIgnoredLabels(const std::string& input);
+    std::string processPairedLabels(const std::string& input);
+    std::string processStandaloneLabels(const std::string& input);
     std::string trackUnknownLabels(const std::string& input);
     
     std::vector<std::string> extractLabels(const std::string& input);
@@ -28,4 +35,5 @@ private:
     
     std::unordered_set<std::string> unknown_labels_;
     UnknownLabelRepository* repository_ = nullptr;
+    std::unique_ptr<label_processing::LabelRegistry> registry_;
 };

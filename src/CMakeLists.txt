@@ -82,6 +82,8 @@ target_sources(dqxu_core
     processing/JapaneseTextDetector.hpp
     processing/LabelProcessor.cpp
     processing/LabelProcessor.hpp
+    processing/LabelRegistry.cpp
+    processing/LabelRegistry.hpp
     processing/TextNormalizer.cpp
     processing/TextNormalizer.hpp
     processing/TextPipeline.cpp
