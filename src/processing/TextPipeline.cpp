@@ -4,9 +4,11 @@
 #include "TextNormalizer.hpp"
 #include "JapaneseTextDetector.hpp"
 #include "Diagnostics.hpp"
+#include "GlossaryManager.hpp"
 #include "../utils/Profile.hpp"
 
 #include <memory>
+#include <optional>
 #include <plog/Log.h>
 
 namespace processing {
@@ -78,9 +80,11 @@ struct TextPipeline::Impl {
     explicit Impl(UnknownLabelRepository* repo)
         : label_processor(repo)
     {
+        glossary_manager.initialize();
     }
 
     LabelProcessor label_processor;
+    GlossaryManager glossary_manager;
 };
 
 TextPipeline::TextPipeline(UnknownLabelRepository* repo)
@@ -90,11 +94,41 @@ TextPipeline::TextPipeline(UnknownLabelRepository* repo)
 
 TextPipeline::~TextPipeline() = default;
 
-std::string TextPipeline::process(const std::string& input)
+std::string TextPipeline::process(const std::string& input,
+                                    const std::string& target_lang,
+                                    bool use_glossary)
 {
     PROFILE_SCOPE_CUSTOM("TextPipeline::process");
 
     logInput(input);
+
+    // Glossary stage: Check for exact match before any processing
+    if (use_glossary && !target_lang.empty())
+    {
+        auto glossary_stage = run_stage<std::optional<std::string>>("glossary", [&]() {
+            return impl_->glossary_manager.lookup(input, target_lang);
+        });
+
+        if (glossary_stage.succeeded && glossary_stage.result.has_value())
+        {
+            if (Diagnostics::IsVerbose())
+            {
+                PLOG_INFO_(Diagnostics::kLogInstance)
+                    << "[TextPipeline] stage=glossary status=hit duration="
+                    << glossary_stage.duration.count() << "us"
+                    << " input=" << Diagnostics::Preview(input)
+                    << " output=" << Diagnostics::Preview(*glossary_stage.result);
+            }
+            logCompletion(*glossary_stage.result);
+            return *glossary_stage.result;
+        }
+        else if (Diagnostics::IsVerbose() && glossary_stage.succeeded)
+        {
+            PLOG_INFO_(Diagnostics::kLogInstance)
+                << "[TextPipeline] stage=glossary status=miss duration="
+                << glossary_stage.duration.count() << "us";
+        }
+    }
 
     auto norm_stage = run_stage<std::string>("normalizer", [&]() {
         std::string s = processing::normalize_line_endings(input);

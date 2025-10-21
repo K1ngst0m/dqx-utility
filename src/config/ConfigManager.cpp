@@ -97,6 +97,7 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     translation.insert("auto_apply_changes", state.translation_config().auto_apply_changes);
     translation.insert("include_dialog_stream", state.translation_config().include_dialog_stream);
     translation.insert("include_corner_stream", state.translation_config().include_corner_stream);
+    translation.insert("glossary_enabled", state.translation_config().glossary_enabled);
     translation.insert("translation_backend", static_cast<int>(state.translation_config().translation_backend));
 
     std::string target_lang;
@@ -185,6 +186,8 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
             state.translation_config().include_dialog_stream = *v;
         if (auto v = (*translation_tbl)["include_corner_stream"].value<bool>())
             state.translation_config().include_corner_stream = *v;
+        if (auto v = (*translation_tbl)["glossary_enabled"].value<bool>())
+            state.translation_config().glossary_enabled = *v;
         if (auto v = (*translation_tbl)["translation_backend"].value<int>())
             state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
         if (auto v = (*translation_tbl)["target_lang"].value<std::string>())
@@ -275,6 +278,7 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
     if (auto v = t["auto_apply_changes"].value<bool>()) state.translation_config().auto_apply_changes = *v;
     if (auto v = t["include_dialog_stream"].value<bool>()) state.translation_config().include_dialog_stream = *v;
     if (auto v = t["include_corner_stream"].value<bool>()) state.translation_config().include_corner_stream = *v;
+    if (auto v = t["glossary_enabled"].value<bool>()) state.translation_config().glossary_enabled = *v;
     if (auto v = t["translation_backend"].value<int>())
         state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
 

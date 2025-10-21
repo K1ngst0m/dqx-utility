@@ -28,6 +28,17 @@
 
 namespace
 {
+    // Convert TargetLang enum to string code for glossary/translation
+    std::string toTargetCode(TranslationConfig::TargetLang lang)
+    {
+        switch (lang) {
+        case TranslationConfig::TargetLang::EN_US: return "en-US";
+        case TranslationConfig::TargetLang::ZH_CN: return "zh-CN";
+        case TranslationConfig::TargetLang::ZH_TW: return "zh-TW";
+        }
+        return "en-US";
+    }
+
     // Prevents UTF-8 character corruption when copying to fixed-size buffers
     // Walks backwards from truncation point to find safe character boundary
     void safe_copy_utf8(char* dest, size_t dest_size, const std::string& src)
@@ -350,9 +361,10 @@ void DialogWindow::applyPending()
             text_to_process = " ";
         }
 
+        std::string target_lang_code = toTargetCode(config.target_lang_enum);
         std::string processed_text = (m.type == dqxclarity::DialogStreamType::CornerText)
             ? text_to_process
-            : text_pipeline_->process(text_to_process);
+            : text_pipeline_->process(text_to_process, target_lang_code, config.glossary_enabled);
 
         if (processed_text.empty())
         {
@@ -789,7 +801,8 @@ void DialogWindow::renderDialog()
                     if (it != failed_original_text_.end() && translator_ && translator_->isReady())
                     {
                         std::string text_to_retry = it->second;
-                        std::string processed_text = text_pipeline_->process(text_to_retry);
+                        std::string target_lang_code = toTargetCode(config.target_lang_enum);
+                        std::string processed_text = text_pipeline_->process(text_to_retry, target_lang_code, config.glossary_enabled);
                     auto submit = session_.submit(
                             processed_text,
                             config.translation_backend,

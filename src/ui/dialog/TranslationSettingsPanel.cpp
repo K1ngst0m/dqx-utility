@@ -175,7 +175,8 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
 
     bool include_dialog_changed = ImGui::Checkbox(i18n::get("dialog.translate.include_dialog"), &config.include_dialog_stream);
     bool include_corner_changed = ImGui::Checkbox(i18n::get("dialog.translate.include_corner"), &config.include_corner_stream);
-    stream_filters_changed_ = include_dialog_changed || include_corner_changed;
+    bool glossary_changed = ImGui::Checkbox(i18n::get("dialog.translate.use_glossary"), &config.glossary_enabled);
+    stream_filters_changed_ = include_dialog_changed || include_corner_changed || glossary_changed;
     ImGui::Spacing();
     
     ImGui::TextUnformatted(i18n::get("dialog.translate.backend.label"));

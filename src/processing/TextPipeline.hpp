@@ -11,7 +11,9 @@ public:
     explicit TextPipeline(UnknownLabelRepository* repo = nullptr);
     ~TextPipeline();
 
-    [[nodiscard]] std::string process(const std::string& input);
+    [[nodiscard]] std::string process(const std::string& input,
+                                       const std::string& target_lang = "",
+                                       bool use_glossary = true);
 
 private:
     struct Impl;

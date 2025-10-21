@@ -116,6 +116,16 @@ CPMAddPackage(
   DOWNLOAD_ONLY YES
 )
 
+# nlohmann/json - JSON parser for glossary system
+CPMAddPackage(
+  NAME nlohmann_json
+  GITHUB_REPOSITORY nlohmann/json
+  GIT_TAG v3.11.3
+  OPTIONS
+    "JSON_BuildTests OFF"
+    "JSON_Install OFF"
+)
+
 # cpptrace - C++ stack trace library
 CPMAddPackage(
   NAME cpptrace
@@ -182,6 +192,10 @@ endif()
 
 if(NOT tomlplusplus_ADDED AND NOT tomlplusplus_SOURCE_DIR)
   message(FATAL_ERROR "Required dependency tomlplusplus was not acquired.")
+endif()
+
+if(NOT nlohmann_json_ADDED)
+  message(FATAL_ERROR "Required dependency nlohmann_json was not acquired.")
 endif()
 
 if(ENABLE_PROFILING)

@@ -207,6 +207,7 @@ use_global = "Use global translation settings"
 use_global_hint = "(uncheck for per-window overrides)"
 include_dialog = "Include dialog text"
 include_corner = "Include follower dialogue"
+use_glossary = "Use glossary (pre-translation cache)"
 
 [dialog.placeholder]
 waiting = "Initializing dialog system..."

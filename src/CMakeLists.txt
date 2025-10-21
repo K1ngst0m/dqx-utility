@@ -78,6 +78,8 @@ target_sources(dqxu_core
   PRIVATE
     processing/Diagnostics.cpp
     processing/Diagnostics.hpp
+    processing/GlossaryManager.cpp
+    processing/GlossaryManager.hpp
     processing/JapaneseTextDetector.cpp
     processing/JapaneseTextDetector.hpp
     processing/LabelProcessor.cpp
@@ -152,6 +154,7 @@ target_link_libraries(dqxu_core
     imgui
     cpr::cpr
     cpptrace::cpptrace
+    nlohmann_json::nlohmann_json
   PRIVATE
     project_options
     project_warnings
