@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-22.04
+  build-windows:
+    runs-on: windows-2022
     strategy:
       matrix:
         build_type: [debug, release]
@@ -17,50 +17,101 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang \
-            pkg-config \
-            cmake \
-            ninja-build \
-            libcurl4-openssl-dev \
-            libx11-dev \
-            libxext-dev \
-            libxrandr-dev \
-            libxcursor-dev \
-            libxfixes-dev \
-            libxi-dev \
-            libxss-dev \
-            libxtst-dev \
-            libxkbcommon-dev \
-            libdrm-dev \
-            libgbm-dev \
-            libgl1-mesa-dev \
-            libgles2-mesa-dev \
-            libegl1-mesa-dev \
-            libdbus-1-dev \
-            libibus-1.0-dev \
-            libudev-dev \
-            libwayland-dev \
-            libdecor-0-dev
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
 
       - name: Cache CPM dependencies
         uses: actions/cache@v4
         with:
           path: |
-            out/linux-clang-${{ matrix.build_type }}/_deps
-            out/linux-clang-${{ matrix.build_type }}/cmake/CPM.cmake
+            .cpm-cache
+            out/windows-msvc-${{ matrix.build_type }}/_deps
           key: deps-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: |
             deps-${{ runner.os }}-${{ matrix.build_type }}-
+            deps-${{ runner.os }}-
 
       - name: Configure
-        run: cmake --preset linux-clang-${{ matrix.build_type }}
+        run: cmake --preset windows-msvc-${{ matrix.build_type }}
 
       - name: Build
-        run: cmake --build --preset linux-clang-${{ matrix.build_type }}
+        run: cmake --build --preset windows-msvc-${{ matrix.build_type }}
 
       - name: Test
-        run: ./out/linux-clang-${{ matrix.build_type }}/dqx_utility_tests
+        working-directory: ${{ github.workspace }}
+        run: |
+          if ("${{ matrix.build_type }}" -eq "release") {
+            .\out\windows-msvc-release\Release\tests\dqxu_tests.exe
+          } else {
+            .\out\windows-msvc-debug\Debug\tests\dqxu_tests.exe
+          }
+
+      - name: Upload artifacts
+        if: matrix.build_type == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dqx-utility-windows-${{ matrix.build_type }}
+          path: |
+            out/windows-msvc-release/Release/app/dqx-utility.exe
+            config.toml
+            assets/
+          retention-days: 7
+
+  # Linux builds temporarily disabled - will be re-enabled in future
+  # build-linux:
+  #   runs-on: ubuntu-22.04
+  #   strategy:
+  #     matrix:
+  #       build_type: [debug, release]
+  #
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Install dependencies
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y \
+  #           clang \
+  #           pkg-config \
+  #           cmake \
+  #           ninja-build \
+  #           libcurl4-openssl-dev \
+  #           libx11-dev \
+  #           libxext-dev \
+  #           libxrandr-dev \
+  #           libxcursor-dev \
+  #           libxfixes-dev \
+  #           libxi-dev \
+  #           libxss-dev \
+  #           libxtst-dev \
+  #           libxkbcommon-dev \
+  #           libdrm-dev \
+  #           libgbm-dev \
+  #           libgl1-mesa-dev \
+  #           libgles2-mesa-dev \
+  #           libegl1-mesa-dev \
+  #           libdbus-1-dev \
+  #           libibus-1.0-dev \
+  #           libudev-dev \
+  #           libwayland-dev \
+  #           libdecor-0-dev
+  #
+  #     - name: Cache CPM dependencies
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: |
+  #           out/linux-clang-${{ matrix.build_type }}/_deps
+  #           out/linux-clang-${{ matrix.build_type }}/cmake/CPM.cmake
+  #         key: deps-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('CMakeLists.txt') }}
+  #         restore-keys: |
+  #           deps-${{ runner.os }}-${{ matrix.build_type }}-
+  #
+  #     - name: Configure
+  #       run: cmake --preset linux-clang-${{ matrix.build_type }}
+  #
+  #     - name: Build
+  #       run: cmake --build --preset linux-clang-${{ matrix.build_type }}
+  #
+  #     - name: Test
+  #       run: ./out/linux-clang-${{ matrix.build_type }}/dqx_utility_tests
