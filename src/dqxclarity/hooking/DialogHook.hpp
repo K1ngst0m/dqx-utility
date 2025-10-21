@@ -55,6 +55,8 @@ public:
     const std::vector<uint8_t>& GetOriginalBytes() const { return m_original_bytes; }
 
 private:
+    static constexpr size_t kMaxStringLength = 4096;
+
     std::shared_ptr<IProcessMemory> m_memory;
     bool m_is_installed;
     

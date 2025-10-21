@@ -482,13 +482,13 @@ bool DialogHook::PollDialogData() {
         // Read dialog text
         std::string dialog_text;
         if (text_address != 0) {
-            m_memory->ReadString(text_address, dialog_text);
+            m_memory->ReadString(text_address, dialog_text, kMaxStringLength);
         }
-        
+
         // Read NPC name
         std::string npc_name = "No_NPC";
         if (npc_address != 0) {
-            if (!m_memory->ReadString(npc_address, npc_name) || npc_name.empty()) {
+            if (!m_memory->ReadString(npc_address, npc_name, kMaxStringLength) || npc_name.empty()) {
                 npc_name = "No_NPC";
             }
         }
