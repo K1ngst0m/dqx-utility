@@ -92,5 +92,12 @@ if(BUILD_DQXCLARITY_CLI)
 
   target_link_libraries(dqxclarity-cpp PRIVATE dqxclarity)
 
-  set_target_properties(dqxclarity-cpp PROPERTIES OUTPUT_NAME "dqxclarity-cpp")
+  set_target_properties(dqxclarity-cpp PROPERTIES
+    OUTPUT_NAME "dqxclarity-cpp"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/app"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/Debug/app"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/Release/app"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/RelWithDebInfo/app"
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/MinSizeRel/app"
+  )
 endif()

@@ -8,12 +8,21 @@ add_executable(dqxu_tests
   dqxclarity/test_process_finder.cpp
 )
 
+# Set output directory to {preset}/{Config}/tests/
+set_target_properties(dqxu_tests PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+  RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/Debug/tests"
+  RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/Release/tests"
+  RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/RelWithDebInfo/tests"
+  RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/MinSizeRel/tests"
+)
+
 target_include_directories(dqxu_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
-target_link_libraries(dqxu_tests 
-  PRIVATE 
-    Catch2::Catch2WithMain 
-    dqxu_core 
+target_link_libraries(dqxu_tests
+  PRIVATE
+    Catch2::Catch2WithMain
+    dqxu_core
     dqxclarity::dqxclarity
 )
 
