@@ -5,6 +5,7 @@
 #include <chrono>
 #include "../utils/HttpCommon.hpp"
 #include "../utils/ErrorReporter.hpp"
+#include "TranslatorHelpers.hpp"
 
 namespace {
 struct FlightGuard {
@@ -184,6 +185,19 @@ std::string NiutransTranslator::mapTarget(const std::string& dst_lang)
 
 bool NiutransTranslator::doRequest(const std::string& text, const std::string& dst_lang, std::string& out_text)
 {
+    using namespace translate::helpers;
+
+    // PHASE 1: Text length validation with diagnostic logging
+    auto length_check = check_text_length(text, LengthLimits::NIUTRANS_API_MAX, "Niutrans");
+    if (!length_check.ok) {
+        last_error_ = length_check.error_message;
+        PLOG_WARNING << "Niutrans text length check failed: " << length_check.error_message;
+        PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
+        return false;
+    }
+
+    PLOG_DEBUG << "Niutrans translation request - Text length: " << length_check.byte_size << " bytes";
+
     if (text.empty()) return false;
     std::string url = cfg_.base_url.empty() ? std::string("https://api.niutrans.com/NiuTransServer/translation") : cfg_.base_url;
 
@@ -194,18 +208,26 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
         {"src_text", text}
     };
 
+    // PHASE 2: Adaptive timeout (increased from 15s to 45s base)
     translate::SessionConfig scfg;
     scfg.connect_timeout_ms = 5000;
-    scfg.timeout_ms = 15000;
+    scfg.timeout_ms = 45000;  // Increased from 15000
+    scfg.text_length_hint = text.size();
+    scfg.use_adaptive_timeout = true;
     scfg.cancel_flag = &running_;
+
     auto resp = translate::post_form(url, fields, scfg);
+
+    // PHASE 1: Enhanced error handling
     if (!resp.error.empty())
     {
-        std::string err_msg = resp.error;
+        auto err_type = categorize_http_error(0, resp.error);
+        std::string err_msg = get_error_description(err_type, 0, resp.error);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Niutrans request failed: " << err_msg;
+            PLOG_DEBUG << "Original error: " << resp.error;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "Niutrans request failed",
                 err_msg);
@@ -214,14 +236,16 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
     }
     if (resp.status_code < 200 || resp.status_code >= 300)
     {
-        std::string err_msg = std::string("http ") + std::to_string(resp.status_code);
+        auto err_type = categorize_http_error(resp.status_code, "");
+        std::string err_msg = get_error_description(err_type, resp.status_code, resp.text);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
-            PLOG_WARNING << "Niutrans request failed with status " << resp.status_code << ": " << resp.text;
+            PLOG_WARNING << "Niutrans request failed: " << err_msg;
+            PLOG_DEBUG << "Response body: " << resp.text;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "Niutrans HTTP error",
-                std::to_string(resp.status_code) + ": " + resp.text);
+                err_msg);
         }
         return false;
     }

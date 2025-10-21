@@ -5,6 +5,7 @@
 #include <chrono>
 #include "../utils/HttpCommon.hpp"
 #include "../utils/ErrorReporter.hpp"
+#include "TranslatorHelpers.hpp"
 
 namespace {
 struct FlightGuard {
@@ -272,6 +273,21 @@ std::string OpenAITranslator::normalizeURL(const std::string& base_url)
 
 bool OpenAITranslator::doRequest(const std::string& text, const std::string& target_lang, std::string& out_text)
 {
+    using namespace translate::helpers;
+
+    // PHASE 1: Text length validation with diagnostic logging
+    auto length_check = check_text_length(text, LengthLimits::OPENAI_API_MAX, "OpenAI");
+    if (!length_check.ok) {
+        last_error_ = length_check.error_message;
+        PLOG_WARNING << "OpenAI text length check failed: " << length_check.error_message;
+        PLOG_DEBUG << "Text stats - Characters: " << length_check.text_length
+                   << ", Bytes: " << length_check.byte_size;
+        return false;
+    }
+
+    // Diagnostic logging
+    PLOG_DEBUG << "OpenAI translation request - Text length: " << length_check.byte_size << " bytes";
+
     if (text.empty()) return false;
     std::string url = normalizeURL(cfg_.base_url);
 
@@ -280,28 +296,44 @@ bool OpenAITranslator::doRequest(const std::string& text, const std::string& tar
     else if (target_lang == "zh-cn") target_name = "Simplified Chinese";
     else if (target_lang == "zh-tw") target_name = "Traditional Chinese";
     else target_name = target_lang;
-    
+
     std::string sys = "Translate the following game dialog to " + target_name + ". Keep the speaker's tone and game style. Do not add or remove content.";
     std::string user = text;
 
+    // PHASE 2: Fix buffer reservation
     std::string body;
-    body.reserve(512 + user.size());
+    body.reserve(calculate_json_buffer_size(user.size()));
     body += "{\"model\":\"" + cfg_.model + "\",";
     body += "\"messages\":[";
     body += "{\"role\":\"system\",\"content\":\"" + escapeJSON(sys) + "\"},";
     body += "{\"role\":\"user\",\"content\":\"" + escapeJSON(user) + "\"}],";
     body += "\"temperature\":0.3}";
 
+    // Diagnostic logging for request size
+    PLOG_DEBUG << "OpenAI request body size: " << body.size() << " bytes";
+
     std::vector<translate::Header> headers{{"Content-Type","application/json"},{"Authorization", std::string("Bearer ")+cfg_.api_key}};
-    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 45000; scfg.cancel_flag = &running_;
+
+    // PHASE 2: Adaptive timeout
+    translate::SessionConfig scfg;
+    scfg.connect_timeout_ms = 5000;
+    scfg.timeout_ms = 45000;
+    scfg.text_length_hint = text.size();
+    scfg.use_adaptive_timeout = true;
+    scfg.cancel_flag = &running_;
+
     auto r = translate::post_json(url, body, headers, scfg);
+
+    // PHASE 1: Enhanced error handling
     if (!r.error.empty())
     {
-        std::string err_msg = r.error;
+        auto err_type = categorize_http_error(0, r.error);
+        std::string err_msg = get_error_description(err_type, 0, r.error);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
-            PLOG_WARNING << "Translation request failed: " << err_msg;
+            PLOG_WARNING << "OpenAI translation request failed: " << err_msg;
+            PLOG_DEBUG << "Original error: " << r.error;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "OpenAI translation request failed",
                 err_msg);
@@ -310,14 +342,16 @@ bool OpenAITranslator::doRequest(const std::string& text, const std::string& tar
     }
     if (r.status_code < 200 || r.status_code >= 300)
     {
-        std::string err_msg = std::string("http ") + std::to_string(r.status_code);
+        auto err_type = categorize_http_error(r.status_code, "");
+        std::string err_msg = get_error_description(err_type, r.status_code, r.text);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
-            PLOG_WARNING << "Translation request failed with status " << r.status_code << ": " << r.text;
+            PLOG_WARNING << "OpenAI translation failed: " << err_msg;
+            PLOG_DEBUG << "Response body: " << r.text;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "OpenAI translation HTTP error",
-                std::to_string(r.status_code) + ": " + r.text);
+                err_msg);
         }
         return false;
     }

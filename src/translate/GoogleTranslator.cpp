@@ -5,6 +5,7 @@
 #include <chrono>
 #include "../utils/HttpCommon.hpp"
 #include "../utils/ErrorReporter.hpp"
+#include "TranslatorHelpers.hpp"
 
 namespace {
 struct FlightGuard {
@@ -204,10 +205,23 @@ bool GoogleTranslator::doRequest(const std::string& text, const std::string& src
 
 bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::string& out_text)
 {
+    using namespace translate::helpers;
+
+    // PHASE 1: Text length validation
+    auto length_check = check_text_length(text, LengthLimits::GOOGLE_PAID_API_MAX, "Google Paid API");
+    if (!length_check.ok) {
+        last_error_ = length_check.error_message;
+        PLOG_WARNING << "Google Paid API text length check failed: " << length_check.error_message;
+        PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
+        return false;
+    }
+
+    PLOG_DEBUG << "Google Paid API translation request - Text length: " << length_check.byte_size << " bytes";
+
     std::string url = "https://translation.googleapis.com/language/translate/v2";
     std::string src = normalizeLanguageCode(src_lang);
     std::string dst = normalizeLanguageCode(dst_lang);
-    
+
     std::string escaped_text = text;
     std::size_t pos = 0;
     while ((pos = escaped_text.find('\"', pos)) != std::string::npos) {
@@ -229,19 +243,33 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
         escaped_text.replace(pos, 1, "\\\\");
         pos += 2;
     }
-    
+
     std::string body = R"({"q": ")" + escaped_text + R"(", "source": ")" + src + R"(", "target": ")" + dst + R"(", "format": "text"})";
-    
+
+    PLOG_DEBUG << "Google Paid API request body size: " << body.size() << " bytes";
+
     std::vector<translate::Header> headers{{"Content-Type","application/json"},{"Authorization", std::string("Bearer ")+cfg_.api_key}};
-    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 45000; scfg.cancel_flag = &running_;
+
+    // PHASE 2: Adaptive timeout
+    translate::SessionConfig scfg;
+    scfg.connect_timeout_ms = 5000;
+    scfg.timeout_ms = 45000;
+    scfg.text_length_hint = text.size();
+    scfg.use_adaptive_timeout = true;
+    scfg.cancel_flag = &running_;
+
     auto r = translate::post_json(url, body, headers, scfg);
+
+    // PHASE 1: Enhanced error handling
     if (!r.error.empty())
     {
-        std::string err_msg = r.error;
+        auto err_type = categorize_http_error(0, r.error);
+        std::string err_msg = get_error_description(err_type, 0, r.error);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate paid API request failed: " << err_msg;
+            PLOG_DEBUG << "Original error: " << r.error;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "Google Translate paid API request failed",
                 err_msg);
@@ -250,14 +278,16 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
     }
     if (r.status_code < 200 || r.status_code >= 300)
     {
-        std::string err_msg = std::string("http ") + std::to_string(r.status_code);
+        auto err_type = categorize_http_error(r.status_code, "");
+        std::string err_msg = get_error_description(err_type, r.status_code, r.text);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
-            PLOG_WARNING << "Google Translate paid API failed with status " << r.status_code << ": " << r.text;
+            PLOG_WARNING << "Google Translate paid API failed: " << err_msg;
+            PLOG_DEBUG << "Response body: " << r.text;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "Google Translate paid API HTTP error",
-                std::to_string(r.status_code) + ": " + r.text);
+                err_msg);
         }
         return false;
     }
@@ -282,21 +312,49 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
 
 bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::string& out_text)
 {
+    using namespace translate::helpers;
+
+    // CRITICAL FIX: Google Free API uses GET with URL encoding
+    // This has strict length limits due to URL length restrictions
+    auto length_check = check_text_length(text, LengthLimits::GOOGLE_FREE_API_MAX, "Google Free API");
+    if (!length_check.ok) {
+        last_error_ = length_check.error_message + " (Google Free API uses URL encoding - try paid API for longer texts)";
+        PLOG_WARNING << "Google Free API rejected due to text length: " << length_check.byte_size
+                     << " bytes (limit: " << LengthLimits::GOOGLE_FREE_API_MAX << ")";
+        return false;
+    }
+
+    PLOG_DEBUG << "Google Free API request - Text length: " << length_check.byte_size << " bytes";
+
     std::string src = normalizeLanguageCode(src_lang);
     std::string dst = normalizeLanguageCode(dst_lang);
-    
-    std::string url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + 
+
+    std::string url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" +
                       escapeUrl(src) + "&tl=" + escapeUrl(dst) + "&dt=t&q=" + escapeUrl(text);
-    
-    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 30000; scfg.cancel_flag = &running_;
+
+    // Diagnostic: log URL length
+    PLOG_DEBUG << "Google Free API URL length: " << url.size() << " bytes";
+
+    // PHASE 2: Adaptive timeout
+    translate::SessionConfig scfg;
+    scfg.connect_timeout_ms = 5000;
+    scfg.timeout_ms = 30000;
+    scfg.text_length_hint = text.size();
+    scfg.use_adaptive_timeout = true;
+    scfg.cancel_flag = &running_;
+
     auto r = translate::get(url, {}, scfg);
+
+    // PHASE 1: Enhanced error handling
     if (!r.error.empty())
     {
-        std::string err_msg = r.error;
+        auto err_type = categorize_http_error(0, r.error);
+        std::string err_msg = get_error_description(err_type, 0, r.error);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate free API request failed: " << err_msg;
+            PLOG_DEBUG << "Original error: " << r.error;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "Google Translate free API request failed",
                 err_msg);
@@ -305,14 +363,16 @@ bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& sr
     }
     if (r.status_code < 200 || r.status_code >= 300)
     {
-        std::string err_msg = std::string("http ") + std::to_string(r.status_code);
+        auto err_type = categorize_http_error(r.status_code, "");
+        std::string err_msg = get_error_description(err_type, r.status_code, r.text);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
-            PLOG_WARNING << "Google Translate free API failed with status " << r.status_code << ": " << r.text;
+            PLOG_WARNING << "Google Translate free API failed: " << err_msg;
+            PLOG_DEBUG << "Response body: " << r.text;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "Google Translate free API HTTP error",
-                std::to_string(r.status_code) + ": " + r.text);
+                err_msg);
         }
         return false;
     }

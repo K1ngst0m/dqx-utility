@@ -4,6 +4,7 @@
 #include <plog/Log.h>
 #include "../utils/HttpCommon.hpp"
 #include "../utils/ErrorReporter.hpp"
+#include "TranslatorHelpers.hpp"
 
 #include <algorithm>
 #include <array>
@@ -367,6 +368,19 @@ void YoudaoTranslator::workerLoop()
 
 bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::string& out_text)
 {
+    using namespace translate::helpers;
+
+    // PHASE 1: Text length validation with diagnostic logging
+    auto length_check = check_text_length(text, LengthLimits::YOUDAO_API_MAX, "Youdao");
+    if (!length_check.ok) {
+        last_error_ = length_check.error_message;
+        PLOG_WARNING << "Youdao text length check failed: " << length_check.error_message;
+        PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
+        return false;
+    }
+
+    PLOG_DEBUG << "Youdao translation request - Text length: " << length_check.byte_size << " bytes";
+
     const std::string url = cfg_.base_url.empty() ? std::string("https://openapi.youdao.com/api") : cfg_.base_url;
     std::string from = mapSource(src_lang, Mode::Text);
     std::string to = mapTarget(dst_lang, Mode::Text);
@@ -391,25 +405,40 @@ bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string&
         {"curtime", curtime},
         {"sign", sign}
     };
-    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 15000; scfg.cancel_flag = &running_;
+
+    // PHASE 2: Adaptive timeout (increased from 15s to 45s base)
+    translate::SessionConfig scfg;
+    scfg.connect_timeout_ms = 5000;
+    scfg.timeout_ms = 45000;  // Increased from 15000
+    scfg.text_length_hint = text.size();
+    scfg.use_adaptive_timeout = true;
+    scfg.cancel_flag = &running_;
+
     auto response = translate::post_form(url, fields, scfg);
+
+    // PHASE 1: Enhanced error handling
     if (!response.error.empty())
     {
-        if (last_error_ != response.error)
+        auto err_type = categorize_http_error(0, response.error);
+        std::string err_msg = get_error_description(err_type, 0, response.error);
+        if (last_error_ != err_msg)
         {
-            PLOG_WARNING << "Youdao text request failed: " << response.error;
+            PLOG_WARNING << "Youdao text request failed: " << err_msg;
+            PLOG_DEBUG << "Original error: " << response.error;
         }
-        report_youdao_error(last_error_, "Youdao text request failed", response.error);
+        report_youdao_error(last_error_, "Youdao text request failed", err_msg);
         return false;
     }
     if (response.status_code < 200 || response.status_code >= 300)
     {
-        std::string err_detail = std::string("http ") + std::to_string(response.status_code) + ": " + response.text;
-        if (last_error_ != err_detail)
+        auto err_type = categorize_http_error(response.status_code, "");
+        std::string err_msg = get_error_description(err_type, response.status_code, response.text);
+        if (last_error_ != err_msg)
         {
-            PLOG_WARNING << "Youdao text request failed with status " << response.status_code << ": " << response.text;
+            PLOG_WARNING << "Youdao text request failed: " << err_msg;
+            PLOG_DEBUG << "Response body: " << response.text;
         }
-        report_youdao_error(last_error_, "Youdao text HTTP error", err_detail);
+        report_youdao_error(last_error_, "Youdao text HTTP error", err_msg);
         return false;
     }
 
@@ -420,6 +449,19 @@ bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string&
 
 bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::string& out_text)
 {
+    using namespace translate::helpers;
+
+    // PHASE 1: Text length validation
+    auto length_check = check_text_length(text, LengthLimits::YOUDAO_API_MAX, "Youdao Large Model");
+    if (!length_check.ok) {
+        last_error_ = length_check.error_message;
+        PLOG_WARNING << "Youdao large model text length check failed: " << length_check.error_message;
+        PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
+        return false;
+    }
+
+    PLOG_DEBUG << "Youdao large model translation request - Text length: " << length_check.byte_size << " bytes";
+
     const std::string url = cfg_.base_url.empty() ? std::string("https://openapi.youdao.com/llm_trans") : cfg_.base_url;
     std::string from = mapSource(src_lang, Mode::LargeModel);
     std::string to = mapTarget(dst_lang, Mode::LargeModel);
@@ -460,9 +502,19 @@ bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::s
         {"handleOption", "2"},
         {"streamType", "full"}
     };
-    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 20000; scfg.cancel_flag = &running_;
+
+    // PHASE 2: Adaptive timeout (increased from 20s to 45s base)
+    translate::SessionConfig scfg;
+    scfg.connect_timeout_ms = 5000;
+    scfg.timeout_ms = 45000;  // Increased from 20000
+    scfg.text_length_hint = text.size();
+    scfg.use_adaptive_timeout = true;
+    scfg.cancel_flag = &running_;
+
     std::vector<translate::Header> headers{{"Accept","text/event-stream"}};
     auto response = translate::post_form(url, fields, scfg, headers);
+
+    // PHASE 1: Enhanced error handling
     if (!response.error.empty())
     {
         if (last_error_ != response.error)

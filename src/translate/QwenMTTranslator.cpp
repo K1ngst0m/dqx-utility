@@ -5,6 +5,7 @@
 #include <chrono>
 #include "../utils/HttpCommon.hpp"
 #include "../utils/ErrorReporter.hpp"
+#include "TranslatorHelpers.hpp"
 
 namespace {
 struct FlightGuard {
@@ -202,28 +203,56 @@ std::string QwenMTTranslator::mapTarget(const std::string& dst_lang)
 
 bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst_lang, std::string& out_text)
 {
+    using namespace translate::helpers;
+
+    // PHASE 1: Text length validation with diagnostic logging
+    auto length_check = check_text_length(text, LengthLimits::QWEN_MT_API_MAX, "Qwen-MT");
+    if (!length_check.ok) {
+        last_error_ = length_check.error_message;
+        PLOG_WARNING << "Qwen-MT text length check failed: " << length_check.error_message;
+        PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
+        return false;
+    }
+
+    PLOG_DEBUG << "Qwen-MT translation request - Text length: " << length_check.byte_size << " bytes";
+
     if (text.empty()) return false;
 
     std::string url = cfg_.base_url;
 
     std::string target = mapTarget(dst_lang);
 
+    // PHASE 2: Fix buffer reservation
     std::string body;
-    body.reserve(512 + text.size());
+    body.reserve(calculate_json_buffer_size(text.size()));
     body += "{\"model\":\"" + cfg_.model + "\",";
     body += "\"messages\":[{\"role\":\"user\",\"content\":\"" + escapeJSON(text) + "\"}],";
     body += "\"translation_options\":{\"source_lang\":\"auto\",\"target_lang\":\"" + target + "\"}}";
 
+    PLOG_DEBUG << "Qwen-MT request body size: " << body.size() << " bytes";
+
     std::vector<translate::Header> headers{{"Content-Type","application/json"},{"Authorization", std::string("Bearer ")+cfg_.api_key}};
-    translate::SessionConfig scfg; scfg.connect_timeout_ms = 5000; scfg.timeout_ms = 45000; scfg.cancel_flag = &running_;
+
+    // PHASE 2: Adaptive timeout
+    translate::SessionConfig scfg;
+    scfg.connect_timeout_ms = 5000;
+    scfg.timeout_ms = 45000;
+    scfg.text_length_hint = text.size();
+    scfg.use_adaptive_timeout = true;
+    scfg.cancel_flag = &running_;
+
     auto r = translate::post_json(url, body, headers, scfg);
+
+    // PHASE 1: Enhanced error handling
     if (!r.error.empty())
     {
-        std::string err_msg = r.error;
+        auto err_type = categorize_http_error(0, r.error);
+        std::string err_msg = get_error_description(err_type, 0, r.error);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
             PLOG_WARNING << "Qwen-MT request failed: " << err_msg;
+            PLOG_DEBUG << "Original error: " << r.error;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "Qwen-MT request failed",
                 err_msg);
@@ -232,11 +261,13 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
     }
     if (r.status_code < 200 || r.status_code >= 300)
     {
-        std::string err_msg = std::string("http ") + std::to_string(r.status_code);
+        auto err_type = categorize_http_error(r.status_code, "");
+        std::string err_msg = get_error_description(err_type, r.status_code, r.text);
         if (last_error_ != err_msg)
         {
             last_error_ = err_msg;
-            PLOG_WARNING << "Qwen-MT request failed with status " << r.status_code << ": " << r.text;
+            PLOG_WARNING << "Qwen-MT request failed: " << err_msg;
+            PLOG_DEBUG << "Response body: " << r.text;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
                 "Qwen-MT HTTP error",
                 std::to_string(r.status_code) + ": " + r.text);

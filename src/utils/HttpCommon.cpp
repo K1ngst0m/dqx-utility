@@ -7,7 +7,17 @@
  
  inline void apply_common(cpr::Session& s, const translate::SessionConfig& cfg) {
      s.SetConnectTimeout(cpr::ConnectTimeout{cfg.connect_timeout_ms});
-     s.SetTimeout(cpr::Timeout{cfg.timeout_ms});
+
+     // Use adaptive timeout if enabled and text length hint is provided
+     int actual_timeout = cfg.timeout_ms;
+     if (cfg.use_adaptive_timeout && cfg.text_length_hint > 0) {
+         // Add 2 seconds per 100 characters
+         const int extra_ms = static_cast<int>((cfg.text_length_hint / 100) * 2000);
+         actual_timeout = cfg.timeout_ms + extra_ms;
+     }
+
+     s.SetTimeout(cpr::Timeout{actual_timeout});
+
      if (cfg.cancel_flag) {
          s.SetProgressCallback(cpr::ProgressCallback(
              [](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t userdata) -> bool {

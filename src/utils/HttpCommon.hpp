@@ -16,6 +16,10 @@
      int connect_timeout_ms = 5000;
      int timeout_ms = 45000;
      std::atomic<bool>* cancel_flag = nullptr;
+
+     // Optional adaptive timeout based on text length
+     bool use_adaptive_timeout = true;
+     std::size_t text_length_hint = 0;  // Set this for adaptive timeout calculation
  };
 
  struct HttpResponse {
