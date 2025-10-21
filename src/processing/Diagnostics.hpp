@@ -5,9 +5,11 @@
 #include <string>
 #include <string_view>
 
-namespace processing {
+namespace processing
+{
 
-class Diagnostics {
+class Diagnostics
+{
 public:
     static constexpr int kLogInstance = 1;
 

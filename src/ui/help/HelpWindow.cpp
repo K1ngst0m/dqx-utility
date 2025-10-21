@@ -16,19 +16,32 @@
 #include <cmath>
 #include <string_view>
 
-namespace {
+namespace
+{
 
-constexpr ImVec4 kOkColor{52.0f / 255.0f, 168.0f / 255.0f, 83.0f / 255.0f, 1.0f};
-constexpr ImVec4 kWarningColor{211.0f / 255.0f, 168.0f / 255.0f, 0.0f, 1.0f};
-constexpr ImVec4 kErrorColor{229.0f / 255.0f, 57.0f / 255.0f, 53.0f / 255.0f, 1.0f};
+constexpr ImVec4 kOkColor{ 52.0f / 255.0f, 168.0f / 255.0f, 83.0f / 255.0f, 1.0f };
+constexpr ImVec4 kWarningColor{ 211.0f / 255.0f, 168.0f / 255.0f, 0.0f, 1.0f };
+constexpr ImVec4 kErrorColor{ 229.0f / 255.0f, 57.0f / 255.0f, 53.0f / 255.0f, 1.0f };
 constexpr float kFadeDelaySeconds = 8.0f;
 constexpr float kFadeDurationSeconds = 1.5f;
 
 std::string trimWhitespace(std::string text)
 {
-    auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
-    auto begin = std::find_if_not(text.begin(), text.end(), [&](char c) { return is_space(static_cast<unsigned char>(c)); });
-    auto end = std::find_if_not(text.rbegin(), text.rend(), [&](char c) { return is_space(static_cast<unsigned char>(c)); }).base();
+    auto is_space = [](unsigned char c)
+    {
+        return std::isspace(c) != 0;
+    };
+    auto begin = std::find_if_not(text.begin(), text.end(),
+                                  [&](char c)
+                                  {
+                                      return is_space(static_cast<unsigned char>(c));
+                                  });
+    auto end = std::find_if_not(text.rbegin(), text.rend(),
+                                [&](char c)
+                                {
+                                    return is_space(static_cast<unsigned char>(c));
+                                })
+                   .base();
     if (begin >= end)
         return {};
     std::string result(begin, end);
@@ -58,10 +71,7 @@ HelpWindow::HelpWindow(FontManager& font_manager, const std::string& name)
     refreshFontBinding();
 }
 
-HelpWindow::~HelpWindow()
-{
-    font_manager_.unregisterDialog(state_.ui_state());
-}
+HelpWindow::~HelpWindow() { font_manager_.unregisterDialog(state_.ui_state()); }
 
 void HelpWindow::rename(const char* new_name)
 {
@@ -71,10 +81,7 @@ void HelpWindow::rename(const char* new_name)
     window_label_ = name_ + "###" + id_suffix_;
 }
 
-void HelpWindow::refreshFontBinding()
-{
-    font_manager_.ensureFont(state_.ui_state());
-}
+void HelpWindow::refreshFontBinding() { font_manager_.ensureFont(state_.ui_state()); }
 
 ImVec4 HelpWindow::colorFor(StatusKind kind)
 {
@@ -95,7 +102,7 @@ std::string HelpWindow::sanitizeErrorMessage(const std::string& message)
     if (message.empty())
         return {};
 
-    static constexpr std::string_view kToken{"dqxclarity"};
+    static constexpr std::string_view kToken{ "dqxclarity" };
 
     std::string buffer;
     buffer.reserve(message.size());
@@ -166,7 +173,8 @@ HelpWindow::StatusInfo HelpWindow::evaluateStatus() const
     {
         info.kind = StatusKind::Warning;
         info.status_text = i18n::get("help.status.warning");
-        info.message = ui::LocalizedOrFallback("help.message.game_not_running", "DQX is not running. Please launch the game first.");
+        info.message = ui::LocalizedOrFallback("help.message.game_not_running",
+                                               "DQX is not running. Please launch the game first.");
         info.color = colorFor(info.kind);
         return info;
     }
@@ -175,7 +183,8 @@ HelpWindow::StatusInfo HelpWindow::evaluateStatus() const
     {
         info.kind = StatusKind::Warning;
         info.status_text = i18n::get("help.status.warning");
-        info.message = ui::LocalizedOrFallback("help.message.waiting_for_service", "Waiting for DQX-Utility to finish initializing...");
+        info.message = ui::LocalizedOrFallback("help.message.waiting_for_service",
+                                               "Waiting for DQX-Utility to finish initializing...");
         info.color = colorFor(info.kind);
         return info;
     }
@@ -189,14 +198,17 @@ HelpWindow::StatusInfo HelpWindow::evaluateStatus() const
         info.status_text = i18n::get("help.status.error");
         std::string raw = launcher->getLastErrorMessage();
         std::string sanitized = sanitizeErrorMessage(raw);
-        std::string generic = ui::LocalizedOrFallback("help.message.error_generic", "Initialization failed. Please check the logs for details.");
+        std::string generic = ui::LocalizedOrFallback("help.message.error_generic",
+                                                      "Initialization failed. Please check the logs for details.");
         if (sanitized.empty())
         {
             info.message = generic;
         }
         else
         {
-            info.message = i18n::format("help.message.error_with_reason", {{"reason", sanitized}});
+            info.message = i18n::format("help.message.error_with_reason", {
+                                                                              { "reason", sanitized }
+            });
         }
         info.color = colorFor(info.kind);
         return info;
@@ -213,7 +225,8 @@ HelpWindow::StatusInfo HelpWindow::evaluateStatus() const
 
     info.kind = StatusKind::Warning;
     info.status_text = i18n::get("help.status.warning");
-    info.message = ui::LocalizedOrFallback("help.message.waiting_for_service", "Waiting for DQX-Utility to finish initializing...");
+    info.message = ui::LocalizedOrFallback("help.message.waiting_for_service",
+                                           "Waiting for DQX-Utility to finish initializing...");
     info.color = colorFor(info.kind);
     return info;
 }
@@ -281,19 +294,19 @@ void HelpWindow::render()
     if (status.kind == StatusKind::Ok)
     {
         int seconds = static_cast<int>(std::ceil(std::max(0.0f, countdown_seconds_)));
-        status.message = i18n::format("help.message.ready_with_timer", {{"seconds", std::to_string(seconds)}});
+        status.message = i18n::format("help.message.ready_with_timer", {
+                                                                           { "seconds", std::to_string(seconds) }
+        });
     }
 
-    UITheme::pushDialogStyle(state_.ui_state().background_alpha,
-                             state_.ui_state().padding,
-                             state_.ui_state().rounding,
-                             state_.ui_state().border_thickness,
-                             state_.ui_state().border_enabled);
+    UITheme::pushDialogStyle(state_.ui_state().background_alpha, state_.ui_state().padding, state_.ui_state().rounding,
+                             state_.ui_state().border_thickness, state_.ui_state().border_enabled);
     ImGui::PushStyleColor(ImGuiCol_Border, status.color);
     ImGui::PushStyleColor(ImGuiCol_Text, status.color);
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, fade_alpha_);
 
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+    ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
     if (auto* cm = ConfigManager_Get())
     {
         if (cm->getAppMode() == ConfigManager::AppMode::Mini)
@@ -313,7 +326,8 @@ void HelpWindow::render()
         state_.ui_state().pending_resize = false;
         state_.ui_state().is_docked = ImGui::IsWindowDocked();
 
-        bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_ChildWindows);
+        bool hovered =
+            ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_ChildWindows);
         last_hovered_ = hovered;
 
         const float wrap_width = std::max(80.0f, state_.ui_state().width - state_.ui_state().padding.x * 2.0f);

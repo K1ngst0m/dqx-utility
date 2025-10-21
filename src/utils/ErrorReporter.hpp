@@ -6,32 +6,33 @@
 #include <chrono>
 #include <cstddef>
 
-namespace utils {
+namespace utils
+{
 
 enum class ErrorCategory
 {
-    Initialization,   // SDL, ImGui, window creation
-    MemoryHook,       // DialogHook, memory operations
+    Initialization, // SDL, ImGui, window creation
+    MemoryHook, // DialogHook, memory operations
     ProcessDetection, // DQXGame.exe not found
-    Configuration,    // TOML parsing, invalid config
-    IPC,              // TextSourceClient connection
-    Translation,      // API failures (OpenAI, Google)
+    Configuration, // TOML parsing, invalid config
+    IPC, // TextSourceClient connection
+    Translation, // API failures (OpenAI, Google)
     Unknown
 };
 
 enum class ErrorSeverity
 {
-    Info,    // Informational, no action needed
+    Info, // Informational, no action needed
     Warning, // Degraded functionality, but continues
-    Error,   // Operation failed, but app can continue
-    Fatal    // Critical error, app should exit
+    Error, // Operation failed, but app can continue
+    Fatal // Critical error, app should exit
 };
 
 struct ErrorReport
 {
     ErrorCategory category;
     ErrorSeverity severity;
-    std::string user_message;      // Non-technical, actionable message for users
+    std::string user_message; // Non-technical, actionable message for users
     std::string technical_details; // Technical details for logs/bug reports
     std::string timestamp;
     bool is_fatal;
@@ -67,30 +68,26 @@ public:
      * @param user_message User-friendly message
      * @param technical_details Technical details for debugging
      */
-    static void ReportError(ErrorCategory category, ErrorSeverity severity,
-                           const std::string& user_message,
-                           const std::string& technical_details = "");
+    static void ReportError(ErrorCategory category, ErrorSeverity severity, const std::string& user_message,
+                            const std::string& technical_details = "");
 
     /**
      * @brief Report a fatal error (logs and queues for UI)
      */
-    static void ReportFatal(ErrorCategory category,
-                           const std::string& user_message,
-                           const std::string& technical_details = "");
+    static void ReportFatal(ErrorCategory category, const std::string& user_message,
+                            const std::string& technical_details = "");
 
     /**
      * @brief Report a regular error
      */
-    static void ReportError(ErrorCategory category,
-                           const std::string& user_message,
-                           const std::string& technical_details = "");
+    static void ReportError(ErrorCategory category, const std::string& user_message,
+                            const std::string& technical_details = "");
 
     /**
      * @brief Report a warning
      */
-    static void ReportWarning(ErrorCategory category,
-                             const std::string& user_message,
-                             const std::string& technical_details = "");
+    static void ReportWarning(ErrorCategory category, const std::string& user_message,
+                              const std::string& technical_details = "");
 
     /**
      * @brief Check if there are pending errors to display

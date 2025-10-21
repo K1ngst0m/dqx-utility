@@ -10,7 +10,8 @@
 
 #include <string>
 
-namespace ui {
+namespace ui
+{
 
 UIEventHandler::UIEventHandler(AppContext& app_context, WindowRegistry& registry)
     : app_context_(app_context)
@@ -29,29 +30,26 @@ bool UIEventHandler::IsMouseOutsideDialogs() const
         if (auto* dialog = dynamic_cast<DialogWindow*>(window))
         {
             const auto& state = dialog->state();
-            return ImGui::IsMouseHoveringRect(
-                state.ui_state().window_pos,
-                ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
-                       state.ui_state().window_pos.y + state.ui_state().window_size.y),
-                false);
+            return ImGui::IsMouseHoveringRect(state.ui_state().window_pos,
+                                              ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
+                                                     state.ui_state().window_pos.y + state.ui_state().window_size.y),
+                                              false);
         }
         if (auto* quest = dynamic_cast<QuestWindow*>(window))
         {
             const auto& state = quest->state();
-            return ImGui::IsMouseHoveringRect(
-                state.ui_state().window_pos,
-                ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
-                       state.ui_state().window_pos.y + state.ui_state().window_size.y),
-                false);
+            return ImGui::IsMouseHoveringRect(state.ui_state().window_pos,
+                                              ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
+                                                     state.ui_state().window_pos.y + state.ui_state().window_size.y),
+                                              false);
         }
         if (auto* help = dynamic_cast<HelpWindow*>(window))
         {
             const auto& state = help->state();
-            return ImGui::IsMouseHoveringRect(
-                state.ui_state().window_pos,
-                ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
-                       state.ui_state().window_pos.y + state.ui_state().window_size.y),
-                false);
+            return ImGui::IsMouseHoveringRect(state.ui_state().window_pos,
+                                              ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
+                                                     state.ui_state().window_pos.y + state.ui_state().window_size.y),
+                                              false);
         }
         return false;
     };
@@ -112,9 +110,11 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
             if (auto* cm = ConfigManager_Get())
             {
                 auto mode = cm->getAppMode();
-                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, mode == ConfigManager::AppMode::Normal))
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr,
+                                    mode == ConfigManager::AppMode::Normal))
                     cm->setAppMode(ConfigManager::AppMode::Normal);
-                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, mode == ConfigManager::AppMode::Borderless))
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr,
+                                    mode == ConfigManager::AppMode::Borderless))
                     cm->setAppMode(ConfigManager::AppMode::Borderless);
                 // Temporarily disable Mini mode due to unresolved issues
                 // if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, mode == ConfigManager::AppMode::Mini))

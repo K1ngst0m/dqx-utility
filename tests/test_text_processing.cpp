@@ -6,60 +6,67 @@
 #include "processing/JapaneseTextDetector.hpp"
 #include "processing/TextPipeline.hpp"
 
-namespace {
-    void safe_copy_utf8(char* dest, size_t dest_size, const std::string& src)
+namespace
+{
+void safe_copy_utf8(char* dest, size_t dest_size, const std::string& src)
+{
+    if (dest_size == 0)
+        return;
+    if (src.empty())
     {
-        if (dest_size == 0) return;
-        if (src.empty()) { dest[0] = '\0'; return; }
-        
-        size_t copy_len = std::min(src.length(), dest_size - 1);
-        
-        if (copy_len < src.length())
-        {
-            while (copy_len > 0 && (src[copy_len] & 0x80) && !(src[copy_len] & 0x40))
-            {
-                --copy_len;
-            }
-        }
-        
-        std::memcpy(dest, src.c_str(), copy_len);
-        dest[copy_len] = '\0';
+        dest[0] = '\0';
+        return;
     }
-    
-    std::string collapse_newlines(const std::string& text)
+
+    size_t copy_len = std::min(src.length(), dest_size - 1);
+
+    if (copy_len < src.length())
     {
-        if (text.empty()) return text;
-        
-        std::string result;
-        result.reserve(text.size());
-        
-        int consecutive_newlines = 0;
-        for (size_t i = 0; i < text.size(); ++i)
+        while (copy_len > 0 && (src[copy_len] & 0x80) && !(src[copy_len] & 0x40))
         {
-            char c = text[i];
-            if (c == '\n' || c == '\r')
-            {
-                if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
-                {
-                    continue;
-                }
-                
-                consecutive_newlines++;
-                if (consecutive_newlines <= 2)
-                {
-                    result += '\n';
-                }
-            }
-            else
-            {
-                consecutive_newlines = 0;
-                result += c;
-            }
+            --copy_len;
         }
-        
-        return result;
     }
+
+    std::memcpy(dest, src.c_str(), copy_len);
+    dest[copy_len] = '\0';
 }
+
+std::string collapse_newlines(const std::string& text)
+{
+    if (text.empty())
+        return text;
+
+    std::string result;
+    result.reserve(text.size());
+
+    int consecutive_newlines = 0;
+    for (size_t i = 0; i < text.size(); ++i)
+    {
+        char c = text[i];
+        if (c == '\n' || c == '\r')
+        {
+            if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+            {
+                continue;
+            }
+
+            consecutive_newlines++;
+            if (consecutive_newlines <= 2)
+            {
+                result += '\n';
+            }
+        }
+        else
+        {
+            consecutive_newlines = 0;
+            result += c;
+        }
+    }
+
+    return result;
+}
+} // namespace
 
 TEST_CASE("safe_copy_utf8 handles basic ASCII", "[text_processing]")
 {
@@ -78,7 +85,7 @@ TEST_CASE("safe_copy_utf8 handles empty string", "[text_processing]")
 
 TEST_CASE("safe_copy_utf8 handles zero buffer size", "[text_processing]")
 {
-    char buffer[1] = {'X'};
+    char buffer[1] = { 'X' };
     safe_copy_utf8(buffer, 0, "test");
     REQUIRE(buffer[0] == 'X');
 }
@@ -88,19 +95,26 @@ TEST_CASE("safe_copy_utf8 truncates at UTF-8 boundary", "[text_processing]")
     char buffer[10];
     std::string japanese = "こんにちは";
     safe_copy_utf8(buffer, sizeof(buffer), japanese);
-    
+
     size_t len = std::strlen(buffer);
     REQUIRE(len < sizeof(buffer));
     REQUIRE(len > 0);
-    
-    for (size_t i = 0; i < len; ++i) {
+
+    for (size_t i = 0; i < len; ++i)
+    {
         unsigned char c = static_cast<unsigned char>(buffer[i]);
-        if ((c & 0x80) != 0) {
-            if ((c & 0xE0) == 0xC0) {
+        if ((c & 0x80) != 0)
+        {
+            if ((c & 0xE0) == 0xC0)
+            {
                 REQUIRE(i + 1 < len);
-            } else if ((c & 0xF0) == 0xE0) {
+            }
+            else if ((c & 0xF0) == 0xE0)
+            {
                 REQUIRE(i + 2 < len);
-            } else if ((c & 0xF8) == 0xF0) {
+            }
+            else if ((c & 0xF8) == 0xF0)
+            {
                 REQUIRE(i + 3 < len);
             }
         }
@@ -263,7 +277,7 @@ TEST_CASE("safe_copy_utf8 buffer boundary with emoji", "[text_processing]")
     char buffer[20];
     std::string emoji_text = "Test 😀 Emoji";
     safe_copy_utf8(buffer, sizeof(buffer), emoji_text);
-    
+
     size_t len = std::strlen(buffer);
     REQUIRE(len < sizeof(buffer));
 }
@@ -282,9 +296,9 @@ TEST_CASE("collapse_newlines performance with large text", "[text_processing]")
     {
         input += "Line " + std::to_string(i) + "\n\n\n\n";
     }
-    
+
     std::string result = collapse_newlines(input);
-    
+
     size_t newline_count = std::count(result.begin(), result.end(), '\n');
     REQUIRE(newline_count <= 200);
 }

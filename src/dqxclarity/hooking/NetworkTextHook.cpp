@@ -13,9 +13,11 @@
 #include <sstream>
 #include <string_view>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-namespace {
+namespace
+{
 
 constexpr std::size_t kMaxLogFileSize = 10u * 1024u * 1024u;
 constexpr std::size_t kLogFileBackups = 3u;
@@ -25,45 +27,60 @@ bool IsValidUtf8(std::string_view text)
     std::size_t index = 0;
     const std::size_t size = text.size();
 
-    while (index < size) {
+    while (index < size)
+    {
         const unsigned char lead = static_cast<unsigned char>(text[index]);
 
-        if (lead < 0x80u) {
+        if (lead < 0x80u)
+        {
             ++index;
             continue;
         }
 
-        if ((lead >> 5) == 0x6) {
-            if (index + 1 >= size) return false;
+        if ((lead >> 5) == 0x6)
+        {
+            if (index + 1 >= size)
+                return false;
             const unsigned char c1 = static_cast<unsigned char>(text[index + 1]);
-            if ((c1 & 0xC0u) != 0x80u) return false;
+            if ((c1 & 0xC0u) != 0x80u)
+                return false;
             const uint32_t codepoint = ((lead & 0x1Fu) << 6) | (c1 & 0x3Fu);
-            if (codepoint < 0x80u) return false; // overlong
+            if (codepoint < 0x80u)
+                return false; // overlong
             index += 2;
             continue;
         }
 
-        if ((lead >> 4) == 0xEu) {
-            if (index + 2 >= size) return false;
+        if ((lead >> 4) == 0xEu)
+        {
+            if (index + 2 >= size)
+                return false;
             const unsigned char c1 = static_cast<unsigned char>(text[index + 1]);
             const unsigned char c2 = static_cast<unsigned char>(text[index + 2]);
-            if ((c1 & 0xC0u) != 0x80u || (c2 & 0xC0u) != 0x80u) return false;
+            if ((c1 & 0xC0u) != 0x80u || (c2 & 0xC0u) != 0x80u)
+                return false;
             const uint32_t codepoint = ((lead & 0x0Fu) << 12) | ((c1 & 0x3Fu) << 6) | (c2 & 0x3Fu);
-            if (codepoint < 0x800u) return false; // overlong
-            if (codepoint >= 0xD800u && codepoint <= 0xDFFFu) return false; // surrogate range
+            if (codepoint < 0x800u)
+                return false; // overlong
+            if (codepoint >= 0xD800u && codepoint <= 0xDFFFu)
+                return false; // surrogate range
             index += 3;
             continue;
         }
 
-        if ((lead >> 3) == 0x1Eu) {
-            if (index + 3 >= size) return false;
+        if ((lead >> 3) == 0x1Eu)
+        {
+            if (index + 3 >= size)
+                return false;
             const unsigned char c1 = static_cast<unsigned char>(text[index + 1]);
             const unsigned char c2 = static_cast<unsigned char>(text[index + 2]);
             const unsigned char c3 = static_cast<unsigned char>(text[index + 3]);
-            if ((c1 & 0xC0u) != 0x80u || (c2 & 0xC0u) != 0x80u || (c3 & 0xC0u) != 0x80u) return false;
-            const uint32_t codepoint = ((lead & 0x07u) << 18) | ((c1 & 0x3Fu) << 12) |
-                                       ((c2 & 0x3Fu) << 6) | (c3 & 0x3Fu);
-            if (codepoint < 0x10000u || codepoint > 0x10FFFFu) return false;
+            if ((c1 & 0xC0u) != 0x80u || (c2 & 0xC0u) != 0x80u || (c3 & 0xC0u) != 0x80u)
+                return false;
+            const uint32_t codepoint =
+                ((lead & 0x07u) << 18) | ((c1 & 0x3Fu) << 12) | ((c2 & 0x3Fu) << 6) | (c3 & 0x3Fu);
+            if (codepoint < 0x10000u || codepoint > 0x10FFFFu)
+                return false;
             index += 4;
             continue;
         }
@@ -78,22 +95,41 @@ std::string EscapeJson(std::string_view input)
 {
     std::string out;
     out.reserve(input.size() + 16);
-    for (char ch : input) {
-        switch (ch) {
-        case '"': out += "\\\""; break;
-        case '\\': out += "\\\\"; break;
-        case '\b': out += "\\b"; break;
-        case '\f': out += "\\f"; break;
-        case '\n': out += "\\n"; break;
-        case '\r': out += "\\r"; break;
-        case '\t': out += "\\t"; break;
+    for (char ch : input)
+    {
+        switch (ch)
+        {
+        case '"':
+            out += "\\\"";
+            break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\b':
+            out += "\\b";
+            break;
+        case '\f':
+            out += "\\f";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
         default:
-            if (static_cast<unsigned char>(ch) < 0x20) {
+            if (static_cast<unsigned char>(ch) < 0x20)
+            {
                 std::ostringstream oss;
                 oss << "\\u" << std::hex << std::uppercase << std::setw(4) << std::setfill('0')
                     << static_cast<int>(static_cast<unsigned char>(ch));
                 out += oss.str();
-            } else {
+            }
+            else
+            {
                 out += ch;
             }
             break;
@@ -111,15 +147,18 @@ std::string ToHex(uintptr_t value)
 
 std::string BytesToHex(std::string_view data)
 {
-    if (data.empty()) {
+    if (data.empty())
+    {
         return {};
     }
 
     std::ostringstream oss;
     oss << std::hex << std::uppercase << std::setfill('0');
     bool first = true;
-    for (unsigned char ch : data) {
-        if (!first) {
+    for (unsigned char ch : data)
+    {
+        if (!first)
+        {
             oss << ' ';
         }
         first = false;
@@ -130,8 +169,9 @@ std::string BytesToHex(std::string_view data)
 
 std::string FormatTimestamp(const std::tm& tm)
 {
-    char buffer[32] = {0};
-    if (std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S", &tm) == 0) {
+    char buffer[32] = { 0 };
+    if (std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S", &tm) == 0)
+    {
         return {};
     }
     return buffer;
@@ -139,28 +179,35 @@ std::string FormatTimestamp(const std::tm& tm)
 
 void RotateLogsIfNeeded()
 {
-    try {
-        const std::filesystem::path path{"logs/network.log"};
-        if (!std::filesystem::exists(path)) {
+    try
+    {
+        const std::filesystem::path path{ "logs/network.log" };
+        if (!std::filesystem::exists(path))
+        {
             return;
         }
 
         const auto size = std::filesystem::file_size(path);
-        if (size <= kMaxLogFileSize) {
+        if (size <= kMaxLogFileSize)
+        {
             return;
         }
 
-        for (std::size_t i = kLogFileBackups; i > 0; --i) {
+        for (std::size_t i = kLogFileBackups; i > 0; --i)
+        {
             const auto from = i == 1 ? path : std::filesystem::path(path.string() + "." + std::to_string(i - 1));
             const auto to = std::filesystem::path(path.string() + "." + std::to_string(i));
-            if (std::filesystem::exists(from)) {
+            if (std::filesystem::exists(from))
+            {
                 std::error_code ec;
                 std::filesystem::rename(from, to, ec);
             }
         }
 
         std::ofstream truncate_stream(path, std::ios::trunc);
-    } catch (...) {
+    }
+    catch (...)
+    {
     }
 }
 
@@ -169,17 +216,23 @@ void WriteNetworkLog(const NetworkTextHook::Capture& data)
     static std::once_flag once;
     static std::mutex log_mutex;
 
-    std::call_once(once, [] {
-        try {
-            std::filesystem::create_directories("logs");
-        } catch (...) {
-        }
-    });
+    std::call_once(once,
+                   []
+                   {
+                       try
+                       {
+                           std::filesystem::create_directories("logs");
+                       }
+                       catch (...)
+                       {
+                       }
+                   });
 
     std::lock_guard<std::mutex> lock(log_mutex);
 
     std::ofstream stream("logs/network.log", std::ios::app);
-    if (!stream.is_open()) {
+    if (!stream.is_open())
+    {
         return;
     }
 
@@ -193,8 +246,7 @@ void WriteNetworkLog(const NetworkTextHook::Capture& data)
 #endif
 
     std::ostringstream entry;
-    entry << '{'
-          << "\"timestamp\":\"" << EscapeJson(FormatTimestamp(local_tm)) << "\",";
+    entry << '{' << "\"timestamp\":\"" << EscapeJson(FormatTimestamp(local_tm)) << "\",";
     entry << "\"text_ptr\":\"" << EscapeJson(ToHex(data.text_ptr)) << "\",";
     entry << "\"category_ptr\":\"" << EscapeJson(ToHex(data.category_ptr)) << "\",";
     entry << "\"category\":\"" << EscapeJson(data.category) << "\",";
@@ -220,40 +272,51 @@ NetworkTextHook::NetworkTextHook(std::shared_ptr<IProcessMemory> memory)
 
 NetworkTextHook::~NetworkTextHook()
 {
-    if (m_is_installed) {
+    if (m_is_installed)
+    {
         RemoveHook();
     }
 }
 
 bool NetworkTextHook::InstallHook(bool enable_patch)
 {
-    if (m_is_installed && enable_patch) {
+    if (m_is_installed && enable_patch)
+    {
         return true;
     }
 
-    if (!FindNetworkTriggerAddress()) {
-        if (m_logger.error) m_logger.error("Failed to find network text trigger address");
+    if (!FindNetworkTriggerAddress())
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to find network text trigger address");
         return false;
     }
 
-    if (!AllocateDetourMemory()) {
-        if (m_logger.error) m_logger.error("Failed to allocate network text detour memory");
+    if (!AllocateDetourMemory())
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to allocate network text detour memory");
         return false;
     }
 
     const size_t stolen_bytes = ComputeStolenLength();
     m_original_bytes.resize(stolen_bytes);
-    if (!m_memory->ReadMemory(m_hook_address, m_original_bytes.data(), stolen_bytes)) {
-        if (m_logger.error) m_logger.error("Failed to read network text hook original bytes");
+    if (!m_memory->ReadMemory(m_hook_address, m_original_bytes.data(), stolen_bytes))
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to read network text hook original bytes");
         return false;
     }
 
-    if (!WriteDetourCode()) {
-        if (m_logger.error) m_logger.error("Failed to write network text detour code");
+    if (!WriteDetourCode())
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to write network text detour code");
         return false;
     }
 
-    if (!enable_patch) {
+    if (!enable_patch)
+    {
         return true;
     }
 
@@ -262,7 +325,8 @@ bool NetworkTextHook::InstallHook(bool enable_patch)
 
 bool NetworkTextHook::EnablePatch()
 {
-    if (m_original_bytes.empty()) {
+    if (m_original_bytes.empty())
+    {
         return false;
     }
 
@@ -272,12 +336,15 @@ bool NetworkTextHook::EnablePatch()
     patch_bytes.insert(patch_bytes.end(), reinterpret_cast<const uint8_t*>(&jump_offset),
                        reinterpret_cast<const uint8_t*>(&jump_offset) + sizeof(uint32_t));
 
-    while (patch_bytes.size() < m_original_bytes.size()) {
+    while (patch_bytes.size() < m_original_bytes.size())
+    {
         patch_bytes.push_back(0x90);
     }
 
-    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes)) {
-        if (m_logger.error) m_logger.error("Failed to write network text hook patch bytes");
+    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes))
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to write network text hook patch bytes");
         return false;
     }
 
@@ -287,18 +354,21 @@ bool NetworkTextHook::EnablePatch()
 
 bool NetworkTextHook::RemoveHook()
 {
-    if (!m_is_installed) {
+    if (!m_is_installed)
+    {
         return true;
     }
 
     RestoreOriginalFunction();
 
-    if (m_detour_address != 0) {
+    if (m_detour_address != 0)
+    {
         m_memory->FreeMemory(m_detour_address, 4096);
         m_detour_address = 0;
     }
 
-    if (m_backup_address != 0) {
+    if (m_backup_address != 0)
+    {
         m_memory->FreeMemory(m_backup_address, 256);
         m_backup_address = 0;
     }
@@ -309,7 +379,8 @@ bool NetworkTextHook::RemoveHook()
 
 bool NetworkTextHook::ReapplyPatch()
 {
-    if (m_original_bytes.empty()) {
+    if (m_original_bytes.empty())
+    {
         return false;
     }
 
@@ -319,12 +390,15 @@ bool NetworkTextHook::ReapplyPatch()
     patch_bytes.insert(patch_bytes.end(), reinterpret_cast<const uint8_t*>(&jump_offset),
                        reinterpret_cast<const uint8_t*>(&jump_offset) + sizeof(uint32_t));
 
-    while (patch_bytes.size() < m_original_bytes.size()) {
+    while (patch_bytes.size() < m_original_bytes.size())
+    {
         patch_bytes.push_back(0x90);
     }
 
-    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes)) {
-        if (m_logger.error) m_logger.error("Failed to reapply network text hook patch");
+    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes))
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to reapply network text hook patch");
         return false;
     }
 
@@ -333,15 +407,18 @@ bool NetworkTextHook::ReapplyPatch()
 
 bool NetworkTextHook::IsPatched() const
 {
-    if (m_hook_address == 0 || m_detour_address == 0 || m_original_bytes.empty()) {
+    if (m_hook_address == 0 || m_detour_address == 0 || m_original_bytes.empty())
+    {
         return false;
     }
 
     std::vector<uint8_t> cur(m_original_bytes.size());
-    if (!m_memory->ReadMemory(m_hook_address, cur.data(), cur.size())) {
+    if (!m_memory->ReadMemory(m_hook_address, cur.data(), cur.size()))
+    {
         return false;
     }
-    if (cur.size() < 5 || cur[0] != 0xE9) {
+    if (cur.size() < 5 || cur[0] != 0xE9)
+    {
         return false;
     }
 
@@ -352,16 +429,19 @@ bool NetworkTextHook::IsPatched() const
 
 bool NetworkTextHook::PollNetworkText()
 {
-    if (!m_is_installed || m_backup_address == 0) {
+    if (!m_is_installed || m_backup_address == 0)
+    {
         return false;
     }
 
     uint8_t flag = 0;
-    if (!m_memory->ReadMemory(m_backup_address + kFlagOffset, &flag, sizeof(flag))) {
+    if (!m_memory->ReadMemory(m_backup_address + kFlagOffset, &flag, sizeof(flag)))
+    {
         return false;
     }
 
-    if (flag == 0) {
+    if (flag == 0)
+    {
         return false;
     }
 
@@ -370,10 +450,12 @@ bool NetworkTextHook::PollNetworkText()
 
     uint32_t text_ptr_raw = 0;
     uint32_t category_ptr_raw = 0;
-    if (!m_memory->ReadMemory(m_backup_address + kTextRegisterOffset, &text_ptr_raw, sizeof(text_ptr_raw))) {
+    if (!m_memory->ReadMemory(m_backup_address + kTextRegisterOffset, &text_ptr_raw, sizeof(text_ptr_raw)))
+    {
         return false;
     }
-    if (!m_memory->ReadMemory(m_backup_address + kCategoryRegisterOffset, &category_ptr_raw, sizeof(category_ptr_raw))) {
+    if (!m_memory->ReadMemory(m_backup_address + kCategoryRegisterOffset, &category_ptr_raw, sizeof(category_ptr_raw)))
+    {
         return false;
     }
 
@@ -385,26 +467,32 @@ bool NetworkTextHook::PollNetworkText()
 
     std::string category;
     std::string text;
-    if (category_ptr != 0) {
-        if (!m_memory->ReadString(category_ptr, category, kMaxCategoryLength)) {
+    if (category_ptr != 0)
+    {
+        if (!m_memory->ReadString(category_ptr, category, kMaxCategoryLength))
+        {
             category.clear();
         }
     }
     const std::string category_raw = category;
     const bool category_has_raw = !category_raw.empty();
     const bool category_valid = category_has_raw ? IsValidUtf8(category_raw) : true;
-    if (!category_valid) {
+    if (!category_valid)
+    {
         category.clear();
     }
-    if (text_ptr != 0) {
-        if (!m_memory->ReadString(text_ptr, text, kMaxTextLength)) {
+    if (text_ptr != 0)
+    {
+        if (!m_memory->ReadString(text_ptr, text, kMaxTextLength))
+        {
             text.clear();
         }
     }
     const std::string text_raw = text;
     const bool text_has_raw = !text_raw.empty();
     const bool text_valid = text_has_raw ? IsValidUtf8(text_raw) : true;
-    if (!text_valid) {
+    if (!text_valid)
+    {
         text.clear();
     }
 
@@ -424,17 +512,20 @@ bool NetworkTextHook::FindNetworkTriggerAddress()
     PatternFinder finder(m_memory);
     const auto& pattern = Signatures::GetNetworkText();
 
-    if (auto addr = finder.FindInModule(pattern, "DQXGame.exe")) {
+    if (auto addr = finder.FindInModule(pattern, "DQXGame.exe"))
+    {
         m_hook_address = *addr;
         return true;
     }
 
-    if (auto addr = finder.FindInProcessExec(pattern)) {
+    if (auto addr = finder.FindInProcessExec(pattern))
+    {
         m_hook_address = *addr;
         return true;
     }
 
-    if (auto addr = finder.FindWithFallback(pattern, "DQXGame.exe", 64u * 1024u * 1024u)) {
+    if (auto addr = finder.FindWithFallback(pattern, "DQXGame.exe", 64u * 1024u * 1024u))
+    {
         m_hook_address = *addr;
         return true;
     }
@@ -445,12 +536,14 @@ bool NetworkTextHook::FindNetworkTriggerAddress()
 bool NetworkTextHook::AllocateDetourMemory()
 {
     m_detour_address = m_memory->AllocateMemory(4096, true);
-    if (m_detour_address == 0) {
+    if (m_detour_address == 0)
+    {
         return false;
     }
 
     m_backup_address = m_memory->AllocateMemory(256, false);
-    if (m_backup_address == 0) {
+    if (m_backup_address == 0)
+    {
         m_memory->FreeMemory(m_detour_address, 4096);
         m_detour_address = 0;
         return false;
@@ -465,11 +558,13 @@ bool NetworkTextHook::AllocateDetourMemory()
 bool NetworkTextHook::WriteDetourCode()
 {
     auto bytecode = CreateDetourBytecode();
-    if (bytecode.empty()) {
+    if (bytecode.empty())
+    {
         return false;
     }
 
-    if (!m_memory->WriteMemory(m_detour_address, bytecode.data(), bytecode.size())) {
+    if (!m_memory->WriteMemory(m_detour_address, bytecode.data(), bytecode.size()))
+    {
         return false;
     }
 
@@ -477,14 +572,12 @@ bool NetworkTextHook::WriteDetourCode()
     return true;
 }
 
-bool NetworkTextHook::PatchOriginalFunction()
-{
-    return EnablePatch();
-}
+bool NetworkTextHook::PatchOriginalFunction() { return EnablePatch(); }
 
 void NetworkTextHook::RestoreOriginalFunction()
 {
-    if (m_hook_address != 0 && !m_original_bytes.empty()) {
+    if (m_hook_address != 0 && !m_original_bytes.empty())
+    {
         m_memory->WriteMemory(m_hook_address, m_original_bytes.data(), m_original_bytes.size());
     }
 }
@@ -555,12 +648,14 @@ void NetworkTextHook::EmitReturnJump(std::vector<uint8_t>& code)
 
 size_t NetworkTextHook::ComputeStolenLength()
 {
-    if (!m_instr_safe) {
+    if (!m_instr_safe)
+    {
         return kDefaultStolenBytes;
     }
 
     std::vector<uint8_t> head(kDefaultStolenBytes);
-    if (!m_memory->ReadMemory(m_hook_address, head.data(), head.size())) {
+    if (!m_memory->ReadMemory(m_hook_address, head.data(), head.size()))
+    {
         return kDefaultStolenBytes;
     }
     return kDefaultStolenBytes;

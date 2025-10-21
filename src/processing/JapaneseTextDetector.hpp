@@ -2,7 +2,8 @@
 
 #include <string_view>
 
-namespace processing {
+namespace processing
+{
 
 [[nodiscard]] bool ContainsJapaneseText(std::string_view text);
 

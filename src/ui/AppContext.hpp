@@ -17,6 +17,7 @@ public:
     void endFrame();
 
     SDL_Window* window() const { return window_; }
+
     SDL_Renderer* renderer() const { return renderer_; }
 
     void triggerVignette(float x, float y);
@@ -32,7 +33,7 @@ public:
 
 private:
     void updateRendererScale();
-    
+
     // Initialization phase helpers
     bool initializeSDL();
     bool createWindow();
@@ -40,14 +41,14 @@ private:
     bool initializeImGui();
     void reportInitError(const char* phase, const std::string& i18n_key, const std::string& details);
 
-    SDL_Window* window_        = nullptr;
-    SDL_Renderer* renderer_    = nullptr;
-    bool initialized_          = false;
-    bool is_resizing_          = false;
+    SDL_Window* window_ = nullptr;
+    SDL_Renderer* renderer_ = nullptr;
+    bool initialized_ = false;
+    bool is_resizing_ = false;
 
-    bool vignette_active_      = false;
-    float vignette_time_       = 0.0f;
-    float vignette_center_x_   = 0.0f;
-    float vignette_center_y_   = 0.0f;
+    bool vignette_active_ = false;
+    float vignette_time_ = 0.0f;
+    float vignette_center_x_ = 0.0f;
+    float vignette_center_y_ = 0.0f;
     static constexpr float vignette_duration_ = 1.0f;
 };

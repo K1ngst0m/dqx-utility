@@ -3,30 +3,24 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace processing {
-
-namespace {
-
-constexpr bool isHiragana(uint32_t cp) noexcept
+namespace processing
 {
-    return cp >= 0x3040u && cp <= 0x309Fu;
-}
+
+namespace
+{
+
+constexpr bool isHiragana(uint32_t cp) noexcept { return cp >= 0x3040u && cp <= 0x309Fu; }
 
 constexpr bool isKatakana(uint32_t cp) noexcept
 {
     return (cp >= 0x30A0u && cp <= 0x30FFu) || (cp >= 0x31F0u && cp <= 0x31FFu);
 }
 
-constexpr bool isHalfwidthKatakana(uint32_t cp) noexcept
-{
-    return cp >= 0xFF66u && cp <= 0xFF9Fu;
-}
+constexpr bool isHalfwidthKatakana(uint32_t cp) noexcept { return cp >= 0xFF66u && cp <= 0xFF9Fu; }
 
 constexpr bool isCjkUnified(uint32_t cp) noexcept
 {
-    return (cp >= 0x4E00u && cp <= 0x9FFFu) ||
-           (cp >= 0x3400u && cp <= 0x4DBFu) ||
-           (cp >= 0xF900u && cp <= 0xFAFFu);
+    return (cp >= 0x4E00u && cp <= 0x9FFFu) || (cp >= 0x3400u && cp <= 0x4DBFu) || (cp >= 0xF900u && cp <= 0xFAFFu);
 }
 
 constexpr bool isJapaneseSpecificPunctuation(uint32_t cp) noexcept
@@ -73,9 +67,17 @@ bool decodeNextUtf8(std::string_view text, size_t& index, uint32_t& codepoint)
 
     if (lead < 0xE0u)
     {
-        if (remaining < 2) { index = text.size(); return false; }
+        if (remaining < 2)
+        {
+            index = text.size();
+            return false;
+        }
         unsigned char c1 = static_cast<unsigned char>(text[index + 1]);
-        if ((c1 & 0xC0u) != 0x80u) { index += 1; return false; }
+        if ((c1 & 0xC0u) != 0x80u)
+        {
+            index += 1;
+            return false;
+        }
         codepoint = ((lead & 0x1Fu) << 6) | (c1 & 0x3Fu);
         index += 2;
         return true;
@@ -83,7 +85,11 @@ bool decodeNextUtf8(std::string_view text, size_t& index, uint32_t& codepoint)
 
     if (lead < 0xF0u)
     {
-        if (remaining < 3) { index = text.size(); return false; }
+        if (remaining < 3)
+        {
+            index = text.size();
+            return false;
+        }
         unsigned char c1 = static_cast<unsigned char>(text[index + 1]);
         unsigned char c2 = static_cast<unsigned char>(text[index + 2]);
         if ((c1 & 0xC0u) != 0x80u || (c2 & 0xC0u) != 0x80u)
@@ -108,7 +114,11 @@ bool decodeNextUtf8(std::string_view text, size_t& index, uint32_t& codepoint)
 
     if (lead < 0xF5u)
     {
-        if (remaining < 4) { index = text.size(); return false; }
+        if (remaining < 4)
+        {
+            index = text.size();
+            return false;
+        }
         unsigned char c1 = static_cast<unsigned char>(text[index + 1]);
         unsigned char c2 = static_cast<unsigned char>(text[index + 2]);
         unsigned char c3 = static_cast<unsigned char>(text[index + 3]);

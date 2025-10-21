@@ -2,9 +2,11 @@
 
 struct DialogStateManager;
 
-class AppearanceSettingsPanel {
+class AppearanceSettingsPanel
+{
 public:
-    struct RenderResult {
+    struct RenderResult
+    {
         bool width_changed = false;
         bool height_changed = false;
         bool alpha_changed = false;
@@ -12,7 +14,7 @@ public:
     };
 
     explicit AppearanceSettingsPanel(DialogStateManager& state);
-    
+
     RenderResult render();
 
 private:

@@ -44,12 +44,12 @@ struct TranslationConfig
     int max_retries;
     TranslationBackend translation_backend;
     TargetLang target_lang_enum;
-    std::array<char, URLSize>   openai_base_url{};
+    std::array<char, URLSize> openai_base_url{};
     std::array<char, ModelSize> openai_model{};
     std::array<char, ApiKeySize> openai_api_key{};
     std::array<char, ApiKeySize> google_api_key{};
     // Zhipu (BigModel) GLM settings
-    std::array<char, URLSize>   zhipu_base_url{};
+    std::array<char, URLSize> zhipu_base_url{};
     std::array<char, ModelSize> zhipu_model{};
     std::array<char, ApiKeySize> zhipu_api_key{};
 
@@ -77,10 +77,10 @@ struct TranslationConfig
         max_retries = 3;
         translation_backend = TranslationBackend::OpenAI;
         target_lang_enum = TargetLang::EN_US;
-        
+
         openai_base_url.fill('\0');
         std::snprintf(openai_base_url.data(), openai_base_url.size(), "%s", "https://api.openai.com");
-        
+
         openai_model.fill('\0');
         openai_api_key.fill('\0');
         google_api_key.fill('\0');

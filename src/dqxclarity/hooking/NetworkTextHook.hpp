@@ -10,11 +10,14 @@
 #include <string>
 #include <vector>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class NetworkTextHook {
+class NetworkTextHook
+{
 public:
-    struct Capture {
+    struct Capture
+    {
         uintptr_t text_ptr = 0;
         uintptr_t category_ptr = 0;
         std::string category;
@@ -35,8 +38,11 @@ public:
     bool IsPatched() const;
 
     void SetLogger(const dqxclarity::Logger& log) { m_logger = log; }
+
     void SetVerbose(bool enabled) { m_verbose = enabled; }
+
     void SetInstructionSafeSteal(bool enabled) { m_instr_safe = enabled; }
+
     void SetReadbackBytes(size_t n) { m_readback_n = n; }
 
     bool PollNetworkText();
@@ -44,6 +50,7 @@ public:
     const Capture& GetLastCapture() const { return m_last_capture; }
 
     uintptr_t GetHookAddress() const { return m_hook_address; }
+
     const std::vector<uint8_t>& GetOriginalBytes() const { return m_original_bytes; }
 
 private:

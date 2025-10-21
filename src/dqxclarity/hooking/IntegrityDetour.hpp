@@ -8,9 +8,11 @@
 #include <string>
 #include <mutex>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class IntegrityDetour {
+class IntegrityDetour
+{
 public:
     explicit IntegrityDetour(std::shared_ptr<IProcessMemory> memory);
     ~IntegrityDetour();
@@ -31,41 +33,50 @@ public:
     bool IsInstalled() const { return m_installed; }
 
     void SetLogger(const dqxclarity::Logger& log) { m_log = log; }
+
     void SetDiagnosticsEnabled(bool d) { m_diag = d; }
 
     // Provide a list of hook sites to temporarily restore during integrity.
     // Each call adds one site with its original bytes.
-    void AddRestoreTarget(uintptr_t address, const std::vector<uint8_t>& original_bytes) {
+    void AddRestoreTarget(uintptr_t address, const std::vector<uint8_t>& original_bytes)
+    {
         std::lock_guard<std::mutex> lock(m_restore_mutex);
-        for (auto& site : m_restore_sites) {
-            if (site.address == address) {
+        for (auto& site : m_restore_sites)
+        {
+            if (site.address == address)
+            {
                 site.bytes = original_bytes;
                 return;
             }
         }
-        m_restore_sites.push_back({address, original_bytes});
+        m_restore_sites.push_back({ address, original_bytes });
     }
 
-    void UpdateRestoreTarget(uintptr_t address, const std::vector<uint8_t>& original_bytes) {
+    void UpdateRestoreTarget(uintptr_t address, const std::vector<uint8_t>& original_bytes)
+    {
         AddRestoreTarget(address, original_bytes);
     }
 
-    void MoveRestoreTarget(uintptr_t old_address, uintptr_t new_address, const std::vector<uint8_t>& original_bytes) {
+    void MoveRestoreTarget(uintptr_t old_address, uintptr_t new_address, const std::vector<uint8_t>& original_bytes)
+    {
         std::lock_guard<std::mutex> lock(m_restore_mutex);
-        for (auto& site : m_restore_sites) {
-            if (site.address == old_address) {
+        for (auto& site : m_restore_sites)
+        {
+            if (site.address == old_address)
+            {
                 site.address = new_address;
                 site.bytes = original_bytes;
                 return;
             }
         }
-        m_restore_sites.push_back({new_address, original_bytes});
+        m_restore_sites.push_back({ new_address, original_bytes });
     }
 
 private:
-    struct RestoreSite {
-        uintptr_t address;                 // original hook site address
-        std::vector<uint8_t> bytes;        // original bytes to restore
+    struct RestoreSite
+    {
+        uintptr_t address; // original hook site address
+        std::vector<uint8_t> bytes; // original bytes to restore
     };
 
     std::shared_ptr<IProcessMemory> m_memory;
@@ -74,9 +85,9 @@ private:
     bool m_diag = false; // detailed diagnostics switch
     dqxclarity::Logger m_log{};
 
-    uintptr_t m_integrity_addr = 0;   // address of integrity function where we patch
-    uintptr_t m_trampoline_addr = 0;  // allocated exec memory with our code
-    uintptr_t m_state_addr = 0;       // allocated byte for state flag
+    uintptr_t m_integrity_addr = 0; // address of integrity function where we patch
+    uintptr_t m_trampoline_addr = 0; // allocated exec memory with our code
+    uintptr_t m_state_addr = 0; // allocated byte for state flag
 
     std::vector<uint8_t> m_original_bytes; // stolen original bytes (instruction-safe)
     std::vector<RestoreSite> m_restore_sites; // hook sites to temporarily restore

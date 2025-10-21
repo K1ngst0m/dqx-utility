@@ -7,17 +7,25 @@
 #include "../utils/ErrorReporter.hpp"
 #include "TranslatorHelpers.hpp"
 
-namespace {
-struct FlightGuard {
+namespace
+{
+struct FlightGuard
+{
     std::atomic<std::size_t>& ref;
-    explicit FlightGuard(std::atomic<std::size_t>& r) : ref(r) {}
+
+    explicit FlightGuard(std::atomic<std::size_t>& r)
+        : ref(r)
+    {
+    }
+
     ~FlightGuard() { ref.fetch_sub(1, std::memory_order_relaxed); }
 };
-}
+} // namespace
 
 using namespace translate;
 
 QwenMTTranslator::QwenMTTranslator() = default;
+
 QwenMTTranslator::~QwenMTTranslator() { shutdown(); }
 
 bool QwenMTTranslator::init(const BackendConfig& cfg)
@@ -30,7 +38,8 @@ bool QwenMTTranslator::init(const BackendConfig& cfg)
     max_retries_ = cfg_.max_retries < 0 ? 0 : cfg_.max_retries;
     in_flight_.store(0, std::memory_order_relaxed);
     const auto interval = std::chrono::duration<double>(request_interval_seconds_);
-    last_request_ = std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+    last_request_ =
+        std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
     running_.store(true);
     worker_ = std::thread(&QwenMTTranslator::workerLoop, this);
     return true;
@@ -58,7 +67,8 @@ void QwenMTTranslator::shutdown()
     in_flight_.store(0, std::memory_order_relaxed);
 }
 
-bool QwenMTTranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id)
+bool QwenMTTranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang,
+                                 std::uint64_t& out_id)
 {
     if (!isReady())
     {
@@ -66,7 +76,14 @@ bool QwenMTTranslator::translate(const std::string& text, const std::string& src
         return false;
     }
     bool all_space = true;
-    for (char c : text) { if (!std::isspace(static_cast<unsigned char>(c))) { all_space = false; break; } }
+    for (char c : text)
+    {
+        if (!std::isspace(static_cast<unsigned char>(c)))
+        {
+            all_space = false;
+            break;
+        }
+    }
     if (text.empty() || all_space)
         return false;
     Job j;
@@ -124,7 +141,8 @@ void QwenMTTranslator::workerLoop()
                 std::chrono::steady_clock::time_point wait_until;
                 {
                     std::lock_guard<std::mutex> lock(rate_mtx_);
-                    wait_until = last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+                    wait_until =
+                        last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
                 }
                 auto now = std::chrono::steady_clock::now();
                 if (wait_until > now)
@@ -160,15 +178,24 @@ void QwenMTTranslator::workerLoop()
 
         if (success)
         {
-            PLOG_INFO << "Qwen-MT Translation [" << j.src << " -> " << j.dst << "]: '" << j.text << "' -> '" << out << "'";
-            Completed c; c.id = j.id; c.text = std::move(out); c.failed = false;
+            PLOG_INFO << "Qwen-MT Translation [" << j.src << " -> " << j.dst << "]: '" << j.text << "' -> '" << out
+                      << "'";
+            Completed c;
+            c.id = j.id;
+            c.text = std::move(out);
+            c.failed = false;
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(c));
         }
         else
         {
-            PLOG_WARNING << "Qwen-MT Translation failed [" << j.src << " -> " << j.dst << "]: '" << j.text << "' - " << last_error_;
-            Completed c; c.id = j.id; c.failed = true; c.original_text = j.text; c.error_message = last_error_;
+            PLOG_WARNING << "Qwen-MT Translation failed [" << j.src << " -> " << j.dst << "]: '" << j.text << "' - "
+                         << last_error_;
+            Completed c;
+            c.id = j.id;
+            c.failed = true;
+            c.original_text = j.text;
+            c.error_message = last_error_;
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(c));
         }
@@ -177,17 +204,30 @@ void QwenMTTranslator::workerLoop()
 
 std::string QwenMTTranslator::escapeJSON(const std::string& s)
 {
-    std::string o; o.reserve(s.size() + 16);
+    std::string o;
+    o.reserve(s.size() + 16);
     for (char c : s)
     {
         switch (c)
         {
-        case '\\': o += "\\\\"; break;
-        case '"':  o += "\\\""; break;
-        case '\n': o += "\\n"; break;
-        case '\r': o += "\\r"; break;
-        case '\t': o += "\\t"; break;
-        default: o += c; break;
+        case '\\':
+            o += "\\\\";
+            break;
+        case '"':
+            o += "\\\"";
+            break;
+        case '\n':
+            o += "\\n";
+            break;
+        case '\r':
+            o += "\\r";
+            break;
+        case '\t':
+            o += "\\t";
+            break;
+        default:
+            o += c;
+            break;
         }
     }
     return o;
@@ -195,9 +235,12 @@ std::string QwenMTTranslator::escapeJSON(const std::string& s)
 
 std::string QwenMTTranslator::mapTarget(const std::string& dst_lang)
 {
-    if (dst_lang == "en-us") return "English";
-    if (dst_lang == "zh-cn") return "Chinese";
-    if (dst_lang == "zh-tw") return "Chinese (Traditional)"; // best-effort label
+    if (dst_lang == "en-us")
+        return "English";
+    if (dst_lang == "zh-cn")
+        return "Chinese";
+    if (dst_lang == "zh-tw")
+        return "Chinese (Traditional)"; // best-effort label
     return dst_lang;
 }
 
@@ -207,7 +250,8 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
 
     // PHASE 1: Text length validation with diagnostic logging
     auto length_check = check_text_length(text, LengthLimits::QWEN_MT_API_MAX, "Qwen-MT");
-    if (!length_check.ok) {
+    if (!length_check.ok)
+    {
         last_error_ = length_check.error_message;
         PLOG_WARNING << "Qwen-MT text length check failed: " << length_check.error_message;
         PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
@@ -216,7 +260,8 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
 
     PLOG_DEBUG << "Qwen-MT translation request - Text length: " << length_check.byte_size << " bytes";
 
-    if (text.empty()) return false;
+    if (text.empty())
+        return false;
 
     std::string url = cfg_.base_url;
 
@@ -231,7 +276,10 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
 
     PLOG_DEBUG << "Qwen-MT request body size: " << body.size() << " bytes";
 
-    std::vector<translate::Header> headers{{"Content-Type","application/json"},{"Authorization", std::string("Bearer ")+cfg_.api_key}};
+    std::vector<translate::Header> headers{
+        { "Content-Type",  "application/json"                    },
+        { "Authorization", std::string("Bearer ") + cfg_.api_key }
+    };
 
     // PHASE 2: Adaptive timeout
     translate::SessionConfig scfg;
@@ -253,9 +301,7 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
             last_error_ = err_msg;
             PLOG_WARNING << "Qwen-MT request failed: " << err_msg;
             PLOG_DEBUG << "Original error: " << r.error;
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Qwen-MT request failed",
-                err_msg);
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation, "Qwen-MT request failed", err_msg);
         }
         return false;
     }
@@ -268,21 +314,24 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
             last_error_ = err_msg;
             PLOG_WARNING << "Qwen-MT request failed: " << err_msg;
             PLOG_DEBUG << "Response body: " << r.text;
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Qwen-MT HTTP error",
-                std::to_string(r.status_code) + ": " + r.text);
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation, "Qwen-MT HTTP error",
+                                                std::to_string(r.status_code) + ": " + r.text);
         }
         return false;
     }
 
     const std::string key = "\"content\"";
     size_t p = r.text.find(key);
-    if (p == std::string::npos) return false;
+    if (p == std::string::npos)
+        return false;
     p = r.text.find(':', p);
-    if (p == std::string::npos) return false;
+    if (p == std::string::npos)
+        return false;
     ++p;
-    while (p < r.text.size() && (r.text[p] == ' ' || r.text[p] == '\t' || r.text[p] == '\n' || r.text[p] == '\r')) ++p;
-    if (p >= r.text.size() || r.text[p] != '"') return false;
+    while (p < r.text.size() && (r.text[p] == ' ' || r.text[p] == '\t' || r.text[p] == '\n' || r.text[p] == '\r'))
+        ++p;
+    if (p >= r.text.size() || r.text[p] != '"')
+        return false;
     ++p;
     std::string v;
     while (p < r.text.size())
@@ -290,12 +339,17 @@ bool QwenMTTranslator::doRequest(const std::string& text, const std::string& dst
         char c = r.text[p++];
         if (c == '\\')
         {
-            if (p >= r.text.size()) break;
+            if (p >= r.text.size())
+                break;
             char e = r.text[p++];
-            if (e == 'n') v.push_back('\n');
-            else if (e == 'r') v.push_back('\r');
-            else if (e == 't') v.push_back('\t');
-            else v.push_back(e);
+            if (e == 'n')
+                v.push_back('\n');
+            else if (e == 'r')
+                v.push_back('\r');
+            else if (e == 't')
+                v.push_back('\t');
+            else
+                v.push_back(e);
         }
         else if (c == '"')
         {
@@ -322,9 +376,11 @@ std::string QwenMTTranslator::testConnection()
     std::string result;
     if (!doRequest("Hello", cfg_.target_lang.empty() ? "zh-cn" : cfg_.target_lang, result))
     {
-        if (last_error_.empty()) return "Error: Test translation failed";
+        if (last_error_.empty())
+            return "Error: Test translation failed";
         return std::string("Error: Test translation failed - ") + last_error_;
     }
-    if (result.empty()) return "Error: Test translation returned empty result";
+    if (result.empty())
+        return "Error: Test translation returned empty result";
     return "Success: Qwen-MT connection test passed";
 }

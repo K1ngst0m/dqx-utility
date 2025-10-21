@@ -9,11 +9,7 @@
 #include "../../translate/ITranslator.hpp"
 #include "../../translate/TranslateSession.hpp"
 
-DialogSettingsView::DialogSettingsView(
-    DialogStateManager& state,
-    FontManager& fontManager,
-    TranslateSession& session
-)
+DialogSettingsView::DialogSettingsView(DialogStateManager& state, FontManager& fontManager, TranslateSession& session)
     : state_(state)
     , fontManager_(fontManager)
     , session_(session)
@@ -23,17 +19,11 @@ DialogSettingsView::DialogSettingsView(
 {
 }
 
-void DialogSettingsView::render(
-    translate::ITranslator* translator,
-    std::string& applyHint,
-    float& applyHintTimer,
-    bool& testingConnection,
-    std::string& testResult,
-    std::string& testTimestamp,
-    const std::string& settingsIdSuffix,
-    const std::function<void()>& initTranslatorIfEnabledFn,
-    const std::function<translate::ITranslator*()>& currentTranslatorFn
-)
+void DialogSettingsView::render(translate::ITranslator* translator, std::string& applyHint, float& applyHintTimer,
+                                bool& testingConnection, std::string& testResult, std::string& testTimestamp,
+                                const std::string& settingsIdSuffix,
+                                const std::function<void()>& initTranslatorIfEnabledFn,
+                                const std::function<translate::ITranslator*()>& currentTranslatorFn)
 {
     ImGui::Spacing();
 
@@ -66,20 +56,13 @@ void DialogSettingsView::render(
         {
             global_config = &cm->globalTranslationConfig();
         }
-        translationPanel_.render(translator,
-                                 applyHint,
-                                 applyHintTimer,
-                                 testingConnection,
-                                 testResult,
-                                 testTimestamp,
-                                 initTranslatorIfEnabledFn,
-                                 currentTranslatorFn,
-                                 global_config);
+        translationPanel_.render(translator, applyHint, applyHintTimer, testingConnection, testResult, testTimestamp,
+                                 initTranslatorIfEnabledFn, currentTranslatorFn, global_config);
         ImGui::Unindent();
         ImGui::Spacing();
     }
 
-    #if DQXU_ENABLE_DEBUG_SECTIONS
+#if DQXU_ENABLE_DEBUG_SECTIONS
     if (ImGui::CollapsingHeader(i18n::get("dialog.debug.title")))
     {
         ImGui::Indent();
@@ -87,8 +70,7 @@ void DialogSettingsView::render(
         ImGui::Unindent();
         ImGui::Spacing();
     }
-    #endif
-
+#endif
 }
 
 void DialogSettingsView::applyPendingResizeFlags(const AppearanceSettingsPanel::RenderResult& changes)

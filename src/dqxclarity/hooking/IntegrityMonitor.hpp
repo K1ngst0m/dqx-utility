@@ -8,46 +8,56 @@
 #include <thread>
 #include <mutex>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class IntegrityMonitor {
+class IntegrityMonitor
+{
 public:
-    struct RestoreSite { uintptr_t addr; std::vector<uint8_t> bytes; };
+    struct RestoreSite
+    {
+        uintptr_t addr;
+        std::vector<uint8_t> bytes;
+    };
 
-    IntegrityMonitor(std::shared_ptr<IProcessMemory> memory,
-                     Logger logger,
-                     uintptr_t state_addr,
+    IntegrityMonitor(std::shared_ptr<IProcessMemory> memory, Logger logger, uintptr_t state_addr,
                      std::function<void(bool first)> on_integrity)
         : memory_(std::move(memory))
         , log_(std::move(logger))
         , state_addr_(state_addr)
-        , on_integrity_(std::move(on_integrity)) {}
+        , on_integrity_(std::move(on_integrity))
+    {
+    }
 
-    void AddRestoreTarget(uintptr_t addr, const std::vector<uint8_t>& bytes) {
+    void AddRestoreTarget(uintptr_t addr, const std::vector<uint8_t>& bytes)
+    {
         std::lock_guard<std::mutex> lock(restore_mutex_);
-        for (auto& site : restore_) {
-            if (site.addr == addr) {
+        for (auto& site : restore_)
+        {
+            if (site.addr == addr)
+            {
                 site.bytes = bytes;
                 return;
             }
         }
-        restore_.push_back({addr, bytes});
+        restore_.push_back({ addr, bytes });
     }
 
-    void UpdateRestoreTarget(uintptr_t addr, const std::vector<uint8_t>& bytes) {
-        AddRestoreTarget(addr, bytes);
-    }
+    void UpdateRestoreTarget(uintptr_t addr, const std::vector<uint8_t>& bytes) { AddRestoreTarget(addr, bytes); }
 
-    void MoveRestoreTarget(uintptr_t old_addr, uintptr_t new_addr, const std::vector<uint8_t>& bytes) {
+    void MoveRestoreTarget(uintptr_t old_addr, uintptr_t new_addr, const std::vector<uint8_t>& bytes)
+    {
         std::lock_guard<std::mutex> lock(restore_mutex_);
-        for (auto& site : restore_) {
-            if (site.addr == old_addr) {
+        for (auto& site : restore_)
+        {
+            if (site.addr == old_addr)
+            {
                 site.addr = new_addr;
                 site.bytes = bytes;
                 return;
             }
         }
-        restore_.push_back({new_addr, bytes});
+        restore_.push_back({ new_addr, bytes });
     }
 
     bool start();
@@ -63,7 +73,7 @@ private:
     mutable std::mutex restore_mutex_;
 
     std::thread worker_;
-    std::atomic<bool> stop_{false};
+    std::atomic<bool> stop_{ false };
 };
 
 } // namespace dqxclarity

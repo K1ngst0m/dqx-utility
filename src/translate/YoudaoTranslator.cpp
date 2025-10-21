@@ -24,11 +24,18 @@
 
 using namespace translate;
 
-namespace {
+namespace
+{
 
-struct FlightGuard {
+struct FlightGuard
+{
     std::atomic<std::size_t>& ref;
-    explicit FlightGuard(std::atomic<std::size_t>& r) : ref(r) {}
+
+    explicit FlightGuard(std::atomic<std::size_t>& r)
+        : ref(r)
+    {
+    }
+
     ~FlightGuard() { ref.fetch_sub(1, std::memory_order_relaxed); }
 };
 
@@ -53,16 +60,12 @@ inline void report_youdao_error(std::string& last_error, const char* user_messag
     utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation, user_message, details);
 }
 
-inline std::uint32_t rotr(std::uint32_t x, std::uint32_t n)
-{
-    return (x >> n) | (x << (32u - n));
-}
+inline std::uint32_t rotr(std::uint32_t x, std::uint32_t n) { return (x >> n) | (x << (32u - n)); }
 
-struct Sha256Ctx {
-    std::array<std::uint32_t, 8> state{
-        0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
-        0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u
-    };
+struct Sha256Ctx
+{
+    std::array<std::uint32_t, 8> state{ 0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
+                                        0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u };
     std::array<std::uint8_t, 64> buffer{};
     std::uint64_t bitlen = 0;
     std::size_t buffer_len = 0;
@@ -74,10 +77,8 @@ void sha256_transform(Sha256Ctx& ctx, const std::uint8_t* data)
     for (std::size_t i = 0; i < 16; ++i)
     {
         std::size_t j = i * 4;
-        w[i] = (static_cast<std::uint32_t>(data[j]) << 24) |
-               (static_cast<std::uint32_t>(data[j + 1]) << 16) |
-               (static_cast<std::uint32_t>(data[j + 2]) << 8) |
-               static_cast<std::uint32_t>(data[j + 3]);
+        w[i] = (static_cast<std::uint32_t>(data[j]) << 24) | (static_cast<std::uint32_t>(data[j + 1]) << 16) |
+               (static_cast<std::uint32_t>(data[j + 2]) << 8) | static_cast<std::uint32_t>(data[j + 3]);
     }
     for (std::size_t i = 16; i < 64; ++i)
     {
@@ -166,9 +167,9 @@ void sha256_final(Sha256Ctx& ctx, std::uint8_t hash[32])
 
     for (std::size_t i = 0; i < 4; ++i)
     {
-        hash[i]      = static_cast<std::uint8_t>((ctx.state[0] >> (24 - i * 8)) & 0xFFu);
-        hash[i + 4]  = static_cast<std::uint8_t>((ctx.state[1] >> (24 - i * 8)) & 0xFFu);
-        hash[i + 8]  = static_cast<std::uint8_t>((ctx.state[2] >> (24 - i * 8)) & 0xFFu);
+        hash[i] = static_cast<std::uint8_t>((ctx.state[0] >> (24 - i * 8)) & 0xFFu);
+        hash[i + 4] = static_cast<std::uint8_t>((ctx.state[1] >> (24 - i * 8)) & 0xFFu);
+        hash[i + 8] = static_cast<std::uint8_t>((ctx.state[2] >> (24 - i * 8)) & 0xFFu);
         hash[i + 12] = static_cast<std::uint8_t>((ctx.state[3] >> (24 - i * 8)) & 0xFFu);
         hash[i + 16] = static_cast<std::uint8_t>((ctx.state[4] >> (24 - i * 8)) & 0xFFu);
         hash[i + 20] = static_cast<std::uint8_t>((ctx.state[5] >> (24 - i * 8)) & 0xFFu);
@@ -180,10 +181,8 @@ void sha256_final(Sha256Ctx& ctx, std::uint8_t hash[32])
 } // namespace
 
 YoudaoTranslator::YoudaoTranslator() = default;
-YoudaoTranslator::~YoudaoTranslator()
-{
-    shutdown();
-}
+
+YoudaoTranslator::~YoudaoTranslator() { shutdown(); }
 
 bool YoudaoTranslator::init(const BackendConfig& cfg)
 {
@@ -199,7 +198,8 @@ bool YoudaoTranslator::init(const BackendConfig& cfg)
     max_retries_ = cfg_.max_retries < 0 ? 0 : cfg_.max_retries;
     in_flight_.store(0, std::memory_order_relaxed);
     const auto interval = std::chrono::duration<double>(request_interval_seconds_);
-    last_request_ = std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+    last_request_ =
+        std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
     mode_ = (cfg_.model == "youdao_large") ? Mode::LargeModel : Mode::Text;
     running_.store(true);
     worker_ = std::thread(&YoudaoTranslator::workerLoop, this);
@@ -232,7 +232,8 @@ void YoudaoTranslator::shutdown()
     in_flight_.store(0, std::memory_order_relaxed);
 }
 
-bool YoudaoTranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id)
+bool YoudaoTranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang,
+                                 std::uint64_t& out_id)
 {
     if (!isReady())
     {
@@ -308,7 +309,8 @@ void YoudaoTranslator::workerLoop()
                 std::chrono::steady_clock::time_point wait_until;
                 {
                     std::lock_guard<std::mutex> lock(rate_mtx_);
-                    wait_until = last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+                    wait_until =
+                        last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
                 }
                 auto now = std::chrono::steady_clock::now();
                 if (wait_until > now)
@@ -319,9 +321,8 @@ void YoudaoTranslator::workerLoop()
                 }
             }
 
-            bool ok = (mode_ == Mode::LargeModel)
-                ? doLargeModelRequest(job.text, job.src, job.dst, translated)
-                : doTextRequest(job.text, job.src, job.dst, translated);
+            bool ok = (mode_ == Mode::LargeModel) ? doLargeModelRequest(job.text, job.src, job.dst, translated) :
+                                                    doTextRequest(job.text, job.src, job.dst, translated);
 
             {
                 std::lock_guard<std::mutex> lock(rate_mtx_);
@@ -344,7 +345,8 @@ void YoudaoTranslator::workerLoop()
 
         if (success)
         {
-            PLOG_INFO << "Youdao Translation [" << job.src << " -> " << job.dst << "]: '" << job.text << "' -> '" << translated << "'";
+            PLOG_INFO << "Youdao Translation [" << job.src << " -> " << job.dst << "]: '" << job.text << "' -> '"
+                      << translated << "'";
             Completed c;
             c.id = job.id;
             c.text = std::move(translated);
@@ -354,7 +356,8 @@ void YoudaoTranslator::workerLoop()
         }
         else
         {
-            PLOG_WARNING << "Youdao Translation failed [" << job.src << " -> " << job.dst << "]: '" << job.text << "' - " << last_error_;
+            PLOG_WARNING << "Youdao Translation failed [" << job.src << " -> " << job.dst << "]: '" << job.text
+                         << "' - " << last_error_;
             Completed c;
             c.id = job.id;
             c.failed = true;
@@ -366,13 +369,15 @@ void YoudaoTranslator::workerLoop()
     }
 }
 
-bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::string& out_text)
+bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string& src_lang, const std::string& dst_lang,
+                                     std::string& out_text)
 {
     using namespace translate::helpers;
 
     // PHASE 1: Text length validation with diagnostic logging
     auto length_check = check_text_length(text, LengthLimits::YOUDAO_API_MAX, "Youdao");
-    if (!length_check.ok) {
+    if (!length_check.ok)
+    {
         last_error_ = length_check.error_message;
         PLOG_WARNING << "Youdao text length check failed: " << length_check.error_message;
         PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
@@ -395,21 +400,21 @@ bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string&
     std::string input = truncateInput(text);
     std::string sign = buildSignature(cfg_.api_key, cfg_.api_secret, input, salt, curtime);
 
-    std::vector<std::pair<std::string,std::string>> fields{
-        {"q", text},
-        {"from", from},
-        {"to", to},
-        {"appKey", cfg_.api_key},
-        {"salt", salt},
-        {"signType", "v3"},
-        {"curtime", curtime},
-        {"sign", sign}
+    std::vector<std::pair<std::string, std::string>> fields{
+        { "q",        text         },
+        { "from",     from         },
+        { "to",       to           },
+        { "appKey",   cfg_.api_key },
+        { "salt",     salt         },
+        { "signType", "v3"         },
+        { "curtime",  curtime      },
+        { "sign",     sign         }
     };
 
     // PHASE 2: Adaptive timeout (increased from 15s to 45s base)
     translate::SessionConfig scfg;
     scfg.connect_timeout_ms = 5000;
-    scfg.timeout_ms = 45000;  // Increased from 15000
+    scfg.timeout_ms = 45000; // Increased from 15000
     scfg.text_length_hint = text.size();
     scfg.use_adaptive_timeout = true;
     scfg.cancel_flag = &running_;
@@ -447,13 +452,15 @@ bool YoudaoTranslator::doTextRequest(const std::string& text, const std::string&
     return true;
 }
 
-bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::string& out_text)
+bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::string& src_lang,
+                                           const std::string& dst_lang, std::string& out_text)
 {
     using namespace translate::helpers;
 
     // PHASE 1: Text length validation
     auto length_check = check_text_length(text, LengthLimits::YOUDAO_API_MAX, "Youdao Large Model");
-    if (!length_check.ok) {
+    if (!length_check.ok)
+    {
         last_error_ = length_check.error_message;
         PLOG_WARNING << "Youdao large model text length check failed: " << length_check.error_message;
         PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
@@ -479,9 +486,12 @@ bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::s
             lower.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(ch))));
         if (lower == "zh-tw" || lower == "zh-hk")
         {
-            std::call_once(trad_warn_once_, [] {
-                PLOG_WARNING << "Youdao large model mode does not support Traditional Chinese directly; using Simplified Chinese target.";
-            });
+            std::call_once(trad_warn_once_,
+                           []
+                           {
+                               PLOG_WARNING << "Youdao large model mode does not support Traditional Chinese directly; "
+                                               "using Simplified Chinese target.";
+                           });
         }
     }
 
@@ -490,28 +500,30 @@ bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::s
     std::string input = truncateInput(text);
     std::string sign = buildSignature(cfg_.api_key, cfg_.api_secret, input, salt, curtime);
 
-    std::vector<std::pair<std::string,std::string>> fields{
-        {"i", text},
-        {"from", from},
-        {"to", to},
-        {"appKey", cfg_.api_key},
-        {"salt", salt},
-        {"signType", "v3"},
-        {"curtime", curtime},
-        {"sign", sign},
-        {"handleOption", "2"},
-        {"streamType", "full"}
+    std::vector<std::pair<std::string, std::string>> fields{
+        { "i",            text         },
+        { "from",         from         },
+        { "to",           to           },
+        { "appKey",       cfg_.api_key },
+        { "salt",         salt         },
+        { "signType",     "v3"         },
+        { "curtime",      curtime      },
+        { "sign",         sign         },
+        { "handleOption", "2"          },
+        { "streamType",   "full"       }
     };
 
     // PHASE 2: Adaptive timeout (increased from 20s to 45s base)
     translate::SessionConfig scfg;
     scfg.connect_timeout_ms = 5000;
-    scfg.timeout_ms = 45000;  // Increased from 20000
+    scfg.timeout_ms = 45000; // Increased from 20000
     scfg.text_length_hint = text.size();
     scfg.use_adaptive_timeout = true;
     scfg.cancel_flag = &running_;
 
-    std::vector<translate::Header> headers{{"Accept","text/event-stream"}};
+    std::vector<translate::Header> headers{
+        { "Accept", "text/event-stream" }
+    };
     auto response = translate::post_form(url, fields, scfg, headers);
 
     // PHASE 1: Enhanced error handling
@@ -529,7 +541,8 @@ bool YoudaoTranslator::doLargeModelRequest(const std::string& text, const std::s
         std::string err_detail = std::string("http ") + std::to_string(response.status_code) + ": " + response.text;
         if (last_error_ != err_detail)
         {
-            PLOG_WARNING << "Youdao large model request failed with status " << response.status_code << ": " << response.text;
+            PLOG_WARNING << "Youdao large model request failed with status " << response.status_code << ": "
+                         << response.text;
         }
         report_youdao_error(last_error_, "Youdao large model HTTP error", err_detail);
         return false;
@@ -580,10 +593,14 @@ bool YoudaoTranslator::parseTextResponse(const std::string& body, std::string& o
         char ch = body[end++];
         if (escaped)
         {
-            if (ch == 'n') value.push_back('\n');
-            else if (ch == 'r') value.push_back('\r');
-            else if (ch == 't') value.push_back('\t');
-            else value.push_back(ch);
+            if (ch == 'n')
+                value.push_back('\n');
+            else if (ch == 'r')
+                value.push_back('\r');
+            else if (ch == 't')
+                value.push_back('\t');
+            else
+                value.push_back(ch);
             escaped = false;
         }
         else if (ch == '\\')
@@ -625,7 +642,8 @@ bool YoudaoTranslator::parseLargeModelResponse(const std::string& body, std::str
         if (data.empty() || data == "[DONE]")
             continue;
 
-        if (data.find("\"code\"") != std::string::npos && data.find("\"msg\"") != std::string::npos && data.find("transFull") == std::string::npos)
+        if (data.find("\"code\"") != std::string::npos && data.find("\"msg\"") != std::string::npos &&
+            data.find("transFull") == std::string::npos)
         {
             extractJsonString(data, "code", err_code);
             extractJsonString(data, "msg", err_message);
@@ -727,7 +745,8 @@ std::string YoudaoTranslator::mapTarget(const std::string& lang, Mode mode)
     return lower;
 }
 
-namespace {
+namespace
+{
 
 std::size_t utf8CharLength(unsigned char lead)
 {
@@ -742,10 +761,7 @@ std::size_t utf8CharLength(unsigned char lead)
     return 1;
 }
 
-bool isValidContinuation(unsigned char byte)
-{
-    return (byte & 0xC0u) == 0x80u;
-}
+bool isValidContinuation(unsigned char byte) { return (byte & 0xC0u) == 0x80u; }
 
 } // namespace
 
@@ -824,7 +840,9 @@ std::string YoudaoTranslator::makeCurtime()
     return std::to_string(sec);
 }
 
-std::string YoudaoTranslator::buildSignature(const std::string& app_key, const std::string& app_secret, const std::string& input, const std::string& salt, const std::string& curtime)
+std::string YoudaoTranslator::buildSignature(const std::string& app_key, const std::string& app_secret,
+                                             const std::string& input, const std::string& salt,
+                                             const std::string& curtime)
 {
     return sha256Hex(app_key + input + salt + curtime + app_secret);
 }
@@ -865,12 +883,24 @@ std::string YoudaoTranslator::unescapeJson(const std::string& value)
         {
             switch (ch)
             {
-            case 'n': out.push_back('\n'); break;
-            case 'r': out.push_back('\r'); break;
-            case 't': out.push_back('\t'); break;
-            case '\\': out.push_back('\\'); break;
-            case '"': out.push_back('"'); break;
-            default: out.push_back(ch); break;
+            case 'n':
+                out.push_back('\n');
+                break;
+            case 'r':
+                out.push_back('\r');
+                break;
+            case 't':
+                out.push_back('\t');
+                break;
+            case '\\':
+                out.push_back('\\');
+                break;
+            case '"':
+                out.push_back('"');
+                break;
+            default:
+                out.push_back(ch);
+                break;
             }
             escape = false;
         }

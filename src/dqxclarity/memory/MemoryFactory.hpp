@@ -3,9 +3,11 @@
 #include "IProcessMemory.hpp"
 #include <memory>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class MemoryFactory {
+class MemoryFactory
+{
 public:
     static std::unique_ptr<IProcessMemory> CreatePlatformMemory();
 };

@@ -3,9 +3,11 @@
 #include <string>
 #include <memory>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class IConsoleSink {
+class IConsoleSink
+{
 public:
     virtual ~IConsoleSink() = default;
     virtual void PrintDialog(const std::string& npc, const std::string& text) = 0;

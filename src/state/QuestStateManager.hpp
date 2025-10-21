@@ -5,7 +5,8 @@
 #include <cstdint>
 #include <string>
 
-struct QuestContentState {
+struct QuestContentState
+{
     std::string subquest_name;
     std::string quest_name;
     std::string description;
@@ -24,7 +25,8 @@ struct QuestContentState {
     }
 };
 
-struct QuestTranslationState {
+struct QuestTranslationState
+{
     std::string subquest_name;
     std::string quest_name;
     std::string description;
@@ -41,7 +43,8 @@ struct QuestTranslationState {
     }
 };
 
-struct QuestStateManager : DialogStateManager {
+struct QuestStateManager : DialogStateManager
+{
     QuestContentState quest;
     QuestTranslationState translated;
     QuestTranslationState original;

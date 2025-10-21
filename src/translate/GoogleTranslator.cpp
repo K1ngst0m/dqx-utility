@@ -7,17 +7,25 @@
 #include "../utils/ErrorReporter.hpp"
 #include "TranslatorHelpers.hpp"
 
-namespace {
-struct FlightGuard {
+namespace
+{
+struct FlightGuard
+{
     std::atomic<std::size_t>& ref;
-    explicit FlightGuard(std::atomic<std::size_t>& r) : ref(r) {}
+
+    explicit FlightGuard(std::atomic<std::size_t>& r)
+        : ref(r)
+    {
+    }
+
     ~FlightGuard() { ref.fetch_sub(1, std::memory_order_relaxed); }
 };
-}
+} // namespace
 
 using namespace translate;
 
 GoogleTranslator::GoogleTranslator() = default;
+
 GoogleTranslator::~GoogleTranslator() { shutdown(); }
 
 bool GoogleTranslator::init(const BackendConfig& cfg)
@@ -30,7 +38,8 @@ bool GoogleTranslator::init(const BackendConfig& cfg)
     max_retries_ = cfg_.max_retries < 0 ? 0 : cfg_.max_retries;
     in_flight_.store(0, std::memory_order_relaxed);
     const auto interval = std::chrono::duration<double>(request_interval_seconds_);
-    last_request_ = std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+    last_request_ =
+        std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
     paid_api_working_.store(true);
     warned_about_fallback_ = false;
     running_.store(true);
@@ -38,10 +47,7 @@ bool GoogleTranslator::init(const BackendConfig& cfg)
     return true;
 }
 
-bool GoogleTranslator::isReady() const
-{
-    return running_.load();
-}
+bool GoogleTranslator::isReady() const { return running_.load(); }
 
 void GoogleTranslator::shutdown()
 {
@@ -60,7 +66,8 @@ void GoogleTranslator::shutdown()
     in_flight_.store(0, std::memory_order_relaxed);
 }
 
-bool GoogleTranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id)
+bool GoogleTranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang,
+                                 std::uint64_t& out_id)
 {
     if (!isReady())
     {
@@ -69,7 +76,14 @@ bool GoogleTranslator::translate(const std::string& text, const std::string& src
     }
     // ignore empty or whitespace-only input
     bool all_space = true;
-    for (char c : text) { if (!std::isspace(static_cast<unsigned char>(c))) { all_space = false; break; } }
+    for (char c : text)
+    {
+        if (!std::isspace(static_cast<unsigned char>(c)))
+        {
+            all_space = false;
+            break;
+        }
+    }
     if (text.empty() || all_space)
         return false;
     Job j;
@@ -126,7 +140,8 @@ void GoogleTranslator::workerLoop()
                 std::chrono::steady_clock::time_point wait_until;
                 {
                     std::lock_guard<std::mutex> lock(rate_mtx_);
-                    wait_until = last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+                    wait_until =
+                        last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
                 }
                 auto now = std::chrono::steady_clock::now();
                 if (wait_until > now)
@@ -163,24 +178,34 @@ void GoogleTranslator::workerLoop()
         if (success)
         {
             PLOG_INFO << "Translation [" << j.src << " -> " << j.dst << "]: '" << j.text << "' -> '" << out << "'";
-            Completed c; c.id = j.id; c.text = std::move(out); c.failed = false;
+            Completed c;
+            c.id = j.id;
+            c.text = std::move(out);
+            c.failed = false;
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(c));
         }
         else
         {
-            PLOG_WARNING << "Translation failed [" << j.src << " -> " << j.dst << "]: '" << j.text << "' - " << last_error_;
-            Completed c; c.id = j.id; c.failed = true; c.original_text = j.text; c.error_message = last_error_;
+            PLOG_WARNING << "Translation failed [" << j.src << " -> " << j.dst << "]: '" << j.text << "' - "
+                         << last_error_;
+            Completed c;
+            c.id = j.id;
+            c.failed = true;
+            c.original_text = j.text;
+            c.error_message = last_error_;
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(c));
         }
     }
 }
 
-bool GoogleTranslator::doRequest(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::string& out_text)
+bool GoogleTranslator::doRequest(const std::string& text, const std::string& src_lang, const std::string& dst_lang,
+                                 std::string& out_text)
 {
-    if (text.empty()) return false;
-    
+    if (text.empty())
+        return false;
+
     // Try paid API first if API key is available and hasn't failed recently
     if (!cfg_.api_key.empty() && paid_api_working_.load())
     {
@@ -198,18 +223,20 @@ bool GoogleTranslator::doRequest(const std::string& text, const std::string& src
             }
         }
     }
-    
+
     // Fall back to free API
     return tryFreeAPI(text, src_lang, dst_lang, out_text);
 }
 
-bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::string& out_text)
+bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& src_lang, const std::string& dst_lang,
+                                  std::string& out_text)
 {
     using namespace translate::helpers;
 
     // PHASE 1: Text length validation
     auto length_check = check_text_length(text, LengthLimits::GOOGLE_PAID_API_MAX, "Google Paid API");
-    if (!length_check.ok) {
+    if (!length_check.ok)
+    {
         last_error_ = length_check.error_message;
         PLOG_WARNING << "Google Paid API text length check failed: " << length_check.error_message;
         PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
@@ -224,31 +251,39 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
 
     std::string escaped_text = text;
     std::size_t pos = 0;
-    while ((pos = escaped_text.find('\"', pos)) != std::string::npos) {
+    while ((pos = escaped_text.find('\"', pos)) != std::string::npos)
+    {
         escaped_text.replace(pos, 1, "\\\"");
         pos += 2;
     }
     pos = 0;
-    while ((pos = escaped_text.find('\n', pos)) != std::string::npos) {
+    while ((pos = escaped_text.find('\n', pos)) != std::string::npos)
+    {
         escaped_text.replace(pos, 1, "\\n");
         pos += 2;
     }
     pos = 0;
-    while ((pos = escaped_text.find('\r', pos)) != std::string::npos) {
+    while ((pos = escaped_text.find('\r', pos)) != std::string::npos)
+    {
         escaped_text.replace(pos, 1, "\\r");
         pos += 2;
     }
     pos = 0;
-    while ((pos = escaped_text.find('\\', pos)) != std::string::npos) {
+    while ((pos = escaped_text.find('\\', pos)) != std::string::npos)
+    {
         escaped_text.replace(pos, 1, "\\\\");
         pos += 2;
     }
 
-    std::string body = R"({"q": ")" + escaped_text + R"(", "source": ")" + src + R"(", "target": ")" + dst + R"(", "format": "text"})";
+    std::string body =
+        R"({"q": ")" + escaped_text + R"(", "source": ")" + src + R"(", "target": ")" + dst + R"(", "format": "text"})";
 
     PLOG_DEBUG << "Google Paid API request body size: " << body.size() << " bytes";
 
-    std::vector<translate::Header> headers{{"Content-Type","application/json"},{"Authorization", std::string("Bearer ")+cfg_.api_key}};
+    std::vector<translate::Header> headers{
+        { "Content-Type",  "application/json"                    },
+        { "Authorization", std::string("Bearer ") + cfg_.api_key }
+    };
 
     // PHASE 2: Adaptive timeout
     translate::SessionConfig scfg;
@@ -271,8 +306,7 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
             PLOG_WARNING << "Google Translate paid API request failed: " << err_msg;
             PLOG_DEBUG << "Original error: " << r.error;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Google Translate paid API request failed",
-                err_msg);
+                                                "Google Translate paid API request failed", err_msg);
         }
         return false;
     }
@@ -286,12 +320,11 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
             PLOG_WARNING << "Google Translate paid API failed: " << err_msg;
             PLOG_DEBUG << "Response body: " << r.text;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Google Translate paid API HTTP error",
-                err_msg);
+                                                "Google Translate paid API HTTP error", err_msg);
         }
         return false;
     }
-    
+
     std::string content = extractTranslationFromJSON(r.text);
     if (content.empty())
     {
@@ -301,8 +334,7 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate paid API response parse failed: " << r.text;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Google Translate paid API response parse failed",
-                r.text);
+                                                "Google Translate paid API response parse failed", r.text);
         }
         return false;
     }
@@ -310,15 +342,18 @@ bool GoogleTranslator::tryPaidAPI(const std::string& text, const std::string& sr
     return true;
 }
 
-bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::string& out_text)
+bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& src_lang, const std::string& dst_lang,
+                                  std::string& out_text)
 {
     using namespace translate::helpers;
 
     // CRITICAL FIX: Google Free API uses GET with URL encoding
     // This has strict length limits due to URL length restrictions
     auto length_check = check_text_length(text, LengthLimits::GOOGLE_FREE_API_MAX, "Google Free API");
-    if (!length_check.ok) {
-        last_error_ = length_check.error_message + " (Google Free API uses URL encoding - try paid API for longer texts)";
+    if (!length_check.ok)
+    {
+        last_error_ =
+            length_check.error_message + " (Google Free API uses URL encoding - try paid API for longer texts)";
         PLOG_WARNING << "Google Free API rejected due to text length: " << length_check.byte_size
                      << " bytes (limit: " << LengthLimits::GOOGLE_FREE_API_MAX << ")";
         return false;
@@ -329,8 +364,8 @@ bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& sr
     std::string src = normalizeLanguageCode(src_lang);
     std::string dst = normalizeLanguageCode(dst_lang);
 
-    std::string url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" +
-                      escapeUrl(src) + "&tl=" + escapeUrl(dst) + "&dt=t&q=" + escapeUrl(text);
+    std::string url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + escapeUrl(src) +
+                      "&tl=" + escapeUrl(dst) + "&dt=t&q=" + escapeUrl(text);
 
     // Diagnostic: log URL length
     PLOG_DEBUG << "Google Free API URL length: " << url.size() << " bytes";
@@ -356,8 +391,7 @@ bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& sr
             PLOG_WARNING << "Google Translate free API request failed: " << err_msg;
             PLOG_DEBUG << "Original error: " << r.error;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Google Translate free API request failed",
-                err_msg);
+                                                "Google Translate free API request failed", err_msg);
         }
         return false;
     }
@@ -371,12 +405,11 @@ bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& sr
             PLOG_WARNING << "Google Translate free API failed: " << err_msg;
             PLOG_DEBUG << "Response body: " << r.text;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Google Translate free API HTTP error",
-                err_msg);
+                                                "Google Translate free API HTTP error", err_msg);
         }
         return false;
     }
-    
+
     std::string content = extractTranslationFromFreeAPI(r.text);
     if (content.empty())
     {
@@ -386,8 +419,7 @@ bool GoogleTranslator::tryFreeAPI(const std::string& text, const std::string& sr
             last_error_ = err_msg;
             PLOG_WARNING << "Google Translate free API response parse failed: " << r.text;
             utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Google Translate free API response parse failed",
-                r.text);
+                                                "Google Translate free API response parse failed", r.text);
         }
         return false;
     }
@@ -399,7 +431,7 @@ std::string GoogleTranslator::escapeUrl(const std::string& s)
 {
     std::string escaped;
     escaped.reserve(s.size() * 3);
-    
+
     for (unsigned char c : s)
     {
         if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
@@ -416,24 +448,30 @@ std::string GoogleTranslator::escapeUrl(const std::string& s)
     }
     return escaped;
 }
+
 std::string GoogleTranslator::extractTranslationFromJSON(const std::string& body)
 {
     const std::string key = "\"translatedText\"";
     size_t start = body.find(key);
-    if (start == std::string::npos) return "";
-    
+    if (start == std::string::npos)
+        return "";
+
     start = body.find(':', start);
-    if (start == std::string::npos) return "";
+    if (start == std::string::npos)
+        return "";
     ++start;
-    
-    while (start < body.size() && std::isspace(body[start])) ++start;
-    
-    if (start >= body.size() || body[start] != '\"') return "";
+
+    while (start < body.size() && std::isspace(body[start]))
+        ++start;
+
+    if (start >= body.size() || body[start] != '\"')
+        return "";
     ++start;
-    
+
     size_t end = findQuoteEnd(body, start);
-    if (end == std::string::npos) return "";
-    
+    if (end == std::string::npos)
+        return "";
+
     return unescapeJSONString(body.substr(start, end - start));
 }
 
@@ -441,13 +479,15 @@ std::string GoogleTranslator::extractTranslationFromFreeAPI(const std::string& b
 {
     const std::string pattern = "[[[\"";
     size_t start = body.find(pattern);
-    if (start == std::string::npos) return "";
-    
+    if (start == std::string::npos)
+        return "";
+
     start += pattern.length();
-    
+
     size_t end = findQuoteEnd(body, start);
-    if (end == std::string::npos) return "";
-    
+    if (end == std::string::npos)
+        return "";
+
     return unescapeJSONString(body.substr(start, end - start));
 }
 
@@ -455,7 +495,7 @@ size_t GoogleTranslator::findQuoteEnd(const std::string& body, size_t start)
 {
     size_t pos = start;
     bool escaped = false;
-    
+
     while (pos < body.size())
     {
         if (escaped)
@@ -464,7 +504,7 @@ size_t GoogleTranslator::findQuoteEnd(const std::string& body, size_t start)
             ++pos;
             continue;
         }
-        
+
         char c = body[pos];
         if (c == '\\')
         {
@@ -480,7 +520,7 @@ size_t GoogleTranslator::findQuoteEnd(const std::string& body, size_t start)
             ++pos;
         }
     }
-    
+
     return std::string::npos;
 }
 
@@ -492,12 +532,33 @@ std::string GoogleTranslator::unescapeJSONString(const std::string& escaped)
         if (escaped[i] == '\\' && i + 1 < escaped.size())
         {
             char next = escaped[i + 1];
-            if (next == '\"') { unescaped += '\"'; ++i; }
-            else if (next == '\\') { unescaped += '\\'; ++i; }
-            else if (next == 'n') { unescaped += '\n'; ++i; }
-            else if (next == 'r') { unescaped += '\r'; ++i; }
-            else if (next == 't') { unescaped += '\t'; ++i; }
-            else unescaped += escaped[i];
+            if (next == '\"')
+            {
+                unescaped += '\"';
+                ++i;
+            }
+            else if (next == '\\')
+            {
+                unescaped += '\\';
+                ++i;
+            }
+            else if (next == 'n')
+            {
+                unescaped += '\n';
+                ++i;
+            }
+            else if (next == 'r')
+            {
+                unescaped += '\r';
+                ++i;
+            }
+            else if (next == 't')
+            {
+                unescaped += '\t';
+                ++i;
+            }
+            else
+                unescaped += escaped[i];
         }
         else
         {
@@ -509,11 +570,16 @@ std::string GoogleTranslator::unescapeJSONString(const std::string& escaped)
 
 std::string GoogleTranslator::normalizeLanguageCode(const std::string& lang_code)
 {
-    if (lang_code == "en-us") return "en";
-    if (lang_code == "zh-cn") return "zh-cn";
-    if (lang_code == "zh-tw") return "zh-tw";
-    if (lang_code == "ja-jp") return "ja";
-    if (lang_code == "ko-kr") return "ko";
+    if (lang_code == "en-us")
+        return "en";
+    if (lang_code == "zh-cn")
+        return "zh-cn";
+    if (lang_code == "zh-tw")
+        return "zh-tw";
+    if (lang_code == "ja-jp")
+        return "ja";
+    if (lang_code == "ko-kr")
+        return "ko";
     return lang_code;
 }
 
@@ -522,7 +588,7 @@ std::string GoogleTranslator::testConnection()
     std::string test_text = "Hello";
     std::string target_lang = cfg_.target_lang.empty() ? "zh-cn" : cfg_.target_lang;
     std::string result;
-    
+
     if (!cfg_.api_key.empty())
     {
         if (tryPaidAPI(test_text, "en", target_lang, result))

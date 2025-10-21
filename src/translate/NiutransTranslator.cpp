@@ -7,17 +7,25 @@
 #include "../utils/ErrorReporter.hpp"
 #include "TranslatorHelpers.hpp"
 
-namespace {
-struct FlightGuard {
+namespace
+{
+struct FlightGuard
+{
     std::atomic<std::size_t>& ref;
-    explicit FlightGuard(std::atomic<std::size_t>& r) : ref(r) {}
+
+    explicit FlightGuard(std::atomic<std::size_t>& r)
+        : ref(r)
+    {
+    }
+
     ~FlightGuard() { ref.fetch_sub(1, std::memory_order_relaxed); }
 };
-}
+} // namespace
 
 using namespace translate;
 
 NiutransTranslator::NiutransTranslator() = default;
+
 NiutransTranslator::~NiutransTranslator() { shutdown(); }
 
 bool NiutransTranslator::init(const BackendConfig& cfg)
@@ -30,16 +38,14 @@ bool NiutransTranslator::init(const BackendConfig& cfg)
     max_retries_ = cfg_.max_retries < 0 ? 0 : cfg_.max_retries;
     in_flight_.store(0, std::memory_order_relaxed);
     const auto interval = std::chrono::duration<double>(request_interval_seconds_);
-    last_request_ = std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+    last_request_ =
+        std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
     running_.store(true);
     worker_ = std::thread(&NiutransTranslator::workerLoop, this);
     return true;
 }
 
-bool NiutransTranslator::isReady() const
-{
-    return running_.load() && !cfg_.api_key.empty();
-}
+bool NiutransTranslator::isReady() const { return running_.load() && !cfg_.api_key.empty(); }
 
 void NiutransTranslator::shutdown()
 {
@@ -58,7 +64,8 @@ void NiutransTranslator::shutdown()
     in_flight_.store(0, std::memory_order_relaxed);
 }
 
-bool NiutransTranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang, std::uint64_t& out_id)
+bool NiutransTranslator::translate(const std::string& text, const std::string& src_lang, const std::string& dst_lang,
+                                   std::uint64_t& out_id)
 {
     if (!isReady())
     {
@@ -66,7 +73,14 @@ bool NiutransTranslator::translate(const std::string& text, const std::string& s
         return false;
     }
     bool all_space = true;
-    for (char c : text) { if (!std::isspace(static_cast<unsigned char>(c))) { all_space = false; break; } }
+    for (char c : text)
+    {
+        if (!std::isspace(static_cast<unsigned char>(c)))
+        {
+            all_space = false;
+            break;
+        }
+    }
     if (text.empty() || all_space)
         return false;
     Job j;
@@ -124,7 +138,8 @@ void NiutransTranslator::workerLoop()
                 std::chrono::steady_clock::time_point wait_until;
                 {
                     std::lock_guard<std::mutex> lock(rate_mtx_);
-                    wait_until = last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+                    wait_until =
+                        last_request_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
                 }
                 auto now = std::chrono::steady_clock::now();
                 if (wait_until > now)
@@ -161,14 +176,22 @@ void NiutransTranslator::workerLoop()
         if (success)
         {
             PLOG_INFO << "Niutrans Translation [auto -> " << j.dst << "]: '" << j.text << "' -> '" << out << "'";
-            Completed c; c.id = j.id; c.text = std::move(out); c.failed = false;
+            Completed c;
+            c.id = j.id;
+            c.text = std::move(out);
+            c.failed = false;
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(c));
         }
         else
         {
-            PLOG_WARNING << "Niutrans Translation failed [auto -> " << j.dst << "]: '" << j.text << "' - " << last_error_;
-            Completed c; c.id = j.id; c.failed = true; c.original_text = j.text; c.error_message = last_error_;
+            PLOG_WARNING << "Niutrans Translation failed [auto -> " << j.dst << "]: '" << j.text << "' - "
+                         << last_error_;
+            Completed c;
+            c.id = j.id;
+            c.failed = true;
+            c.original_text = j.text;
+            c.error_message = last_error_;
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(c));
         }
@@ -177,9 +200,12 @@ void NiutransTranslator::workerLoop()
 
 std::string NiutransTranslator::mapTarget(const std::string& dst_lang)
 {
-    if (dst_lang == "en-us") return "en";
-    if (dst_lang == "zh-cn") return "zh";
-    if (dst_lang == "zh-tw") return "zh-TW";
+    if (dst_lang == "en-us")
+        return "en";
+    if (dst_lang == "zh-cn")
+        return "zh";
+    if (dst_lang == "zh-tw")
+        return "zh-TW";
     return dst_lang;
 }
 
@@ -189,7 +215,8 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
 
     // PHASE 1: Text length validation with diagnostic logging
     auto length_check = check_text_length(text, LengthLimits::NIUTRANS_API_MAX, "Niutrans");
-    if (!length_check.ok) {
+    if (!length_check.ok)
+    {
         last_error_ = length_check.error_message;
         PLOG_WARNING << "Niutrans text length check failed: " << length_check.error_message;
         PLOG_DEBUG << "Text stats - Bytes: " << length_check.byte_size;
@@ -198,20 +225,22 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
 
     PLOG_DEBUG << "Niutrans translation request - Text length: " << length_check.byte_size << " bytes";
 
-    if (text.empty()) return false;
-    std::string url = cfg_.base_url.empty() ? std::string("https://api.niutrans.com/NiuTransServer/translation") : cfg_.base_url;
+    if (text.empty())
+        return false;
+    std::string url =
+        cfg_.base_url.empty() ? std::string("https://api.niutrans.com/NiuTransServer/translation") : cfg_.base_url;
 
     std::vector<std::pair<std::string, std::string>> fields{
-        {"from", "auto"},
-        {"to", mapTarget(dst_lang)},
-        {"apikey", cfg_.api_key},
-        {"src_text", text}
+        { "from",     "auto"              },
+        { "to",       mapTarget(dst_lang) },
+        { "apikey",   cfg_.api_key        },
+        { "src_text", text                }
     };
 
     // PHASE 2: Adaptive timeout (increased from 15s to 45s base)
     translate::SessionConfig scfg;
     scfg.connect_timeout_ms = 5000;
-    scfg.timeout_ms = 45000;  // Increased from 15000
+    scfg.timeout_ms = 45000; // Increased from 15000
     scfg.text_length_hint = text.size();
     scfg.use_adaptive_timeout = true;
     scfg.cancel_flag = &running_;
@@ -228,9 +257,7 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
             last_error_ = err_msg;
             PLOG_WARNING << "Niutrans request failed: " << err_msg;
             PLOG_DEBUG << "Original error: " << resp.error;
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Niutrans request failed",
-                err_msg);
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation, "Niutrans request failed", err_msg);
         }
         return false;
     }
@@ -243,9 +270,7 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
             last_error_ = err_msg;
             PLOG_WARNING << "Niutrans request failed: " << err_msg;
             PLOG_DEBUG << "Response body: " << resp.text;
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                "Niutrans HTTP error",
-                err_msg);
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation, "Niutrans HTTP error", err_msg);
         }
         return false;
     }
@@ -258,24 +283,34 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
         size_t em = resp.text.find("\"error_msg\"");
         if (em != std::string::npos)
         {
-            size_t c = resp.text.find(':', em); if (c != std::string::npos) {
-                ++c; while (c < resp.text.size() && (resp.text[c]==' '||resp.text[c]=='\t')) ++c;
-                if (c<resp.text.size() && resp.text[c]=='"') {
+            size_t c = resp.text.find(':', em);
+            if (c != std::string::npos)
+            {
+                ++c;
+                while (c < resp.text.size() && (resp.text[c] == ' ' || resp.text[c] == '\t'))
+                    ++c;
+                if (c < resp.text.size() && resp.text[c] == '"')
+                {
                     ++c;
                     std::string msg;
-                    while (c<resp.text.size()) {
-                        char ch=resp.text[c++];
-                        if (ch=='\\' && c<resp.text.size()) { msg.push_back(resp.text[c++]); }
-                        else if (ch=='"') break;
-                        else msg.push_back(ch);
+                    while (c < resp.text.size())
+                    {
+                        char ch = resp.text[c++];
+                        if (ch == '\\' && c < resp.text.size())
+                        {
+                            msg.push_back(resp.text[c++]);
+                        }
+                        else if (ch == '"')
+                            break;
+                        else
+                            msg.push_back(ch);
                     }
                     if (!msg.empty() && last_error_ != msg)
                     {
                         last_error_ = msg;
                         PLOG_WARNING << "Niutrans returned error: " << msg;
                         utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-                            "Niutrans reported error",
-                            msg);
+                                                            "Niutrans reported error", msg);
                     }
                 }
             }
@@ -283,10 +318,14 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
         return false;
     }
     p = resp.text.find(':', p);
-    if (p == std::string::npos) return false;
+    if (p == std::string::npos)
+        return false;
     ++p;
-    while (p < resp.text.size() && (resp.text[p] == ' ' || resp.text[p] == '\t' || resp.text[p] == '\n' || resp.text[p] == '\r')) ++p;
-    if (p >= resp.text.size() || resp.text[p] != '"') return false;
+    while (p < resp.text.size() &&
+           (resp.text[p] == ' ' || resp.text[p] == '\t' || resp.text[p] == '\n' || resp.text[p] == '\r'))
+        ++p;
+    if (p >= resp.text.size() || resp.text[p] != '"')
+        return false;
     ++p;
     std::string v;
     while (p < resp.text.size())
@@ -294,12 +333,17 @@ bool NiutransTranslator::doRequest(const std::string& text, const std::string& d
         char c = resp.text[p++];
         if (c == '\\')
         {
-            if (p >= resp.text.size()) break;
+            if (p >= resp.text.size())
+                break;
             char e = resp.text[p++];
-            if (e == 'n') v.push_back('\n');
-            else if (e == 'r') v.push_back('\r');
-            else if (e == 't') v.push_back('\t');
-            else v.push_back(e);
+            if (e == 'n')
+                v.push_back('\n');
+            else if (e == 'r')
+                v.push_back('\r');
+            else if (e == 't')
+                v.push_back('\t');
+            else
+                v.push_back(e);
         }
         else if (c == '"')
         {
@@ -319,12 +363,15 @@ std::string NiutransTranslator::testConnection()
     if (cfg_.api_key.empty())
         return "Error: Missing API key";
     std::string result;
-    if (cfg_.base_url.empty()) cfg_.base_url = "https://api.niutrans.com/NiuTransServer/translation";
+    if (cfg_.base_url.empty())
+        cfg_.base_url = "https://api.niutrans.com/NiuTransServer/translation";
     if (!doRequest("Hello", cfg_.target_lang.empty() ? "zh-cn" : cfg_.target_lang, result))
     {
-        if (last_error_.empty()) return "Error: Test translation failed";
+        if (last_error_.empty())
+            return "Error: Test translation failed";
         return std::string("Error: Test translation failed - ") + last_error_;
     }
-    if (result.empty()) return "Error: Test translation returned empty result";
+    if (result.empty())
+        return "Error: Test translation returned empty result";
     return "Success: Niutrans connection test passed";
 }

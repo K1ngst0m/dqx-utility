@@ -6,9 +6,11 @@
 #include <cstring>
 #include <sstream>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-namespace {
+namespace
+{
 
 void LogCornerTextCapture(uintptr_t address, const std::string& text, const dqxclarity::Logger& logger)
 {
@@ -16,12 +18,16 @@ void LogCornerTextCapture(uintptr_t address, const std::string& text, const dqxc
     oss << "Corner text capture\n"
         << "  Address: 0x" << std::hex << address << std::dec << "\n"
         << "  Text: ";
-    if (text.empty()) {
+    if (text.empty())
+    {
         oss << "(empty)";
-    } else {
+    }
+    else
+    {
         oss << text;
     }
-    if (logger.info) {
+    if (logger.info)
+    {
         logger.info(oss.str());
     }
 }
@@ -35,44 +41,56 @@ CornerTextHook::CornerTextHook(std::shared_ptr<IProcessMemory> memory)
 
 CornerTextHook::~CornerTextHook()
 {
-    if (m_is_installed) {
+    if (m_is_installed)
+    {
         RemoveHook();
     }
 }
 
 bool CornerTextHook::InstallHook(bool enable_patch)
 {
-    if (m_is_installed && enable_patch) {
+    if (m_is_installed && enable_patch)
+    {
         return true;
     }
 
-    if (!FindCornerTriggerAddress()) {
-        if (m_logger.error) m_logger.error("Failed to find corner text trigger address");
+    if (!FindCornerTriggerAddress())
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to find corner text trigger address");
         return false;
     }
 
-    if (!AllocateDetourMemory()) {
-        if (m_logger.error) m_logger.error("Failed to allocate corner text detour memory");
+    if (!AllocateDetourMemory())
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to allocate corner text detour memory");
         return false;
     }
 
     size_t stolen_bytes = ComputeStolenLength();
-    if (stolen_bytes < 5) {
+    if (stolen_bytes < 5)
+    {
         stolen_bytes = kDefaultStolenBytes;
     }
 
     m_original_bytes.resize(stolen_bytes);
-    if (!m_memory->ReadMemory(m_hook_address, m_original_bytes.data(), stolen_bytes)) {
-        if (m_logger.error) m_logger.error("Failed to read corner text hook original bytes");
+    if (!m_memory->ReadMemory(m_hook_address, m_original_bytes.data(), stolen_bytes))
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to read corner text hook original bytes");
         return false;
     }
 
-    if (!WriteDetourCode()) {
-        if (m_logger.error) m_logger.error("Failed to write corner text detour code");
+    if (!WriteDetourCode())
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to write corner text detour code");
         return false;
     }
 
-    if (!enable_patch) {
+    if (!enable_patch)
+    {
         return true;
     }
 
@@ -81,7 +99,8 @@ bool CornerTextHook::InstallHook(bool enable_patch)
 
 bool CornerTextHook::EnablePatch()
 {
-    if (m_original_bytes.empty()) {
+    if (m_original_bytes.empty())
+    {
         return false;
     }
 
@@ -91,16 +110,20 @@ bool CornerTextHook::EnablePatch()
     patch_bytes.insert(patch_bytes.end(), reinterpret_cast<const uint8_t*>(&jump_offset),
                        reinterpret_cast<const uint8_t*>(&jump_offset) + sizeof(uint32_t));
 
-    while (patch_bytes.size() < m_original_bytes.size()) {
+    while (patch_bytes.size() < m_original_bytes.size())
+    {
         patch_bytes.push_back(0x90);
     }
 
-    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes)) {
-        if (m_logger.error) m_logger.error("Failed to write corner text hook patch bytes");
+    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes))
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to write corner text hook patch bytes");
         return false;
     }
 
-    if (m_verbose && m_logger.info) {
+    if (m_verbose && m_logger.info)
+    {
         std::ostringstream oss;
         oss << "Corner text hook patched at 0x" << std::hex << m_hook_address << std::dec;
         m_logger.info(oss.str());
@@ -112,18 +135,21 @@ bool CornerTextHook::EnablePatch()
 
 bool CornerTextHook::RemoveHook()
 {
-    if (!m_is_installed) {
+    if (!m_is_installed)
+    {
         return true;
     }
 
     RestoreOriginalFunction();
 
-    if (m_detour_address != 0) {
+    if (m_detour_address != 0)
+    {
         m_memory->FreeMemory(m_detour_address, 4096);
         m_detour_address = 0;
     }
 
-    if (m_backup_address != 0) {
+    if (m_backup_address != 0)
+    {
         m_memory->FreeMemory(m_backup_address, 256);
         m_backup_address = 0;
     }
@@ -134,7 +160,8 @@ bool CornerTextHook::RemoveHook()
 
 bool CornerTextHook::ReapplyPatch()
 {
-    if (m_original_bytes.empty()) {
+    if (m_original_bytes.empty())
+    {
         return false;
     }
 
@@ -143,12 +170,15 @@ bool CornerTextHook::ReapplyPatch()
     const uint32_t jump_offset = Rel32From(m_hook_address, m_detour_address);
     patch_bytes.insert(patch_bytes.end(), reinterpret_cast<const uint8_t*>(&jump_offset),
                        reinterpret_cast<const uint8_t*>(&jump_offset) + sizeof(uint32_t));
-    while (patch_bytes.size() < m_original_bytes.size()) {
+    while (patch_bytes.size() < m_original_bytes.size())
+    {
         patch_bytes.push_back(0x90);
     }
 
-    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes)) {
-        if (m_logger.error) m_logger.error("Failed to reapply corner text hook patch");
+    if (!MemoryPatch::WriteWithProtect(*m_memory, m_hook_address, patch_bytes))
+    {
+        if (m_logger.error)
+            m_logger.error("Failed to reapply corner text hook patch");
         return false;
     }
 
@@ -157,15 +187,18 @@ bool CornerTextHook::ReapplyPatch()
 
 bool CornerTextHook::IsPatched() const
 {
-    if (m_hook_address == 0 || m_detour_address == 0 || m_original_bytes.empty()) {
+    if (m_hook_address == 0 || m_detour_address == 0 || m_original_bytes.empty())
+    {
         return false;
     }
 
     std::vector<uint8_t> cur(m_original_bytes.size());
-    if (!m_memory->ReadMemory(m_hook_address, cur.data(), cur.size())) {
+    if (!m_memory->ReadMemory(m_hook_address, cur.data(), cur.size()))
+    {
         return false;
     }
-    if (cur.size() < 5 || cur[0] != 0xE9) {
+    if (cur.size() < 5 || cur[0] != 0xE9)
+    {
         return false;
     }
 
@@ -176,21 +209,25 @@ bool CornerTextHook::IsPatched() const
 
 bool CornerTextHook::PollCornerText()
 {
-    if (!m_is_installed || m_backup_address == 0) {
+    if (!m_is_installed || m_backup_address == 0)
+    {
         return false;
     }
 
     uint8_t flag = 0;
-    if (!m_memory->ReadMemory(m_backup_address + kFlagOffset, &flag, sizeof(flag))) {
+    if (!m_memory->ReadMemory(m_backup_address + kFlagOffset, &flag, sizeof(flag)))
+    {
         return false;
     }
 
-    if (flag == 0) {
+    if (flag == 0)
+    {
         return false;
     }
 
     uint32_t text_ptr_raw = 0;
-    if (!m_memory->ReadMemory(m_backup_address, &text_ptr_raw, sizeof(text_ptr_raw))) {
+    if (!m_memory->ReadMemory(m_backup_address, &text_ptr_raw, sizeof(text_ptr_raw)))
+    {
         uint8_t zero = 0;
         m_memory->WriteMemory(m_backup_address + kFlagOffset, &zero, sizeof(zero));
         return false;
@@ -199,13 +236,15 @@ bool CornerTextHook::PollCornerText()
     uint8_t zero = 0;
     m_memory->WriteMemory(m_backup_address + kFlagOffset, &zero, sizeof(zero));
 
-    if (text_ptr_raw == 0) {
+    if (text_ptr_raw == 0)
+    {
         return false;
     }
 
     const uintptr_t text_ptr = static_cast<uintptr_t>(text_ptr_raw);
     std::string text;
-    if (!m_memory->ReadString(text_ptr, text, kMaxStringLength)) {
+    if (!m_memory->ReadString(text_ptr, text, kMaxStringLength))
+    {
         text.clear();
     }
 
@@ -220,17 +259,20 @@ bool CornerTextHook::FindCornerTriggerAddress()
     PatternFinder finder(m_memory);
     const auto& pattern = Signatures::GetCornerText();
 
-    if (auto addr = finder.FindInModule(pattern, "DQXGame.exe")) {
+    if (auto addr = finder.FindInModule(pattern, "DQXGame.exe"))
+    {
         m_hook_address = *addr;
         return true;
     }
 
-    if (auto addr = finder.FindInProcessExec(pattern)) {
+    if (auto addr = finder.FindInProcessExec(pattern))
+    {
         m_hook_address = *addr;
         return true;
     }
 
-    if (auto addr = finder.FindWithFallback(pattern, "DQXGame.exe", 64u * 1024u * 1024u)) {
+    if (auto addr = finder.FindWithFallback(pattern, "DQXGame.exe", 64u * 1024u * 1024u))
+    {
         m_hook_address = *addr;
         return true;
     }
@@ -241,12 +283,14 @@ bool CornerTextHook::FindCornerTriggerAddress()
 bool CornerTextHook::AllocateDetourMemory()
 {
     m_detour_address = m_memory->AllocateMemory(4096, true);
-    if (m_detour_address == 0) {
+    if (m_detour_address == 0)
+    {
         return false;
     }
 
     m_backup_address = m_memory->AllocateMemory(256, false);
-    if (m_backup_address == 0) {
+    if (m_backup_address == 0)
+    {
         m_memory->FreeMemory(m_detour_address, 4096);
         m_detour_address = 0;
         return false;
@@ -261,11 +305,13 @@ bool CornerTextHook::AllocateDetourMemory()
 bool CornerTextHook::WriteDetourCode()
 {
     auto bytecode = CreateDetourBytecode();
-    if (bytecode.empty()) {
+    if (bytecode.empty())
+    {
         return false;
     }
 
-    if (!m_memory->WriteMemory(m_detour_address, bytecode.data(), bytecode.size())) {
+    if (!m_memory->WriteMemory(m_detour_address, bytecode.data(), bytecode.size()))
+    {
         return false;
     }
 
@@ -273,14 +319,12 @@ bool CornerTextHook::WriteDetourCode()
     return true;
 }
 
-bool CornerTextHook::PatchOriginalFunction()
-{
-    return EnablePatch();
-}
+bool CornerTextHook::PatchOriginalFunction() { return EnablePatch(); }
 
 void CornerTextHook::RestoreOriginalFunction()
 {
-    if (m_hook_address != 0 && !m_original_bytes.empty()) {
+    if (m_hook_address != 0 && !m_original_bytes.empty())
+    {
         m_memory->WriteMemory(m_hook_address, m_original_bytes.data(), m_original_bytes.size());
     }
 }
@@ -351,12 +395,14 @@ void CornerTextHook::EmitReturnJump(std::vector<uint8_t>& code)
 
 size_t CornerTextHook::ComputeStolenLength()
 {
-    if (!m_instr_safe) {
+    if (!m_instr_safe)
+    {
         return kDefaultStolenBytes;
     }
 
     std::vector<uint8_t> head(kDefaultStolenBytes);
-    if (!m_memory->ReadMemory(m_hook_address, head.data(), head.size())) {
+    if (!m_memory->ReadMemory(m_hook_address, head.data(), head.size()))
+    {
         return kDefaultStolenBytes;
     }
     return kDefaultStolenBytes;

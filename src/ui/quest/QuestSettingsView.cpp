@@ -10,9 +10,7 @@
 #include "../../translate/ITranslator.hpp"
 #include "../../translate/TranslateSession.hpp"
 
-QuestSettingsView::QuestSettingsView(QuestStateManager& state,
-                                     FontManager& font_manager,
-                                     TranslateSession& session)
+QuestSettingsView::QuestSettingsView(QuestStateManager& state, FontManager& font_manager, TranslateSession& session)
     : state_(state)
     , font_manager_(font_manager)
     , session_(session)
@@ -21,12 +19,8 @@ QuestSettingsView::QuestSettingsView(QuestStateManager& state,
 {
 }
 
-void QuestSettingsView::render(translate::ITranslator* translator,
-                               std::string& apply_hint,
-                               float& apply_hint_timer,
-                               bool& testing_connection,
-                               std::string& test_result,
-                               std::string& test_timestamp,
+void QuestSettingsView::render(translate::ITranslator* translator, std::string& apply_hint, float& apply_hint_timer,
+                               bool& testing_connection, std::string& test_result, std::string& test_timestamp,
                                const std::string& settings_id_suffix,
                                const std::function<void()>& initTranslatorIfEnabledFn,
                                const std::function<translate::ITranslator*()>& currentTranslatorFn)
@@ -63,15 +57,8 @@ void QuestSettingsView::render(translate::ITranslator* translator,
         {
             global_config = &cm->globalTranslationConfig();
         }
-        translation_panel_.render(translator,
-                                  apply_hint,
-                                  apply_hint_timer,
-                                  testing_connection,
-                                  test_result,
-                                  test_timestamp,
-                                  initTranslatorIfEnabledFn,
-                                  currentTranslatorFn,
-                                  global_config);
+        translation_panel_.render(translator, apply_hint, apply_hint_timer, testing_connection, test_result,
+                                  test_timestamp, initTranslatorIfEnabledFn, currentTranslatorFn, global_config);
         ImGui::Unindent();
         ImGui::Spacing();
     }

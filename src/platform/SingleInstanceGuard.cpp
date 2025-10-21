@@ -17,7 +17,8 @@
 #include <windows.h>
 #endif
 
-namespace {
+namespace
+{
 
 #ifdef _WIN32
 std::filesystem::path GetExecutablePath()
@@ -92,12 +93,14 @@ std::string WStringToUtf8(const std::wstring& value)
     if (value.empty())
         return {};
 
-    int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+    int size =
+        WideCharToMultiByte(CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
     if (size <= 0)
         return {};
 
     std::string result(static_cast<std::size_t>(size), '\0');
-    int written = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()), result.data(), size, nullptr, nullptr);
+    int written = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()), result.data(), size,
+                                      nullptr, nullptr);
     if (written <= 0)
         return {};
 
@@ -111,7 +114,8 @@ SingleInstanceGuard::SingleInstanceGuard() = default;
 
 #ifdef _WIN32
 SingleInstanceGuard::SingleInstanceGuard(void* handle, std::wstring name)
-    : mutex_handle_(handle), mutex_name_(std::move(name))
+    : mutex_handle_(handle)
+    , mutex_name_(std::move(name))
 {
 }
 #endif
@@ -139,8 +143,7 @@ std::unique_ptr<SingleInstanceGuard> SingleInstanceGuard::Acquire()
         if (!exe_name_utf8.empty() && ProcessDetector::isAnotherDQXU(exe_name_utf8))
         {
             PLOG_WARNING << "Another DQX Utility instance is already running (process-name check).";
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
-                                                "Application already running",
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Application already running",
                                                 "Another DQX Utility instance is already active.");
             SetLastError(ERROR_ALREADY_EXISTS);
             return nullptr;
@@ -152,8 +155,7 @@ std::unique_ptr<SingleInstanceGuard> SingleInstanceGuard::Acquire()
     {
         DWORD err = GetLastError();
         PLOG_ERROR << "InitializeSecurityDescriptor failed: " << err;
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Initialization,
-                                          "Single instance guard failure",
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Initialization, "Single instance guard failure",
                                           "InitializeSecurityDescriptor failed with error " + std::to_string(err));
         SetLastError(err);
         return nullptr;
@@ -163,8 +165,7 @@ std::unique_ptr<SingleInstanceGuard> SingleInstanceGuard::Acquire()
     {
         DWORD err = GetLastError();
         PLOG_ERROR << "SetSecurityDescriptorDacl failed: " << err;
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Initialization,
-                                          "Single instance guard failure",
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Initialization, "Single instance guard failure",
                                           "SetSecurityDescriptorDacl failed with error " + std::to_string(err));
         SetLastError(err);
         return nullptr;
@@ -180,8 +181,7 @@ std::unique_ptr<SingleInstanceGuard> SingleInstanceGuard::Acquire()
     {
         DWORD err = GetLastError();
         PLOG_ERROR << "CreateMutexW failed: " << err;
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Initialization,
-                                          "Single instance guard failure",
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Initialization, "Single instance guard failure",
                                           "CreateMutexW failed with error " + std::to_string(err));
         SetLastError(err);
         return nullptr;
@@ -192,8 +192,7 @@ std::unique_ptr<SingleInstanceGuard> SingleInstanceGuard::Acquire()
     {
         CloseHandle(mutex);
         PLOG_WARNING << "Another DQX Utility instance is already running.";
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
-                                            "Application already running",
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Application already running",
                                             "Another DQX Utility instance is already active.");
         SetLastError(create_error);
         return nullptr;
@@ -209,8 +208,7 @@ std::unique_ptr<SingleInstanceGuard> SingleInstanceGuard::Acquire()
         if (!exe_name.empty() && ProcessDetector::isAnotherDQXU(exe_name))
         {
             PLOG_WARNING << "Another DQX Utility instance is already running (process-name check).";
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
-                                                "Application already running",
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Application already running",
                                                 "Another DQX Utility instance is already active.");
             return nullptr;
         }

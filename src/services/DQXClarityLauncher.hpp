@@ -5,7 +5,14 @@
 #include <vector>
 #include <atomic>
 
-namespace dqxclarity { struct DialogMessage; struct DialogStreamItem; struct QuestMessage; enum class Status; struct Config; }
+namespace dqxclarity
+{
+struct DialogMessage;
+struct DialogStreamItem;
+struct QuestMessage;
+enum class Status;
+struct Config;
+} // namespace dqxclarity
 
 enum class DQXClarityStatus
 {
@@ -51,7 +58,6 @@ public:
 
     // Expose engine stage to guard UI actions
     dqxclarity::Status getEngineStage() const;
-
 
     // (No runtime engine tweak APIs exposed in UI)
 

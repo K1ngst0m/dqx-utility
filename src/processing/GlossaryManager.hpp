@@ -14,8 +14,7 @@ public:
 
     void initialize();
 
-    std::optional<std::string> lookup(const std::string& japanese_text,
-                                       const std::string& target_lang) const;
+    std::optional<std::string> lookup(const std::string& japanese_text, const std::string& target_lang) const;
 
     bool hasGlossary(const std::string& target_lang) const;
 

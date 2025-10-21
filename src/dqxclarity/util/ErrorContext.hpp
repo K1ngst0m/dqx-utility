@@ -3,7 +3,8 @@
 #include <string>
 #include <functional>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
 /**
  * @brief Simple error context for dqxclarity standalone library
@@ -29,8 +30,11 @@ struct ErrorInfo
     std::string details;
 
     ErrorInfo() = default;
+
     ErrorInfo(ErrorSeverityLevel lvl, std::string msg, std::string det = "")
-        : level(lvl), message(std::move(msg)), details(std::move(det))
+        : level(lvl)
+        , message(std::move(msg))
+        , details(std::move(det))
     {
     }
 };
@@ -67,10 +71,7 @@ public:
     /**
      * @brief Set error callback for handling errors
      */
-    void SetCallback(ErrorCallback callback)
-    {
-        callback_ = std::move(callback);
-    }
+    void SetCallback(ErrorCallback callback) { callback_ = std::move(callback); }
 
     /**
      * @brief Report an error
@@ -99,10 +100,7 @@ public:
     /**
      * @brief Check if callback is set
      */
-    bool HasCallback() const
-    {
-        return static_cast<bool>(callback_);
-    }
+    bool HasCallback() const { return static_cast<bool>(callback_); }
 
 private:
     void Report(ErrorSeverityLevel level, const std::string& message, const std::string& details)

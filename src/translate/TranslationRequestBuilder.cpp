@@ -1,27 +1,30 @@
 #include "TranslationRequestBuilder.hpp"
 #include <algorithm>
 
-namespace translate {
+namespace translate
+{
 
 static std::string escape_double_quotes(const std::string& s)
 {
     std::string out;
     out.reserve(s.size());
-    for (char c : s) {
-        if (c == '\"') {
+    for (char c : s)
+    {
+        if (c == '\"')
+        {
             out.push_back('\\');
             out.push_back('\"');
-        } else {
+        }
+        else
+        {
             out.push_back(c);
         }
     }
     return out;
 }
 
-text_processing::TranslationRequest build_translation_request(const std::string& text,
-                                                               const std::string& source_lang,
-                                                               const std::string& target_lang,
-                                                               int backend_id)
+text_processing::TranslationRequest build_translation_request(const std::string& text, const std::string& source_lang,
+                                                              const std::string& target_lang, int backend_id)
 {
     text_processing::TranslationRequest req;
     // Light normalization: escape double quotes to avoid downstream JSON/string issues

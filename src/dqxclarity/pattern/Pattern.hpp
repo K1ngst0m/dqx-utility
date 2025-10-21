@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <string>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-struct Pattern {
+struct Pattern
+{
     std::vector<uint8_t> bytes;
     std::vector<bool> mask;
 

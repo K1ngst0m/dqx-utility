@@ -2,7 +2,8 @@
 
 #include <string>
 
-namespace utils {
+namespace utils
+{
 
 /**
  * @brief Native platform message box for displaying errors before ImGui is available

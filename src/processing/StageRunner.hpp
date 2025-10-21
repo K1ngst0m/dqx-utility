@@ -11,11 +11,12 @@
 #include "../utils/Profile.hpp"
 #include "../utils/ErrorReporter.hpp"
 
-namespace processing {
+namespace processing
+{
 
 // Utility to run a stage (callable returning T) and produce text_processing::StageResult<T>
 // Measures duration and logs errors. Keeps stages consistent for pipeline tracing.
-template<typename T, typename Fn>
+template <typename T, typename Fn>
 text_processing::StageResult<T> run_stage(const std::string& stage_name, Fn&& fn)
 {
     PROFILE_SCOPE_CUSTOM(stage_name);
@@ -28,8 +29,10 @@ text_processing::StageResult<T> run_stage(const std::string& stage_name, Fn&& fn
         auto end = high_resolution_clock::now();
         auto dur = duration_cast<std::chrono::microseconds>(end - start);
         auto sr = text_processing::StageResult<T>::success(std::move(res), dur, stage_name);
-        if (Diagnostics::IsVerbose()) {
-            PLOG_INFO_(Diagnostics::kLogInstance) << "Stage '" << stage_name << "' succeeded in " << dur.count() << "us";
+        if (Diagnostics::IsVerbose())
+        {
+            PLOG_INFO_(Diagnostics::kLogInstance)
+                << "Stage '" << stage_name << "' succeeded in " << dur.count() << "us";
         }
         return sr;
     }
@@ -37,20 +40,20 @@ text_processing::StageResult<T> run_stage(const std::string& stage_name, Fn&& fn
     {
         auto end = high_resolution_clock::now();
         auto dur = duration_cast<std::chrono::microseconds>(end - start);
-        PLOG_ERROR_(Diagnostics::kLogInstance) << "Stage '" << stage_name << "' failed in " << dur.count() << "us: " << ex.what();
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-            "Text pipeline stage failed",
-            stage_name + ": " + ex.what());
+        PLOG_ERROR_(Diagnostics::kLogInstance)
+            << "Stage '" << stage_name << "' failed in " << dur.count() << "us: " << ex.what();
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation, "Text pipeline stage failed",
+                                            stage_name + ": " + ex.what());
         return text_processing::StageResult<T>::failure(ex.what(), dur, stage_name);
     }
     catch (...)
     {
         auto end = high_resolution_clock::now();
         auto dur = duration_cast<std::chrono::microseconds>(end - start);
-        PLOG_ERROR_(Diagnostics::kLogInstance) << "Stage '" << stage_name << "' failed with unknown exception in " << dur.count() << "us";
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation,
-            "Text pipeline stage failed",
-            stage_name + ": unknown exception");
+        PLOG_ERROR_(Diagnostics::kLogInstance)
+            << "Stage '" << stage_name << "' failed with unknown exception in " << dur.count() << "us";
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Translation, "Text pipeline stage failed",
+                                            stage_name + ": unknown exception");
         return text_processing::StageResult<T>::failure("unknown exception", dur, stage_name);
     }
 }

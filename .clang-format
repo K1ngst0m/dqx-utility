@@ -11,7 +11,7 @@ AlignEscapedNewlinesLeft: true
 AlignTrailingComments: false
 
 # Align consecutive assignments.
-AlignConsecutiveAssignments: true
+AlignConsecutiveAssignments: false
 
 # Align consecutive declarations.
 AlignConsecutiveDeclarations: false
@@ -31,8 +31,8 @@ AllowShortBlocksOnASingleLine: false
 # If true, short case labels will be contracted to a single line.
 AllowShortCaseLabelsOnASingleLine: false
 
-# Dependent on the value, int f() { return 0; } can be put on a single line. Possible values: None, Inline, All.
-AllowShortFunctionsOnASingleLine: None
+# Dependent on the value, int f() { return 0; } can be put on a single line. Possible values: None, Inline, All, Empty, InlineOnly.
+AllowShortFunctionsOnASingleLine: All
 
 # If true, if (a) return; can be put on a single line.
 AllowShortIfStatementsOnASingleLine: false
@@ -88,6 +88,9 @@ Cpp11BracedListStyle: false
 
 # Disables formatting at all.
 DisableFormat: false
+
+# Do not sort includes - preserve manual include order (critical for Windows headers)
+SortIncludes: Never
 
 # A vector of macros that should be interpreted as foreach loops instead of as function calls.
 #ForEachMacros: ''
@@ -216,7 +219,6 @@ LambdaBodyIndentation: Signature
 
 # C++20 features
 InsertTrailingCommas: None
-SortIncludes: CaseSensitive
 FixNamespaceComments: true
 
 # Class formatting

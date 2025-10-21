@@ -16,7 +16,7 @@ struct UIState
     float background_alpha;
     float font_size;
     float font_base_size;
-    
+
     float vignette_thickness;
 
     std::array<char, FontPathSize> font_path{};
@@ -27,15 +27,15 @@ struct UIState
     bool has_custom_font;
 
     bool auto_scroll_to_new;
-    bool is_docked;  // Cached docked state for context menu
+    bool is_docked; // Cached docked state for context menu
 
     // Auto-fade settings (per-dialog)
     bool fade_enabled;
-    float fade_timeout;  // seconds
-    
+    float fade_timeout; // seconds
+
     // Auto-fade state
-    float last_activity_time;   // Time since last text append or mouse hover
-    float current_alpha_multiplier;  // Current fade multiplier (1.0 = fully visible, 0.0 = fully hidden)
+    float last_activity_time; // Time since last text append or mouse hover
+    float current_alpha_multiplier; // Current fade multiplier (1.0 = fully visible, 0.0 = fully hidden)
 
     ImFont* font;
 
@@ -50,9 +50,9 @@ struct UIState
         background_alpha = 0.78f;
         font_size = 28.0f;
         font_base_size = 28.0f;
-        
+
         vignette_thickness = 12.0f;
-        
+
         font_path.fill('\0');
         window_pos = ImVec2(0.0f, 0.0f);
         window_size = ImVec2(width, height);
@@ -62,12 +62,12 @@ struct UIState
 
         auto_scroll_to_new = true;
         is_docked = false;
-        
+
         fade_enabled = false;
         fade_timeout = 20.0f;
         last_activity_time = 0.0f;
         current_alpha_multiplier = 1.0f;
-        
+
         font = nullptr;
     }
 };

@@ -66,7 +66,11 @@ void WindowRegistry::removeWindow(UIWindow* window)
         default_quest_ = nullptr;
     }
     windows_.erase(std::remove_if(windows_.begin(), windows_.end(),
-        [&](const std::unique_ptr<UIWindow>& entry) { return entry.get() == window; }), windows_.end());
+                                  [&](const std::unique_ptr<UIWindow>& entry)
+                                  {
+                                      return entry.get() == window;
+                                  }),
+                   windows_.end());
 }
 
 // Produces a filtered view for the requested window type.
@@ -86,43 +90,45 @@ std::vector<UIWindow*> WindowRegistry::windowsByType(UIWindowType type)
 void WindowRegistry::processRemovals()
 {
     windows_.erase(std::remove_if(windows_.begin(), windows_.end(),
-        [this](const std::unique_ptr<UIWindow>& window) {
-            if (window->type() == UIWindowType::Dialog)
-            {
-                if (auto* dialog = dynamic_cast<DialogWindow*>(window.get()))
-                {
-                    if (dialog->shouldBeRemoved())
-                    {
-                        if (window.get() == default_dialog_)
-                        {
-                            dialog->setDefaultInstance(false);
-                            default_dialog_ = nullptr;
-                        }
-                        return true;
-                    }
-                }
-            }
-            else if (window->type() == UIWindowType::Quest)
-            {
-                if (auto* quest = dynamic_cast<QuestWindow*>(window.get()))
-                {
-                    if (quest->shouldBeRemoved())
-                    {
-                        if (window.get() == default_quest_)
-                        {
-                            quest->setDefaultInstance(false);
-                            default_quest_ = nullptr;
-                        }
-                        return true;
-                    }
-                }
-            }
-            else if (window->type() == UIWindowType::Help)
-            {
-                return false;
-            }
-            return false;
-        }), windows_.end());
+                                  [this](const std::unique_ptr<UIWindow>& window)
+                                  {
+                                      if (window->type() == UIWindowType::Dialog)
+                                      {
+                                          if (auto* dialog = dynamic_cast<DialogWindow*>(window.get()))
+                                          {
+                                              if (dialog->shouldBeRemoved())
+                                              {
+                                                  if (window.get() == default_dialog_)
+                                                  {
+                                                      dialog->setDefaultInstance(false);
+                                                      default_dialog_ = nullptr;
+                                                  }
+                                                  return true;
+                                              }
+                                          }
+                                      }
+                                      else if (window->type() == UIWindowType::Quest)
+                                      {
+                                          if (auto* quest = dynamic_cast<QuestWindow*>(window.get()))
+                                          {
+                                              if (quest->shouldBeRemoved())
+                                              {
+                                                  if (window.get() == default_quest_)
+                                                  {
+                                                      quest->setDefaultInstance(false);
+                                                      default_quest_ = nullptr;
+                                                  }
+                                                  return true;
+                                              }
+                                          }
+                                      }
+                                      else if (window->type() == UIWindowType::Help)
+                                      {
+                                          return false;
+                                      }
+                                      return false;
+                                  }),
+                   windows_.end());
 }
 
 void WindowRegistry::markDialogAsDefault(DialogWindow& window)
@@ -162,7 +168,8 @@ std::string WindowRegistry::makeDialogName()
 
 std::string WindowRegistry::makeQuestName()
 {
-    if (quest_counter_ == 0) {
+    if (quest_counter_ == 0)
+    {
         return ui::LocalizedOrFallback("window.quest.default_name", "Quest Log");
     }
     return ui::LocalizedOrFallback("window.quest.default_name", "Quest Log") + " " + std::to_string(quest_counter_ + 1);
@@ -170,7 +177,8 @@ std::string WindowRegistry::makeQuestName()
 
 std::string WindowRegistry::makeHelpName()
 {
-    if (help_counter_ == 0) {
+    if (help_counter_ == 0)
+    {
         return ui::LocalizedOrFallback("window.help.default_name", "Help");
     }
     return ui::LocalizedOrFallback("window.help.default_name", "Help") + " " + std::to_string(help_counter_ + 1);

@@ -42,10 +42,13 @@ public:
     void processRemovals(); // Remove windows marked for removal
 
     std::vector<std::unique_ptr<UIWindow>>& windows() { return windows_; }
+
     std::vector<UIWindow*> windowsByType(UIWindowType type);
 
     DialogWindow* defaultDialogWindow() const { return default_dialog_; }
+
     QuestWindow* defaultQuestWindow() const { return default_quest_; }
+
     void markDialogAsDefault(DialogWindow& window);
     void markQuestAsDefault(QuestWindow& window);
 

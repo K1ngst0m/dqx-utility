@@ -8,25 +8,25 @@
 #include "Localization.hpp"
 #include "UITheme.hpp"
 
-namespace ui {
+namespace ui
+{
 
 inline std::string LocalizedOrFallback(const char* key, const char* fallback)
 {
     const std::string& value = i18n::get_str(key);
-    if (value.empty() || value == key) {
+    if (value.empty() || value == key)
+    {
         return std::string(fallback);
     }
     return value;
 }
 
-inline void RenderVignette(const ImVec2& win_pos,
-                           const ImVec2& win_size,
-                           float thickness,
-                           float rounding,
+inline void RenderVignette(const ImVec2& win_pos, const ImVec2& win_size, float thickness, float rounding,
                            float alpha_multiplier)
 {
     thickness = std::max(0.0f, thickness);
-    if (thickness <= 0.0f) return;
+    if (thickness <= 0.0f)
+        return;
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
     float rounding0 = std::max(0.0f, rounding);
@@ -46,16 +46,14 @@ inline void RenderVignette(const ImVec2& win_pos,
         float a = max_alpha * (1.0f - t);
         a = a * a;
         a *= alpha_multiplier;
-        if (a <= 0.0f) continue;
+        if (a <= 0.0f)
+            continue;
         ImU32 col = IM_COL32(0, 0, 0, static_cast<int>(a * 255.0f));
         dl->AddRect(pmin, pmax, col, r, 0, 1.0f);
     }
 }
 
-inline void RenderOutlinedText(const char* text,
-                               const ImVec2& position,
-                               ImFont* font,
-                               float font_size_px,
+inline void RenderOutlinedText(const char* text, const ImVec2& position, ImFont* font, float font_size_px,
                                float wrap_width)
 {
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -71,9 +69,9 @@ inline void RenderOutlinedText(const char* text,
     {
         for (int oy = -1; oy <= 1; ++oy)
         {
-            if (ox == 0 && oy == 0) continue;
-            dl->AddText(font, font_size_px,
-                        ImVec2(position.x + ox * thickness, position.y + oy * thickness),
+            if (ox == 0 && oy == 0)
+                continue;
+            dl->AddText(font, font_size_px, ImVec2(position.x + ox * thickness, position.y + oy * thickness),
                         outline_col, text, nullptr, wrap_width);
         }
     }

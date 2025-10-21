@@ -8,21 +8,22 @@
 
 #include <thread>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-bool WaitForNoticeScreen(
-    std::atomic<bool>& cancel,
-    std::chrono::milliseconds poll_interval,
-    std::chrono::milliseconds timeout)
+bool WaitForNoticeScreen(std::atomic<bool>& cancel, std::chrono::milliseconds poll_interval,
+                         std::chrono::milliseconds timeout)
 {
     auto pids = ProcessFinder::FindByName("DQXGame.exe", false);
-    if (pids.empty()) {
+    if (pids.empty())
+    {
         return false;
     }
 
     auto mem_unique = MemoryFactory::CreatePlatformMemory();
     std::shared_ptr<IProcessMemory> memory(std::move(mem_unique));
-    if (!memory || !memory->AttachProcess(pids[0])) {
+    if (!memory || !memory->AttachProcess(pids[0]))
+    {
         return false;
     }
 
@@ -30,13 +31,16 @@ bool WaitForNoticeScreen(
     const auto& pat = Signatures::GetNoticeString();
 
     auto start = std::chrono::steady_clock::now();
-    while (!cancel.load()) {
+    while (!cancel.load())
+    {
         auto found = scanner.ScanProcess(pat, /*require_executable=*/false);
-        if (found.has_value()) {
+        if (found.has_value())
+        {
             memory->DetachProcess();
             return true;
         }
-        if (timeout.count() > 0 && (std::chrono::steady_clock::now() - start) > timeout) {
+        if (timeout.count() > 0 && (std::chrono::steady_clock::now() - start) > timeout)
+        {
             break;
         }
         std::this_thread::sleep_for(poll_interval);

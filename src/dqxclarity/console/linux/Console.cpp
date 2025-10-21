@@ -1,5 +1,6 @@
 #include "Console.hpp"
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 // No-op stub implementation on Linux for now
 }

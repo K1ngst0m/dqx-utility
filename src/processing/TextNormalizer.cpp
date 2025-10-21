@@ -2,11 +2,13 @@
 #include <string>
 #include <sstream>
 
-namespace processing {
+namespace processing
+{
 
 std::string normalize_line_endings(const std::string& text)
 {
-    if (text.empty()) return text;
+    if (text.empty())
+        return text;
     std::string out;
     out.reserve(text.size());
 
@@ -37,7 +39,8 @@ std::string normalize_line_endings(const std::string& text)
 
 std::string collapse_newlines(const std::string& text)
 {
-    if (text.empty()) return text;
+    if (text.empty())
+        return text;
 
     std::string normalized = normalize_line_endings(text);
     std::string result;

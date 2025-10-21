@@ -12,14 +12,15 @@
 #include <locale>
 #endif
 
-namespace utils {
+namespace utils
+{
 
 #ifdef _WIN32
 static std::wstring StringToWString(const std::string& str)
 {
     if (str.empty())
         return std::wstring();
-    
+
     int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
     std::wstring wstr(size, 0);
     MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], size);
@@ -63,10 +64,10 @@ void NativeMessageBox::Show(const std::string& title, const std::string& message
         type_str = "--info";
         break;
     }
-    
+
     cmd << "zenity " << type_str << " --title=\"" << title << "\" --text=\"" << message << "\" 2>/dev/null";
     int result = system(cmd.str().c_str());
-    
+
     // If zenity failed, print to console
     if (result != 0)
     {
@@ -83,15 +84,15 @@ void NativeMessageBox::ShowFatalError(const std::string& message, const std::str
 {
     std::stringstream ss;
     ss << message << "\n\n";
-    
+
     if (!details.empty())
     {
         ss << i18n::get("error.native.technical_details") << "\n" << details << "\n\n";
     }
-    
+
     ss << i18n::get("error.native.exit_line") << "\n";
     ss << i18n::get("error.native.check_logs");
-    
+
     Show(i18n::get("error.native.fatal_title"), ss.str(), Type::Error);
 }
 

@@ -2,7 +2,8 @@
 
 #include <atomic>
 
-namespace utils {
+namespace utils
+{
 
 class CrashHandler
 {
@@ -13,4 +14,4 @@ public:
     static void RegisterFatalCleanup(void (*fn)());
 };
 
-}
+} // namespace utils

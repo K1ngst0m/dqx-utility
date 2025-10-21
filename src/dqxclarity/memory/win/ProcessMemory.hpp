@@ -8,9 +8,11 @@
 #include <string>
 #include <vector>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class ProcessMemory : public IProcessMemory {
+class ProcessMemory : public IProcessMemory
+{
 public:
     ProcessMemory();
     ~ProcessMemory() override;

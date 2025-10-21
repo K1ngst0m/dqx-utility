@@ -30,8 +30,8 @@ void GlossaryManager::initialize()
     };
 
     std::vector<GlossaryFile> files = {
-        {"zh-Hans.json", "zh-Hans"},  // Shared for zh-CN and zh-TW
-        {"en-US.json", "en-US"}
+        { "zh-Hans.json", "zh-Hans" }, // Shared for zh-CN and zh-TW
+        { "en-US.json",   "en-US"   }
     };
 
     fs::path glossary_dir = "assets/glossaries";
@@ -47,25 +47,22 @@ void GlossaryManager::initialize()
             total_loaded++;
             total_entries += count;
             PLOG_INFO_(Diagnostics::kLogInstance)
-                << "[GlossaryManager] Loaded " << file.language_code
-                << " glossary: " << count << " entries";
+                << "[GlossaryManager] Loaded " << file.language_code << " glossary: " << count << " entries";
         }
         else
         {
             PLOG_WARNING_(Diagnostics::kLogInstance)
-                << "[GlossaryManager] Failed to load " << file.file_name
-                << " (file may not exist or is empty)";
+                << "[GlossaryManager] Failed to load " << file.file_name << " (file may not exist or is empty)";
         }
     }
 
     initialized_ = true;
-    PLOG_INFO_(Diagnostics::kLogInstance)
-        << "[GlossaryManager] Initialization complete: "
-        << total_loaded << " files, " << total_entries << " total entries";
+    PLOG_INFO_(Diagnostics::kLogInstance) << "[GlossaryManager] Initialization complete: " << total_loaded << " files, "
+                                          << total_entries << " total entries";
 }
 
 std::optional<std::string> GlossaryManager::lookup(const std::string& japanese_text,
-                                                     const std::string& target_lang) const
+                                                   const std::string& target_lang) const
 {
     if (!initialized_)
     {
@@ -108,25 +105,20 @@ std::size_t GlossaryManager::getEntryCount(const std::string& target_lang) const
     return it->second.size();
 }
 
-bool GlossaryManager::isInitialized() const
-{
-    return initialized_;
-}
+bool GlossaryManager::isInitialized() const { return initialized_; }
 
 bool GlossaryManager::loadGlossaryFile(const std::string& file_path, const std::string& language_code)
 {
     if (!fs::exists(file_path))
     {
-        PLOG_DEBUG_(Diagnostics::kLogInstance)
-            << "[GlossaryManager] Glossary file not found: " << file_path;
+        PLOG_DEBUG_(Diagnostics::kLogInstance) << "[GlossaryManager] Glossary file not found: " << file_path;
         return false;
     }
 
     std::ifstream file(file_path);
     if (!file.is_open())
     {
-        PLOG_ERROR_(Diagnostics::kLogInstance)
-            << "[GlossaryManager] Failed to open glossary file: " << file_path;
+        PLOG_ERROR_(Diagnostics::kLogInstance) << "[GlossaryManager] Failed to open glossary file: " << file_path;
         return false;
     }
 

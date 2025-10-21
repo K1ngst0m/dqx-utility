@@ -6,14 +6,15 @@
 class AppContext;
 class WindowRegistry;
 
-namespace ui {
+namespace ui
+{
 
 /// Handles UI-related event processing and interactions
 class UIEventHandler
 {
 public:
     UIEventHandler(AppContext& app_context, WindowRegistry& registry);
-    
+
     /// Check if mouse is currently outside all dialog windows
     bool IsMouseOutsideDialogs() const;
 
@@ -22,7 +23,7 @@ public:
 
     /// Render and handle the global right-click context menu
     void RenderGlobalContextMenu(bool& show_manager, bool& quit_requested);
-    
+
 private:
     AppContext& app_context_;
     WindowRegistry& registry_;

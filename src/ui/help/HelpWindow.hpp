@@ -16,8 +16,11 @@ public:
     ~HelpWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Help; }
+
     const char* displayName() const override { return name_.c_str(); }
+
     const char* windowLabel() const override { return window_label_.c_str(); }
+
     void rename(const char* new_name) override;
 
     void render() override;
@@ -26,7 +29,12 @@ public:
     DialogStateManager& state() { return state_; }
 
 private:
-    enum class StatusKind { Ok, Warning, Error };
+    enum class StatusKind
+    {
+        Ok,
+        Warning,
+        Error
+    };
 
     struct StatusInfo
     {

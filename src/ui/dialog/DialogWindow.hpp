@@ -19,12 +19,17 @@
 #include <unordered_set>
 #include <functional>
 
-namespace translate {
+namespace translate
+{
 class ITranslator;
 struct BackendConfig;
 enum class Backend;
+} // namespace translate
+
+namespace processing
+{
+class TextPipeline;
 }
-namespace processing { class TextPipeline; }
 
 class DialogWindow : public UIWindow
 {
@@ -33,46 +38,60 @@ public:
     ~DialogWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Dialog; }
+
     const char* displayName() const override { return name_.c_str(); }
+
     const char* windowLabel() const override { return window_label_.c_str(); }
+
     void rename(const char* new_name) override;
+
     bool isDefaultInstance() const { return is_default_instance_; }
+
     void setDefaultInstance(bool value) { is_default_instance_ = value; }
 
     void render() override;
     void renderSettings() override;
-
 
     DialogStateManager& state() { return state_; }
 
     // Exposed for config manager apply
     void initTranslatorIfEnabled();
     void refreshFontBinding();
+
     bool shouldBeRemoved() const { return should_be_removed_; }
+
     void reinitializePlaceholder();
+
 private:
-    struct PendingMsg {
+    struct PendingMsg
+    {
         dqxclarity::DialogStreamType type = dqxclarity::DialogStreamType::Dialog;
         std::string text;
         std::string speaker;
         std::uint64_t seq = 0;
     };
 
-
     void renderDialog();
     void renderSettingsPanel();
     void renderSettingsWindow();
     void renderDialogContextMenu();
     void ensurePlaceholderEntry();
-    enum class PlaceholderState { Waiting, Ready, Error };
+    enum class PlaceholderState
+    {
+        Waiting,
+        Ready,
+        Error
+    };
     void setPlaceholderText(const std::string& text, PlaceholderState state);
     void refreshPlaceholderStatus();
     int appendSegmentInternal(const std::string& speaker, const std::string& text);
     void resetPlaceholder();
 
-    void renderVignette(const ImVec2& win_pos, const ImVec2& win_size, float thickness, float rounding, float alpha_multiplier);
+    void renderVignette(const ImVec2& win_pos, const ImVec2& win_size, float thickness, float rounding,
+                        float alpha_multiplier);
     void renderSeparator(bool hasNPC, const std::string& speaker, float content_width);
-    void renderOutlinedText(const char* text, const ImVec2& position, ImFont* font, float font_size_px, float wrap_width);
+    void renderOutlinedText(const char* text, const ImVec2& position, ImFont* font, float font_size_px,
+                            float wrap_width);
 
     void renderAppearanceSection();
     void renderTranslateSection();
@@ -100,7 +119,7 @@ private:
     std::unique_ptr<translate::ITranslator> translator_;
     std::uint64_t last_job_id_ = 0;
     std::unique_ptr<processing::TextPipeline> text_pipeline_;
-    
+
     TranslateSession session_;
     translate::BackendConfig cached_translator_config_{};
     translate::Backend cached_backend_ = translate::Backend::OpenAI;
@@ -114,7 +133,7 @@ private:
     bool testing_connection_ = false;
     std::string test_result_;
     std::string test_timestamp_;
-    
+
     // Apply success hint (auto-clears after 5 seconds)
     std::string apply_hint_;
     float apply_hint_timer_ = 0.0f;
@@ -129,5 +148,4 @@ private:
 
     std::uint64_t observed_global_translation_version_ = 0;
     bool last_used_global_translation_ = false;
-
 };

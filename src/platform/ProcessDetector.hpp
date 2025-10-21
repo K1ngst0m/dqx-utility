@@ -10,7 +10,7 @@ class ProcessDetector
 public:
     static bool isProcessRunning(const std::string& processName);
     static bool isAnotherDQXU(const std::string& processName);
-    
+
     // Wine environment detection (Linux only)
     static std::optional<WineEnvironment> detectWineEnvironment(const std::string& processName);
 

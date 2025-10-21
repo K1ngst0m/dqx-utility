@@ -12,11 +12,11 @@
 
 namespace
 {
-    std::mutex g_repo_mutex;
-    constexpr size_t MAX_WARNING_CACHE_SIZE = 100;
-    std::unordered_map<std::string, size_t> g_load_warnings;
-    std::unordered_map<std::string, size_t> g_save_errors;
-}
+std::mutex g_repo_mutex;
+constexpr size_t MAX_WARNING_CACHE_SIZE = 100;
+std::unordered_map<std::string, size_t> g_load_warnings;
+std::unordered_map<std::string, size_t> g_save_errors;
+} // namespace
 
 UnknownLabelRepository::UnknownLabelRepository(const std::string& path)
     : path_(path)
@@ -27,7 +27,7 @@ bool UnknownLabelRepository::load(std::unordered_set<std::string>& out_labels) c
 {
     std::error_code ec;
     bool file_exists = std::filesystem::exists(path_, ec);
-    
+
     std::ifstream file(path_);
     if (!file.is_open())
     {
@@ -41,16 +41,15 @@ bool UnknownLabelRepository::load(std::unordered_set<std::string>& out_labels) c
                 if (++count > MAX_WARNING_CACHE_SIZE)
                     g_load_warnings.erase(path_);
             }
-            
+
             if (should_warn)
             {
                 std::string detail = "Path: " + path_;
                 if (ec)
                     detail += " | Error: " + ec.message();
-                
+
                 utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
-                    "Failed to read unknown label cache",
-                    detail);
+                                                    "Failed to read unknown label cache", detail);
             }
         }
         return false;
@@ -76,8 +75,8 @@ bool UnknownLabelRepository::save(const std::unordered_set<std::string>& labels)
         if (ec)
         {
             utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
-                "Failed to create directory for unknown label cache",
-                "Path: " + parent_path.string() + " | Error: " + ec.message());
+                                              "Failed to create directory for unknown label cache",
+                                              "Path: " + parent_path.string() + " | Error: " + ec.message());
             return false;
         }
     }
@@ -93,16 +92,15 @@ bool UnknownLabelRepository::save(const std::unordered_set<std::string>& labels)
             if (++count > MAX_WARNING_CACHE_SIZE)
                 g_save_errors.erase(path_);
         }
-        
+
         if (should_report)
         {
             std::string detail = "Path: " + path_;
             if (ec)
                 detail += " | Error: " + ec.message();
-            
+
             utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
-                "Failed to write unknown label cache",
-                detail);
+                                              "Failed to write unknown label cache", detail);
         }
         return false;
     }
@@ -112,9 +110,8 @@ bool UnknownLabelRepository::save(const std::unordered_set<std::string>& labels)
 
     if (!file.good())
     {
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
-            "Error writing unknown label cache",
-            "Path: " + path_);
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration, "Error writing unknown label cache",
+                                          "Path: " + path_);
         return false;
     }
 

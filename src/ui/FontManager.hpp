@@ -17,6 +17,7 @@ public:
     bool reloadFont(const char* path);
 
     ImFont* currentFont() const { return current_font_; }
+
     bool hasCustomFont() const { return has_custom_font_; }
 
 private:

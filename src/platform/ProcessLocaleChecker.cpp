@@ -17,10 +17,10 @@ struct EnumWindowsCallbackData
 BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM lParam)
 {
     auto* data = reinterpret_cast<EnumWindowsCallbackData*>(lParam);
-    
+
     DWORD windowPid;
     GetWindowThreadProcessId(hwnd, &windowPid);
-    
+
     if (windowPid == data->processId)
     {
         // Check if this is a visible window with a title
@@ -32,12 +32,12 @@ BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM lParam)
             {
                 data->windowTitle = title;
                 data->found = true;
-                return FALSE;  // Stop enumeration
+                return FALSE; // Stop enumeration
             }
         }
     }
-    
-    return TRUE;  // Continue enumeration
+
+    return TRUE; // Continue enumeration
 }
 
 ProcessLocale ProcessLocaleChecker::checkProcessLocale(const std::string& processName)
@@ -50,7 +50,7 @@ ProcessLocale ProcessLocaleChecker::checkProcessLocale(const std::string& proces
 
     PROCESSENTRY32W entry;
     entry.dwSize = sizeof(entry);
-    
+
     DWORD pid = 0;
 
     if (Process32FirstW(snapshot, &entry))
@@ -60,7 +60,7 @@ ProcessLocale ProcessLocaleChecker::checkProcessLocale(const std::string& proces
             // Convert process name to wide string for comparison
             std::wstring wProcessName(processName.begin(), processName.end());
             std::wstring entryName(entry.szExeFile);
-            
+
             // Case-insensitive comparison
             if (_wcsicmp(entryName.c_str(), wProcessName.c_str()) == 0)
             {
@@ -79,16 +79,16 @@ ProcessLocale ProcessLocaleChecker::checkProcessLocale(const std::string& proces
     EnumWindowsCallbackData data;
     data.processId = pid;
     data.found = false;
-    
+
     EnumWindows(EnumWindowsCallback, reinterpret_cast<LPARAM>(&data));
-    
+
     if (!data.found || data.windowTitle.empty())
         return ProcessLocale::Unknown;
 
     // Check if the window title contains Japanese text "ドラゴンクエスト" (Dragon Quest)
     // Using Unicode code points directly to avoid encoding issues
     std::wstring japaneseSubstring = L"\u30C9\u30E9\u30B4\u30F3\u30AF\u30A8\u30B9\u30C8";
-    
+
     if (data.windowTitle.find(japaneseSubstring) != std::wstring::npos)
         return ProcessLocale::Japanese;
     else

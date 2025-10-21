@@ -15,37 +15,33 @@
 
 namespace
 {
-    constexpr float kDialogFontSize = 28.0f;
-    constexpr std::array<const char*, 8> kFontCandidates = {
-        "assets/fonts/NotoSansJP-Medium.ttf",
-        "assets/fonts/NotoSansCJKjp-Medium.otf",
-        "assets/fonts/NotoSansCJK-Medium.ttc",
-        "assets/fonts/NotoSansCJKjp-Medium.otf",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/noto-cjk/NotoSansCJKjp-Regular.otf",
-        "/Library/Fonts/Arial Unicode.ttf",
-        "C:/Windows/Fonts/msgothic.ttc"
-    };
+constexpr float kDialogFontSize = 28.0f;
+constexpr std::array<const char*, 8> kFontCandidates = { "assets/fonts/NotoSansJP-Medium.ttf",
+                                                         "assets/fonts/NotoSansCJKjp-Medium.otf",
+                                                         "assets/fonts/NotoSansCJK-Medium.ttc",
+                                                         "assets/fonts/NotoSansCJKjp-Medium.otf",
+                                                         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                                                         "/usr/share/fonts/noto-cjk/NotoSansCJKjp-Regular.otf",
+                                                         "/Library/Fonts/Arial Unicode.ttf",
+                                                         "C:/Windows/Fonts/msgothic.ttc" };
 
-    std::once_flag g_default_font_once;
+std::once_flag g_default_font_once;
 
-    std::string JoinList(const std::vector<std::string>& entries)
+std::string JoinList(const std::vector<std::string>& entries)
+{
+    std::string result;
+    for (size_t i = 0; i < entries.size(); ++i)
     {
-        std::string result;
-        for (size_t i = 0; i < entries.size(); ++i)
-        {
-            if (i)
-                result += ", ";
-            result += entries[i];
-        }
-        return result;
+        if (i)
+            result += ", ";
+        result += entries[i];
     }
+    return result;
 }
+} // namespace
 
 // Prepares font storage tied to the ImGui IO context.
-FontManager::FontManager()
-{
-}
+FontManager::FontManager() {}
 
 // Keeps track of dialog states that need font updates.
 void FontManager::registerDialog(UIState& state)
@@ -134,7 +130,7 @@ ImFont* FontManager::tryLoadFont(const char* path, bool& custom_loaded)
     ImFontConfig config;
     config.OversampleH = 3;
     config.OversampleV = 2;
-    config.PixelSnapH  = false;
+    config.PixelSnapH = false;
 
     ImGuiIO& io = ImGui::GetIO();
     ImFontGlyphRangesBuilder builder;
@@ -170,18 +166,16 @@ ImFont* FontManager::loadFontFromPath(const char* path, bool& custom_loaded)
     if (!std::filesystem::exists(path))
     {
         PLOG_WARNING << "Font path not found: " << path;
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
-            "Font file not found",
-            std::string("Could not locate font at ") + path);
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Font file not found",
+                                            std::string("Could not locate font at ") + path);
         return nullptr;
     }
 
     ImFont* font = tryLoadFont(path, custom_loaded);
     if (!font)
     {
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
-            "Failed to load font",
-            std::string("ImGui could not load font from ") + path);
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Failed to load font",
+                                            std::string("ImGui could not load font from ") + path);
     }
     return font;
 }
@@ -214,27 +208,28 @@ ImFont* FontManager::loadFallbackFont(bool& custom_loaded)
     }
 
     PLOG_WARNING << "Using ImGui default font; CJK glyphs may be missing.";
-    std::call_once(g_default_font_once, [missing_paths, failed_paths]{
-        std::string details;
-        if (!missing_paths.empty())
-        {
-            details += "Missing: " + JoinList(missing_paths);
-        }
-        if (!failed_paths.empty())
-        {
-            if (!details.empty())
-                details += " | ";
-            details += "Failed to load: " + JoinList(failed_paths);
-        }
-        if (details.empty())
-        {
-            details = "All bundled fonts failed to load; some glyphs may be missing.";
-        }
+    std::call_once(g_default_font_once,
+                   [missing_paths, failed_paths]
+                   {
+                       std::string details;
+                       if (!missing_paths.empty())
+                       {
+                           details += "Missing: " + JoinList(missing_paths);
+                       }
+                       if (!failed_paths.empty())
+                       {
+                           if (!details.empty())
+                               details += " | ";
+                           details += "Failed to load: " + JoinList(failed_paths);
+                       }
+                       if (details.empty())
+                       {
+                           details = "All bundled fonts failed to load; some glyphs may be missing.";
+                       }
 
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
-            "Using fallback font",
-            details);
-    });
+                       utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Using fallback font",
+                                                           details);
+                   });
     ImGuiIO& io = ImGui::GetIO();
     ImFont* font = io.Fonts->AddFontDefault();
     io.Fonts->Build();

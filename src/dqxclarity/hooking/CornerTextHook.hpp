@@ -10,9 +10,11 @@
 #include <string>
 #include <vector>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class CornerTextHook {
+class CornerTextHook
+{
 public:
     explicit CornerTextHook(std::shared_ptr<IProcessMemory> memory);
     ~CornerTextHook();
@@ -24,8 +26,11 @@ public:
     bool IsPatched() const;
 
     void SetLogger(const dqxclarity::Logger& log) { m_logger = log; }
+
     void SetVerbose(bool enabled) { m_verbose = enabled; }
+
     void SetInstructionSafeSteal(bool enabled) { m_instr_safe = enabled; }
+
     void SetReadbackBytes(size_t n) { m_readback_n = n; }
 
     bool PollCornerText();
@@ -33,6 +38,7 @@ public:
     const std::string& GetLastText() const { return m_last_text; }
 
     uintptr_t GetHookAddress() const { return m_hook_address; }
+
     const std::vector<uint8_t>& GetOriginalBytes() const { return m_original_bytes; }
 
 private:

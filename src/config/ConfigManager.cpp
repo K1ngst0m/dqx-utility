@@ -18,68 +18,68 @@ namespace fs = std::filesystem;
 
 namespace
 {
-    struct ScopedFlagGuard
+struct ScopedFlagGuard
+{
+    bool& flag;
+    bool previous;
+    bool active;
+
+    ScopedFlagGuard(bool& target, bool value)
+        : flag(target)
+        , previous(target)
+        , active(true)
     {
-        bool& flag;
-        bool previous;
-        bool active;
+        flag = value;
+    }
 
-        ScopedFlagGuard(bool& target, bool value)
-            : flag(target)
-            , previous(target)
-            , active(true)
-        {
-            flag = value;
-        }
-
-        ~ScopedFlagGuard()
-        {
-            if (active)
-                flag = previous;
-        }
-
-        void restore()
-        {
-            if (!active)
-                return;
+    ~ScopedFlagGuard()
+    {
+        if (active)
             flag = previous;
-            active = false;
-        }
-    };
-
-    void sanitizeDialogState(DialogStateManager& state)
-    {
-        auto& ui = state.ui_state();
-        ui.window_size = ImVec2(ui.width, ui.height);
-        ui.pending_resize = true;
-        ui.pending_reposition = true;
-        ui.font = nullptr;
-        ui.font_base_size = 0.0f;
     }
 
-    void applyStoredState(DialogWindow& window, const DialogStateManager& stored)
+    void restore()
     {
-        window.state() = stored;
-        window.reinitializePlaceholder();
-        sanitizeDialogState(window.state());
-        window.refreshFontBinding();
-        window.initTranslatorIfEnabled();
+        if (!active)
+            return;
+        flag = previous;
+        active = false;
     }
+};
 
-    void applyStoredState(QuestWindow& window, const QuestStateManager& stored)
-    {
-        window.state() = stored;
-        window.state().quest.applyDefaults();
-        window.state().translated.applyDefaults();
-        window.state().original.applyDefaults();
-        window.state().translation_valid = false;
-        window.state().translation_failed = false;
-        window.state().translation_error.clear();
-        sanitizeDialogState(window.state());
-        window.refreshFontBinding();
-        window.initTranslatorIfEnabled();
-    }
+void sanitizeDialogState(DialogStateManager& state)
+{
+    auto& ui = state.ui_state();
+    ui.window_size = ImVec2(ui.width, ui.height);
+    ui.pending_resize = true;
+    ui.pending_reposition = true;
+    ui.font = nullptr;
+    ui.font_base_size = 0.0f;
 }
+
+void applyStoredState(DialogWindow& window, const DialogStateManager& stored)
+{
+    window.state() = stored;
+    window.reinitializePlaceholder();
+    sanitizeDialogState(window.state());
+    window.refreshFontBinding();
+    window.initTranslatorIfEnabled();
+}
+
+void applyStoredState(QuestWindow& window, const QuestStateManager& stored)
+{
+    window.state() = stored;
+    window.state().quest.applyDefaults();
+    window.state().translated.applyDefaults();
+    window.state().original.applyDefaults();
+    window.state().translation_valid = false;
+    window.state().translation_failed = false;
+    window.state().translation_error.clear();
+    sanitizeDialogState(window.state());
+    window.refreshFontBinding();
+    window.initTranslatorIfEnabled();
+}
+} // namespace
 
 static ConfigManager* g_cfg_mgr = nullptr;
 
@@ -103,9 +103,15 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     std::string target_lang;
     switch (state.translation_config().target_lang_enum)
     {
-    case TranslationConfig::TargetLang::EN_US: target_lang = "en-us"; break;
-    case TranslationConfig::TargetLang::ZH_CN: target_lang = "zh-cn"; break;
-    case TranslationConfig::TargetLang::ZH_TW: target_lang = "zh-tw"; break;
+    case TranslationConfig::TargetLang::EN_US:
+        target_lang = "en-us";
+        break;
+    case TranslationConfig::TargetLang::ZH_CN:
+        target_lang = "zh-cn";
+        break;
+    case TranslationConfig::TargetLang::ZH_TW:
+        target_lang = "zh-tw";
+        break;
     }
     translation.insert("target_lang", target_lang);
 
@@ -165,7 +171,8 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
 static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, std::string& name)
 {
     auto name_val = t["name"].value<std::string>();
-    if (!name_val) return false;
+    if (!name_val)
+        return false;
     name = *name_val;
 
     if (auto* behavior = t["behavior"].as_table())
@@ -192,57 +199,72 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
             state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
         if (auto v = (*translation_tbl)["target_lang"].value<std::string>())
         {
-            if (*v == "en-us") state.translation_config().target_lang_enum = TranslationConfig::TargetLang::EN_US;
-            else if (*v == "zh-cn") state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
-            else if (*v == "zh-tw") state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
+            if (*v == "en-us")
+                state.translation_config().target_lang_enum = TranslationConfig::TargetLang::EN_US;
+            else if (*v == "zh-cn")
+                state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
+            else if (*v == "zh-tw")
+                state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
         }
 
         if (auto* openai_tbl = (*translation_tbl)["openai"].as_table())
         {
             if (auto v = (*openai_tbl)["base_url"].value<std::string>())
-                std::snprintf(state.translation_config().openai_base_url.data(), state.translation_config().openai_base_url.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().openai_base_url.data(),
+                              state.translation_config().openai_base_url.size(), "%s", v->c_str());
             if (auto v = (*openai_tbl)["model"].value<std::string>())
-                std::snprintf(state.translation_config().openai_model.data(), state.translation_config().openai_model.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().openai_model.data(),
+                              state.translation_config().openai_model.size(), "%s", v->c_str());
             if (auto v = (*openai_tbl)["api_key"].value<std::string>())
-                std::snprintf(state.translation_config().openai_api_key.data(), state.translation_config().openai_api_key.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().openai_api_key.data(),
+                              state.translation_config().openai_api_key.size(), "%s", v->c_str());
         }
 
         if (auto* google_tbl = (*translation_tbl)["google"].as_table())
         {
             if (auto v = (*google_tbl)["api_key"].value<std::string>())
-                std::snprintf(state.translation_config().google_api_key.data(), state.translation_config().google_api_key.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().google_api_key.data(),
+                              state.translation_config().google_api_key.size(), "%s", v->c_str());
         }
 
         if (auto* qwen_tbl = (*translation_tbl)["qwen"].as_table())
         {
             if (auto v = (*qwen_tbl)["api_key"].value<std::string>())
-                std::snprintf(state.translation_config().qwen_api_key.data(), state.translation_config().qwen_api_key.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().qwen_api_key.data(),
+                              state.translation_config().qwen_api_key.size(), "%s", v->c_str());
             if (auto v = (*qwen_tbl)["model"].value<std::string>())
-                std::snprintf(state.translation_config().qwen_model.data(), state.translation_config().qwen_model.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().qwen_model.data(),
+                              state.translation_config().qwen_model.size(), "%s", v->c_str());
         }
 
         if (auto* niutrans_tbl = (*translation_tbl)["niutrans"].as_table())
         {
             if (auto v = (*niutrans_tbl)["api_key"].value<std::string>())
-                std::snprintf(state.translation_config().niutrans_api_key.data(), state.translation_config().niutrans_api_key.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().niutrans_api_key.data(),
+                              state.translation_config().niutrans_api_key.size(), "%s", v->c_str());
         }
 
         if (auto* zhipu_tbl = (*translation_tbl)["zhipu"].as_table())
         {
             if (auto v = (*zhipu_tbl)["base_url"].value<std::string>())
-                std::snprintf(state.translation_config().zhipu_base_url.data(), state.translation_config().zhipu_base_url.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().zhipu_base_url.data(),
+                              state.translation_config().zhipu_base_url.size(), "%s", v->c_str());
             if (auto v = (*zhipu_tbl)["model"].value<std::string>())
-                std::snprintf(state.translation_config().zhipu_model.data(), state.translation_config().zhipu_model.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().zhipu_model.data(),
+                              state.translation_config().zhipu_model.size(), "%s", v->c_str());
             if (auto v = (*zhipu_tbl)["api_key"].value<std::string>())
-                std::snprintf(state.translation_config().zhipu_api_key.data(), state.translation_config().zhipu_api_key.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().zhipu_api_key.data(),
+                              state.translation_config().zhipu_api_key.size(), "%s", v->c_str());
         }
 
         if (auto* youdao_tbl = (*translation_tbl)["youdao"].as_table())
         {
             if (auto v = (*youdao_tbl)["app_key"].value<std::string>())
-                std::snprintf(state.translation_config().youdao_app_key.data(), state.translation_config().youdao_app_key.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().youdao_app_key.data(),
+                              state.translation_config().youdao_app_key.size(), "%s", v->c_str());
             if (auto v = (*youdao_tbl)["app_secret"].value<std::string>())
-                std::snprintf(state.translation_config().youdao_app_secret.data(), state.translation_config().youdao_app_secret.size(), "%s", v->c_str());
+                std::snprintf(state.translation_config().youdao_app_secret.data(),
+                              state.translation_config().youdao_app_secret.size(), "%s", v->c_str());
             if (auto v = (*youdao_tbl)["mode"].value<int>())
             {
                 if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
@@ -255,64 +277,99 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
 
     if (auto* appearance = t["appearance"].as_table())
     {
-        if (auto v = (*appearance)["width"].value<double>()) state.ui_state().width = static_cast<float>(*v);
-        if (auto v = (*appearance)["height"].value<double>()) state.ui_state().height = static_cast<float>(*v);
-        if (auto v = (*appearance)["pos_x"].value<double>()) state.ui_state().window_pos.x = static_cast<float>(*v);
-        if (auto v = (*appearance)["pos_y"].value<double>()) state.ui_state().window_pos.y = static_cast<float>(*v);
-        if (auto v = (*appearance)["padding_x"].value<double>()) state.ui_state().padding.x = static_cast<float>(*v);
-        if (auto v = (*appearance)["padding_y"].value<double>()) state.ui_state().padding.y = static_cast<float>(*v);
-        if (auto v = (*appearance)["rounding"].value<double>()) state.ui_state().rounding = static_cast<float>(*v);
-        if (auto v = (*appearance)["border_thickness"].value<double>()) state.ui_state().border_thickness = static_cast<float>(*v);
-        if (auto v = (*appearance)["background_alpha"].value<double>()) state.ui_state().background_alpha = static_cast<float>(*v);
-        if (auto v = (*appearance)["font_size"].value<double>()) state.ui_state().font_size = static_cast<float>(*v);
-        if (auto v = (*appearance)["vignette_thickness"].value<double>()) state.ui_state().vignette_thickness = static_cast<float>(*v);
+        if (auto v = (*appearance)["width"].value<double>())
+            state.ui_state().width = static_cast<float>(*v);
+        if (auto v = (*appearance)["height"].value<double>())
+            state.ui_state().height = static_cast<float>(*v);
+        if (auto v = (*appearance)["pos_x"].value<double>())
+            state.ui_state().window_pos.x = static_cast<float>(*v);
+        if (auto v = (*appearance)["pos_y"].value<double>())
+            state.ui_state().window_pos.y = static_cast<float>(*v);
+        if (auto v = (*appearance)["padding_x"].value<double>())
+            state.ui_state().padding.x = static_cast<float>(*v);
+        if (auto v = (*appearance)["padding_y"].value<double>())
+            state.ui_state().padding.y = static_cast<float>(*v);
+        if (auto v = (*appearance)["rounding"].value<double>())
+            state.ui_state().rounding = static_cast<float>(*v);
+        if (auto v = (*appearance)["border_thickness"].value<double>())
+            state.ui_state().border_thickness = static_cast<float>(*v);
+        if (auto v = (*appearance)["background_alpha"].value<double>())
+            state.ui_state().background_alpha = static_cast<float>(*v);
+        if (auto v = (*appearance)["font_size"].value<double>())
+            state.ui_state().font_size = static_cast<float>(*v);
+        if (auto v = (*appearance)["vignette_thickness"].value<double>())
+            state.ui_state().vignette_thickness = static_cast<float>(*v);
         if (auto v = (*appearance)["font_path"].value<std::string>())
             std::snprintf(state.ui_state().font_path.data(), state.ui_state().font_path.size(), "%s", v->c_str());
-        if (auto v = (*appearance)["fade_enabled"].value<bool>()) state.ui_state().fade_enabled = *v;
-        if (auto v = (*appearance)["fade_timeout"].value<double>()) state.ui_state().fade_timeout = static_cast<float>(*v);
+        if (auto v = (*appearance)["fade_enabled"].value<bool>())
+            state.ui_state().fade_enabled = *v;
+        if (auto v = (*appearance)["fade_timeout"].value<double>())
+            state.ui_state().fade_timeout = static_cast<float>(*v);
     }
 
-    if (auto v = t["auto_scroll_to_new"].value<bool>()) state.ui_state().auto_scroll_to_new = *v;
-    if (auto v = t["use_global_translation"].value<bool>()) state.use_global_translation = *v;
-    if (auto v = t["translate_enabled"].value<bool>()) state.translation_config().translate_enabled = *v;
-    if (auto v = t["auto_apply_changes"].value<bool>()) state.translation_config().auto_apply_changes = *v;
-    if (auto v = t["include_dialog_stream"].value<bool>()) state.translation_config().include_dialog_stream = *v;
-    if (auto v = t["include_corner_stream"].value<bool>()) state.translation_config().include_corner_stream = *v;
-    if (auto v = t["glossary_enabled"].value<bool>()) state.translation_config().glossary_enabled = *v;
+    if (auto v = t["auto_scroll_to_new"].value<bool>())
+        state.ui_state().auto_scroll_to_new = *v;
+    if (auto v = t["use_global_translation"].value<bool>())
+        state.use_global_translation = *v;
+    if (auto v = t["translate_enabled"].value<bool>())
+        state.translation_config().translate_enabled = *v;
+    if (auto v = t["auto_apply_changes"].value<bool>())
+        state.translation_config().auto_apply_changes = *v;
+    if (auto v = t["include_dialog_stream"].value<bool>())
+        state.translation_config().include_dialog_stream = *v;
+    if (auto v = t["include_corner_stream"].value<bool>())
+        state.translation_config().include_corner_stream = *v;
+    if (auto v = t["glossary_enabled"].value<bool>())
+        state.translation_config().glossary_enabled = *v;
     if (auto v = t["translation_backend"].value<int>())
         state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
 
     if (auto v = t["target_lang"].value<std::string>())
     {
-        if (*v == "en-us") state.translation_config().target_lang_enum = TranslationConfig::TargetLang::EN_US;
-        else if (*v == "zh-cn") state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
-        else if (*v == "zh-tw") state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
+        if (*v == "en-us")
+            state.translation_config().target_lang_enum = TranslationConfig::TargetLang::EN_US;
+        else if (*v == "zh-cn")
+            state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
+        else if (*v == "zh-tw")
+            state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
     }
 
     if (auto v = t["openai_base_url"].value<std::string>())
-        std::snprintf(state.translation_config().openai_base_url.data(), state.translation_config().openai_base_url.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().openai_base_url.data(),
+                      state.translation_config().openai_base_url.size(), "%s", v->c_str());
     if (auto v = t["openai_model"].value<std::string>())
-        std::snprintf(state.translation_config().openai_model.data(), state.translation_config().openai_model.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().openai_model.data(), state.translation_config().openai_model.size(),
+                      "%s", v->c_str());
     if (auto v = t["openai_api_key"].value<std::string>())
-        std::snprintf(state.translation_config().openai_api_key.data(), state.translation_config().openai_api_key.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().openai_api_key.data(),
+                      state.translation_config().openai_api_key.size(), "%s", v->c_str());
     if (auto v = t["google_api_key"].value<std::string>())
-        std::snprintf(state.translation_config().google_api_key.data(), state.translation_config().google_api_key.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().google_api_key.data(),
+                      state.translation_config().google_api_key.size(), "%s", v->c_str());
     if (auto v = t["qwen_api_key"].value<std::string>())
-        std::snprintf(state.translation_config().qwen_api_key.data(), state.translation_config().qwen_api_key.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().qwen_api_key.data(), state.translation_config().qwen_api_key.size(),
+                      "%s", v->c_str());
     if (auto v = t["qwen_model"].value<std::string>())
-        std::snprintf(state.translation_config().qwen_model.data(), state.translation_config().qwen_model.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().qwen_model.data(), state.translation_config().qwen_model.size(), "%s",
+                      v->c_str());
     if (auto v = t["niutrans_api_key"].value<std::string>())
-        std::snprintf(state.translation_config().niutrans_api_key.data(), state.translation_config().niutrans_api_key.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().niutrans_api_key.data(),
+                      state.translation_config().niutrans_api_key.size(), "%s", v->c_str());
     if (auto v = t["zhipu_base_url"].value<std::string>())
-        std::snprintf(state.translation_config().zhipu_base_url.data(), state.translation_config().zhipu_base_url.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().zhipu_base_url.data(),
+                      state.translation_config().zhipu_base_url.size(), "%s", v->c_str());
     if (auto v = t["zhipu_model"].value<std::string>())
-        std::snprintf(state.translation_config().zhipu_model.data(), state.translation_config().zhipu_model.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().zhipu_model.data(), state.translation_config().zhipu_model.size(),
+                      "%s", v->c_str());
     if (auto v = t["zhipu_api_key"].value<std::string>())
-        std::snprintf(state.translation_config().zhipu_api_key.data(), state.translation_config().zhipu_api_key.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().zhipu_api_key.data(), state.translation_config().zhipu_api_key.size(),
+                      "%s", v->c_str());
     if (auto v = t["youdao_app_key"].value<std::string>())
-        std::snprintf(state.translation_config().youdao_app_key.data(), state.translation_config().youdao_app_key.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().youdao_app_key.data(),
+                      state.translation_config().youdao_app_key.size(), "%s", v->c_str());
     if (auto v = t["youdao_app_secret"].value<std::string>())
-        std::snprintf(state.translation_config().youdao_app_secret.data(), state.translation_config().youdao_app_secret.size(), "%s", v->c_str());
+        std::snprintf(state.translation_config().youdao_app_secret.data(),
+                      state.translation_config().youdao_app_secret.size(), "%s", v->c_str());
     if (auto v = t["youdao_mode"].value<int>())
     {
         if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
@@ -322,33 +379,46 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
     }
 
     // GUI properties
-    if (auto v = t["width"].value<double>()) state.ui_state().width = static_cast<float>(*v);
-    if (auto v = t["height"].value<double>()) state.ui_state().height = static_cast<float>(*v);
-    if (auto v = t["pos_x"].value<double>()) state.ui_state().window_pos.x = static_cast<float>(*v);
-    if (auto v = t["pos_y"].value<double>()) state.ui_state().window_pos.y = static_cast<float>(*v);
-    if (auto v = t["padding_x"].value<double>()) state.ui_state().padding.x = static_cast<float>(*v);
-    if (auto v = t["padding_y"].value<double>()) state.ui_state().padding.y = static_cast<float>(*v);
-    if (auto v = t["rounding"].value<double>()) state.ui_state().rounding = static_cast<float>(*v);
-    if (auto v = t["border_thickness"].value<double>()) state.ui_state().border_thickness = static_cast<float>(*v);
-    if (auto v = t["background_alpha"].value<double>()) state.ui_state().background_alpha = static_cast<float>(*v);
-    if (auto v = t["font_size"].value<double>()) state.ui_state().font_size = static_cast<float>(*v);
-    if (auto v = t["vignette_thickness"].value<double>()) state.ui_state().vignette_thickness = static_cast<float>(*v);
+    if (auto v = t["width"].value<double>())
+        state.ui_state().width = static_cast<float>(*v);
+    if (auto v = t["height"].value<double>())
+        state.ui_state().height = static_cast<float>(*v);
+    if (auto v = t["pos_x"].value<double>())
+        state.ui_state().window_pos.x = static_cast<float>(*v);
+    if (auto v = t["pos_y"].value<double>())
+        state.ui_state().window_pos.y = static_cast<float>(*v);
+    if (auto v = t["padding_x"].value<double>())
+        state.ui_state().padding.x = static_cast<float>(*v);
+    if (auto v = t["padding_y"].value<double>())
+        state.ui_state().padding.y = static_cast<float>(*v);
+    if (auto v = t["rounding"].value<double>())
+        state.ui_state().rounding = static_cast<float>(*v);
+    if (auto v = t["border_thickness"].value<double>())
+        state.ui_state().border_thickness = static_cast<float>(*v);
+    if (auto v = t["background_alpha"].value<double>())
+        state.ui_state().background_alpha = static_cast<float>(*v);
+    if (auto v = t["font_size"].value<double>())
+        state.ui_state().font_size = static_cast<float>(*v);
+    if (auto v = t["vignette_thickness"].value<double>())
+        state.ui_state().vignette_thickness = static_cast<float>(*v);
     if (auto v = t["font_path"].value<std::string>())
         std::snprintf(state.ui_state().font_path.data(), state.ui_state().font_path.size(), "%s", v->c_str());
-    
+
     // Fade settings
-    if (auto v = t["fade_enabled"].value<bool>()) state.ui_state().fade_enabled = *v;
-    if (auto v = t["fade_timeout"].value<double>()) state.ui_state().fade_timeout = static_cast<float>(*v);
+    if (auto v = t["fade_enabled"].value<bool>())
+        state.ui_state().fade_enabled = *v;
+    if (auto v = t["fade_timeout"].value<double>())
+        state.ui_state().fade_timeout = static_cast<float>(*v);
 
     return true;
 }
-
 
 static long long file_mtime_ms(const fs::path& p)
 {
     std::error_code ec;
     auto tp = fs::last_write_time(p, ec);
-    if (ec) return 0;
+    if (ec)
+        return 0;
     auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
         tp - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
     return std::chrono::duration_cast<std::chrono::milliseconds>(sctp.time_since_epoch()).count();
@@ -410,10 +480,7 @@ void ConfigManager::setDefaultQuestEnabled(bool enabled)
         saveAll();
 }
 
-void ConfigManager::reconcileDefaultWindowStates()
-{
-    enforceDefaultWindowStates();
-}
+void ConfigManager::reconcileDefaultWindowStates() { enforceDefaultWindowStates(); }
 
 void ConfigManager::enforceDefaultDialogState()
 {
@@ -523,8 +590,10 @@ void ConfigManager::enforceDefaultWindowStates()
 
 void ConfigManager::setUIScale(float scale)
 {
-    if (scale <= 0.1f) scale = 0.1f;
-    if (scale > 3.0f) scale = 3.0f;
+    if (scale <= 0.1f)
+        scale = 0.1f;
+    if (scale > 3.0f)
+        scale = 3.0f;
     if (!base_.valid)
     {
         base_.style = ImGui::GetStyle();
@@ -536,11 +605,7 @@ void ConfigManager::setUIScale(float scale)
     ImGui::GetIO().FontGlobalScale = ui_scale_;
 }
 
-void ConfigManager::setRegistry(WindowRegistry* reg)
-{
-    registry_ = reg;
-}
-
+void ConfigManager::setRegistry(WindowRegistry* reg) { registry_ = reg; }
 
 bool ConfigManager::saveAll()
 {
@@ -548,9 +613,8 @@ bool ConfigManager::saveAll()
     if (!registry_)
     {
         last_error_ = "No registry assigned";
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
-            "Unable to save configuration",
-            "Window registry was not available while saving settings.");
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration, "Unable to save configuration",
+                                          "Window registry was not available while saving settings.");
         return false;
     }
 
@@ -577,9 +641,15 @@ bool ConfigManager::saveAll()
     std::string global_target_lang;
     switch (global_translation_config_.target_lang_enum)
     {
-    case TranslationConfig::TargetLang::EN_US: global_target_lang = "en-us"; break;
-    case TranslationConfig::TargetLang::ZH_CN: global_target_lang = "zh-cn"; break;
-    case TranslationConfig::TargetLang::ZH_TW: global_target_lang = "zh-tw"; break;
+    case TranslationConfig::TargetLang::EN_US:
+        global_target_lang = "en-us";
+        break;
+    case TranslationConfig::TargetLang::ZH_CN:
+        global_target_lang = "zh-cn";
+        break;
+    case TranslationConfig::TargetLang::ZH_TW:
+        global_target_lang = "zh-tw";
+        break;
     }
     translation.insert("target_lang", global_target_lang);
 
@@ -633,7 +703,8 @@ bool ConfigManager::saveAll()
     for (auto* w : windows)
     {
         auto* dw = dynamic_cast<DialogWindow*>(w);
-        if (!dw) continue;
+        if (!dw)
+            continue;
         auto t = dialogStateToToml(dw->displayName(), dw->state());
         arr.push_back(std::move(t));
     }
@@ -669,9 +740,8 @@ bool ConfigManager::saveAll()
     if (!ofs)
     {
         last_error_ = "Failed to open temp file for writing";
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
-            "Failed to save configuration",
-            "Could not create temporary file for writing: " + tmp);
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration, "Failed to save configuration",
+                                          "Could not create temporary file for writing: " + tmp);
         return false;
     }
     ofs << root;
@@ -682,17 +752,14 @@ bool ConfigManager::saveAll()
     if (ec)
     {
         last_error_ = std::string("Failed to rename: ") + ec.message();
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
-            "Failed to save configuration",
-            "Could not rename temporary file: " + ec.message());
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration, "Failed to save configuration",
+                                          "Could not rename temporary file: " + ec.message());
         return false;
     }
     last_mtime_ = file_mtime_ms(config_path_);
     PLOG_INFO << "Saved config to " << config_path_;
     return true;
 }
-
-
 
 bool ConfigManager::loadAndApply()
 {
@@ -735,59 +802,79 @@ bool ConfigManager::loadAndApply()
             global_translation_config_.applyDefaults();
             if (auto* trans = (*g)["translation"].as_table())
             {
-                if (auto v = (*trans)["translate_enabled"].value<bool>()) global_translation_config_.translate_enabled = *v;
-                if (auto v = (*trans)["auto_apply_changes"].value<bool>()) global_translation_config_.auto_apply_changes = *v;
-                if (auto v = (*trans)["include_dialog_stream"].value<bool>()) global_translation_config_.include_dialog_stream = *v;
-                if (auto v = (*trans)["include_corner_stream"].value<bool>()) global_translation_config_.include_corner_stream = *v;
+                if (auto v = (*trans)["translate_enabled"].value<bool>())
+                    global_translation_config_.translate_enabled = *v;
+                if (auto v = (*trans)["auto_apply_changes"].value<bool>())
+                    global_translation_config_.auto_apply_changes = *v;
+                if (auto v = (*trans)["include_dialog_stream"].value<bool>())
+                    global_translation_config_.include_dialog_stream = *v;
+                if (auto v = (*trans)["include_corner_stream"].value<bool>())
+                    global_translation_config_.include_corner_stream = *v;
                 if (auto v = (*trans)["translation_backend"].value<int>())
-                    global_translation_config_.translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
+                    global_translation_config_.translation_backend =
+                        static_cast<TranslationConfig::TranslationBackend>(*v);
                 if (auto v = (*trans)["target_lang"].value<std::string>())
                 {
-                    if (*v == "en-us") global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::EN_US;
-                    else if (*v == "zh-cn") global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
-                    else if (*v == "zh-tw") global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
+                    if (*v == "en-us")
+                        global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::EN_US;
+                    else if (*v == "zh-cn")
+                        global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
+                    else if (*v == "zh-tw")
+                        global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
                 }
                 if (auto* openai_tbl = (*trans)["openai"].as_table())
                 {
                     if (auto v = (*openai_tbl)["base_url"].value<std::string>())
-                        std::snprintf(global_translation_config_.openai_base_url.data(), global_translation_config_.openai_base_url.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.openai_base_url.data(),
+                                      global_translation_config_.openai_base_url.size(), "%s", v->c_str());
                     if (auto v = (*openai_tbl)["model"].value<std::string>())
-                        std::snprintf(global_translation_config_.openai_model.data(), global_translation_config_.openai_model.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.openai_model.data(),
+                                      global_translation_config_.openai_model.size(), "%s", v->c_str());
                     if (auto v = (*openai_tbl)["api_key"].value<std::string>())
-                        std::snprintf(global_translation_config_.openai_api_key.data(), global_translation_config_.openai_api_key.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.openai_api_key.data(),
+                                      global_translation_config_.openai_api_key.size(), "%s", v->c_str());
                 }
                 if (auto* google_tbl = (*trans)["google"].as_table())
                 {
                     if (auto v = (*google_tbl)["api_key"].value<std::string>())
-                        std::snprintf(global_translation_config_.google_api_key.data(), global_translation_config_.google_api_key.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.google_api_key.data(),
+                                      global_translation_config_.google_api_key.size(), "%s", v->c_str());
                 }
                 if (auto* qwen_tbl = (*trans)["qwen"].as_table())
                 {
                     if (auto v = (*qwen_tbl)["api_key"].value<std::string>())
-                        std::snprintf(global_translation_config_.qwen_api_key.data(), global_translation_config_.qwen_api_key.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.qwen_api_key.data(),
+                                      global_translation_config_.qwen_api_key.size(), "%s", v->c_str());
                     if (auto v = (*qwen_tbl)["model"].value<std::string>())
-                        std::snprintf(global_translation_config_.qwen_model.data(), global_translation_config_.qwen_model.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.qwen_model.data(),
+                                      global_translation_config_.qwen_model.size(), "%s", v->c_str());
                 }
                 if (auto* niutrans_tbl = (*trans)["niutrans"].as_table())
                 {
                     if (auto v = (*niutrans_tbl)["api_key"].value<std::string>())
-                        std::snprintf(global_translation_config_.niutrans_api_key.data(), global_translation_config_.niutrans_api_key.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.niutrans_api_key.data(),
+                                      global_translation_config_.niutrans_api_key.size(), "%s", v->c_str());
                 }
                 if (auto* zhipu_tbl = (*trans)["zhipu"].as_table())
                 {
                     if (auto v = (*zhipu_tbl)["base_url"].value<std::string>())
-                        std::snprintf(global_translation_config_.zhipu_base_url.data(), global_translation_config_.zhipu_base_url.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.zhipu_base_url.data(),
+                                      global_translation_config_.zhipu_base_url.size(), "%s", v->c_str());
                     if (auto v = (*zhipu_tbl)["model"].value<std::string>())
-                        std::snprintf(global_translation_config_.zhipu_model.data(), global_translation_config_.zhipu_model.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.zhipu_model.data(),
+                                      global_translation_config_.zhipu_model.size(), "%s", v->c_str());
                     if (auto v = (*zhipu_tbl)["api_key"].value<std::string>())
-                        std::snprintf(global_translation_config_.zhipu_api_key.data(), global_translation_config_.zhipu_api_key.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.zhipu_api_key.data(),
+                                      global_translation_config_.zhipu_api_key.size(), "%s", v->c_str());
                 }
                 if (auto* youdao_tbl = (*trans)["youdao"].as_table())
                 {
                     if (auto v = (*youdao_tbl)["app_key"].value<std::string>())
-                        std::snprintf(global_translation_config_.youdao_app_key.data(), global_translation_config_.youdao_app_key.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.youdao_app_key.data(),
+                                      global_translation_config_.youdao_app_key.size(), "%s", v->c_str());
                     if (auto v = (*youdao_tbl)["app_secret"].value<std::string>())
-                        std::snprintf(global_translation_config_.youdao_app_secret.data(), global_translation_config_.youdao_app_secret.size(), "%s", v->c_str());
+                        std::snprintf(global_translation_config_.youdao_app_secret.data(),
+                                      global_translation_config_.youdao_app_secret.size(), "%s", v->c_str());
                     if (auto v = (*youdao_tbl)["mode"].value<int>())
                     {
                         if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
@@ -798,29 +885,41 @@ bool ConfigManager::loadAndApply()
                 }
 
                 if (auto v = (*trans)["openai_base_url"].value<std::string>())
-                    std::snprintf(global_translation_config_.openai_base_url.data(), global_translation_config_.openai_base_url.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.openai_base_url.data(),
+                                  global_translation_config_.openai_base_url.size(), "%s", v->c_str());
                 if (auto v = (*trans)["openai_model"].value<std::string>())
-                    std::snprintf(global_translation_config_.openai_model.data(), global_translation_config_.openai_model.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.openai_model.data(),
+                                  global_translation_config_.openai_model.size(), "%s", v->c_str());
                 if (auto v = (*trans)["openai_api_key"].value<std::string>())
-                    std::snprintf(global_translation_config_.openai_api_key.data(), global_translation_config_.openai_api_key.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.openai_api_key.data(),
+                                  global_translation_config_.openai_api_key.size(), "%s", v->c_str());
                 if (auto v = (*trans)["google_api_key"].value<std::string>())
-                    std::snprintf(global_translation_config_.google_api_key.data(), global_translation_config_.google_api_key.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.google_api_key.data(),
+                                  global_translation_config_.google_api_key.size(), "%s", v->c_str());
                 if (auto v = (*trans)["qwen_api_key"].value<std::string>())
-                    std::snprintf(global_translation_config_.qwen_api_key.data(), global_translation_config_.qwen_api_key.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.qwen_api_key.data(),
+                                  global_translation_config_.qwen_api_key.size(), "%s", v->c_str());
                 if (auto v = (*trans)["qwen_model"].value<std::string>())
-                    std::snprintf(global_translation_config_.qwen_model.data(), global_translation_config_.qwen_model.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.qwen_model.data(),
+                                  global_translation_config_.qwen_model.size(), "%s", v->c_str());
                 if (auto v = (*trans)["niutrans_api_key"].value<std::string>())
-                    std::snprintf(global_translation_config_.niutrans_api_key.data(), global_translation_config_.niutrans_api_key.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.niutrans_api_key.data(),
+                                  global_translation_config_.niutrans_api_key.size(), "%s", v->c_str());
                 if (auto v = (*trans)["zhipu_base_url"].value<std::string>())
-                    std::snprintf(global_translation_config_.zhipu_base_url.data(), global_translation_config_.zhipu_base_url.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.zhipu_base_url.data(),
+                                  global_translation_config_.zhipu_base_url.size(), "%s", v->c_str());
                 if (auto v = (*trans)["zhipu_model"].value<std::string>())
-                    std::snprintf(global_translation_config_.zhipu_model.data(), global_translation_config_.zhipu_model.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.zhipu_model.data(),
+                                  global_translation_config_.zhipu_model.size(), "%s", v->c_str());
                 if (auto v = (*trans)["zhipu_api_key"].value<std::string>())
-                    std::snprintf(global_translation_config_.zhipu_api_key.data(), global_translation_config_.zhipu_api_key.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.zhipu_api_key.data(),
+                                  global_translation_config_.zhipu_api_key.size(), "%s", v->c_str());
                 if (auto v = (*trans)["youdao_app_key"].value<std::string>())
-                    std::snprintf(global_translation_config_.youdao_app_key.data(), global_translation_config_.youdao_app_key.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.youdao_app_key.data(),
+                                  global_translation_config_.youdao_app_key.size(), "%s", v->c_str());
                 if (auto v = (*trans)["youdao_app_secret"].value<std::string>())
-                    std::snprintf(global_translation_config_.youdao_app_secret.data(), global_translation_config_.youdao_app_secret.size(), "%s", v->c_str());
+                    std::snprintf(global_translation_config_.youdao_app_secret.data(),
+                                  global_translation_config_.youdao_app_secret.size(), "%s", v->c_str());
                 if (auto v = (*trans)["youdao_mode"].value<int>())
                 {
                     if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
@@ -839,20 +938,21 @@ bool ConfigManager::loadAndApply()
             std::vector<std::pair<std::string, DialogStateManager>> dialog_configs;
             for (auto&& node : *arr)
             {
-                if (!node.is_table()) continue;
+                if (!node.is_table())
+                    continue;
                 auto tbl = *node.as_table();
                 DialogStateManager state;
-                state.applyDefaults();  // Start with defaults
+                state.applyDefaults(); // Start with defaults
                 std::string name;
-                if (tomlToDialogState(tbl, state, name))  // Overlay config values
+                if (tomlToDialogState(tbl, state, name)) // Overlay config values
                 {
                     dialog_configs.emplace_back(std::move(name), std::move(state));
                 }
                 else
                 {
                     utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
-                        "Skipped invalid dialog window in configuration",
-                        "Missing name for dialog entry in config file.");
+                                                        "Skipped invalid dialog window in configuration",
+                                                        "Missing name for dialog entry in config file.");
                 }
             }
 
@@ -885,19 +985,21 @@ bool ConfigManager::loadAndApply()
                 for (int i = 0; i < n; ++i)
                 {
                     auto* dw = dynamic_cast<DialogWindow*>(windows[i]);
-                    if (!dw) continue;
+                    if (!dw)
+                        continue;
                     dw->rename(dialog_configs[i].first.c_str());
-                    
+
                     dw->state() = dialog_configs[i].second;
                     dw->reinitializePlaceholder();
-                    
+
                     // Restore runtime-only state not persisted in config
-                    dw->state().ui_state().window_size = ImVec2(dw->state().ui_state().width, dw->state().ui_state().height);
+                    dw->state().ui_state().window_size =
+                        ImVec2(dw->state().ui_state().width, dw->state().ui_state().height);
                     dw->state().ui_state().pending_resize = true;
                     dw->state().ui_state().pending_reposition = true;
                     dw->state().ui_state().font = nullptr;
                     dw->state().ui_state().font_base_size = 0.0f;
-                    
+
                     // Rebind font pointers after state replacement
                     dw->refreshFontBinding();
                     dw->initTranslatorIfEnabled();
@@ -914,7 +1016,8 @@ bool ConfigManager::loadAndApply()
 
         default_quest_state_.reset();
 
-        auto applyQuestConfig = [&](QuestWindow& quest_window, QuestStateManager& quest_state, const std::string& quest_name)
+        auto applyQuestConfig =
+            [&](QuestWindow& quest_window, QuestStateManager& quest_state, const std::string& quest_name)
         {
             if (!quest_name.empty())
                 quest_window.rename(quest_name.c_str());
@@ -926,9 +1029,8 @@ bool ConfigManager::loadAndApply()
             quest_window.state().translation_valid = false;
             quest_window.state().translation_failed = false;
             quest_window.state().translation_error.clear();
-            quest_window.state().ui_state().window_size = ImVec2(
-                quest_window.state().ui_state().width,
-                quest_window.state().ui_state().height);
+            quest_window.state().ui_state().window_size =
+                ImVec2(quest_window.state().ui_state().width, quest_window.state().ui_state().height);
             quest_window.state().ui_state().pending_resize = true;
             quest_window.state().ui_state().pending_reposition = true;
             quest_window.state().ui_state().font = nullptr;
@@ -945,8 +1047,8 @@ bool ConfigManager::loadAndApply()
             if (!tomlToDialogState(quest_tbl, quest_state, quest_name))
             {
                 utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
-                    "Skipped invalid quest window in configuration",
-                    "Missing name for quest entry in config file.");
+                                                    "Skipped invalid quest window in configuration",
+                                                    "Missing name for quest entry in config file.");
                 return;
             }
 
@@ -1011,29 +1113,27 @@ bool ConfigManager::loadAndApply()
     {
         last_error_ = std::string("config parse error: ") + std::string(pe.description());
         PLOG_WARNING << last_error_;
-        
+
         // Extract line number and error details if available
         std::string error_details = "TOML parse error";
         if (pe.source().begin.line > 0)
         {
-            error_details = "Error at line " + std::to_string(pe.source().begin.line) + ": " + std::string(pe.description());
+            error_details =
+                "Error at line " + std::to_string(pe.source().begin.line) + ": " + std::string(pe.description());
         }
         else
         {
             error_details = std::string(pe.description());
         }
-        
+
         utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
-            "Configuration file has errors. Using defaults for invalid entries.",
-            error_details + "\nFile: " + config_path_);
+                                            "Configuration file has errors. Using defaults for invalid entries.",
+                                            error_details + "\nFile: " + config_path_);
         return false;
     }
 }
 
-bool ConfigManager::loadAtStartup()
-{
-    return loadAndApply();
-}
+bool ConfigManager::loadAtStartup() { return loadAndApply(); }
 
 void ConfigManager::pollAndApply()
 {
@@ -1051,9 +1151,8 @@ void ConfigManager::pollAndApply()
     }
     else
     {
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
-            "Failed to reload configuration",
-            last_error_.empty() ? std::string("See logs for details") : last_error_);
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration, "Failed to reload configuration",
+                                            last_error_.empty() ? std::string("See logs for details") : last_error_);
     }
 }
 
@@ -1084,10 +1183,12 @@ void ConfigManager::markGlobalTranslationDirty()
 }
 
 ConfigManager* ConfigManager_Get() { return g_cfg_mgr; }
+
 void ConfigManager_Set(ConfigManager* mgr) { g_cfg_mgr = mgr; }
 
 bool ConfigManager_SaveAll()
 {
-    if (g_cfg_mgr) return g_cfg_mgr->saveAll();
+    if (g_cfg_mgr)
+        return g_cfg_mgr->saveAll();
     return false;
 }

@@ -6,9 +6,11 @@
 #endif
 #include <memory>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-std::unique_ptr<IProcessMemory> MemoryFactory::CreatePlatformMemory() {
+std::unique_ptr<IProcessMemory> MemoryFactory::CreatePlatformMemory()
+{
 #ifdef _WIN32
     return std::make_unique<ProcessMemory>();
 #else

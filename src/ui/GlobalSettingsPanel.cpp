@@ -27,79 +27,89 @@
 
 namespace
 {
-    struct WindowTypeEntry
-    {
-        UIWindowType type;
-        const char*  label_key;
-    };
+struct WindowTypeEntry
+{
+    UIWindowType type;
+    const char* label_key;
+};
 
-    constexpr WindowTypeEntry kWindowTypes[] = {
-        {UIWindowType::Dialog, "window_type.dialog"},
-        {UIWindowType::Quest, "window_type.quest"},
-        {UIWindowType::Help, "window_type.help"}
-    };
+constexpr WindowTypeEntry kWindowTypes[] = {
+    { UIWindowType::Dialog, "window_type.dialog" },
+    { UIWindowType::Quest,  "window_type.quest"  },
+    { UIWindowType::Help,   "window_type.help"   }
+};
 
-    const char* windowTypeLabel(UIWindowType type)
+const char* windowTypeLabel(UIWindowType type)
+{
+    for (const auto& entry : kWindowTypes)
     {
-        for (const auto& entry : kWindowTypes)
+        if (entry.type == type)
         {
-            if (entry.type == type)
-            {
-                return i18n::get(entry.label_key);
-            }
+            return i18n::get(entry.label_key);
         }
+    }
+    return "";
+}
+
+const char* severityBadge(utils::ErrorSeverity severity)
+{
+    switch (severity)
+    {
+    case utils::ErrorSeverity::Info:
+        return "[i]";
+    case utils::ErrorSeverity::Warning:
+        return "[!]";
+    case utils::ErrorSeverity::Error:
+        return "[x]";
+    case utils::ErrorSeverity::Fatal:
+        return "[!!]";
+    default:
         return "";
     }
+}
 
-    const char* severityBadge(utils::ErrorSeverity severity)
+ImVec4 severityColor(utils::ErrorSeverity severity)
+{
+    switch (severity)
     {
-        switch (severity)
-        {
-        case utils::ErrorSeverity::Info:    return "[i]";
-        case utils::ErrorSeverity::Warning: return "[!]";
-        case utils::ErrorSeverity::Error:   return "[x]";
-        case utils::ErrorSeverity::Fatal:   return "[!!]";
-        default:                            return "";
-        }
-    }
-
-    ImVec4 severityColor(utils::ErrorSeverity severity)
-    {
-        switch (severity)
-        {
-        case utils::ErrorSeverity::Info:    return ImVec4(0.35f, 0.65f, 0.95f, 1.0f);
-        case utils::ErrorSeverity::Warning: return UITheme::warningColor();
-        case utils::ErrorSeverity::Error:   return UITheme::errorColor();
-        case utils::ErrorSeverity::Fatal:   return ImVec4(1.0f, 0.3f, 0.2f, 1.0f);
-        default:                            return UITheme::disabledColor();
-        }
-    }
-
-    const char* addButtonLabel(UIWindowType type)
-    {
-        switch (type)
-        {
-        case UIWindowType::Dialog:
-            return i18n::get("settings.add_dialog");
-        case UIWindowType::Quest:
-            return i18n::get("settings.add_quest");
-        case UIWindowType::Help:
-            return i18n::get("settings.add_help");
-        }
-        return nullptr;
-    }
-
-    std::vector<UIWindow*> collectAllWindows(WindowRegistry& registry)
-    {
-        std::vector<UIWindow*> result;
-        result.reserve(registry.windows().size());
-        for (auto& window : registry.windows())
-        {
-            result.push_back(window.get());
-        }
-        return result;
+    case utils::ErrorSeverity::Info:
+        return ImVec4(0.35f, 0.65f, 0.95f, 1.0f);
+    case utils::ErrorSeverity::Warning:
+        return UITheme::warningColor();
+    case utils::ErrorSeverity::Error:
+        return UITheme::errorColor();
+    case utils::ErrorSeverity::Fatal:
+        return ImVec4(1.0f, 0.3f, 0.2f, 1.0f);
+    default:
+        return UITheme::disabledColor();
     }
 }
+
+const char* addButtonLabel(UIWindowType type)
+{
+    switch (type)
+    {
+    case UIWindowType::Dialog:
+        return i18n::get("settings.add_dialog");
+    case UIWindowType::Quest:
+        return i18n::get("settings.add_quest");
+    case UIWindowType::Help:
+        return i18n::get("settings.add_help");
+    }
+    return nullptr;
+}
+
+std::vector<UIWindow*> collectAllWindows(WindowRegistry& registry)
+{
+    std::vector<UIWindow*> result;
+    result.reserve(registry.windows().size());
+    for (auto& window : registry.windows())
+    {
+        result.push_back(window.get());
+    }
+    return result;
+}
+} // namespace
 
 // Builds a settings panel tied to the window registry.
 GlobalSettingsPanel::GlobalSettingsPanel(WindowRegistry& registry)
@@ -163,12 +173,12 @@ void GlobalSettingsPanel::render(bool& open)
 
         renderWindowManagementSection();
 
-        #ifdef DQXU_ENABLE_DEBUG_SECTIONS
+#ifdef DQXU_ENABLE_DEBUG_SECTIONS
         if (ImGui::CollapsingHeader(i18n::get("settings.sections.debug")))
         {
             renderDebugSection();
         }
-        #endif
+#endif
     }
     ImGui::End();
 
@@ -265,7 +275,9 @@ void GlobalSettingsPanel::renderInstanceSelector()
     }
 
     {
-        std::string total = i18n::format("total", {{"count", std::to_string(windows.size())}});
+        std::string total = i18n::format("total", {
+                                                      { "count", std::to_string(windows.size()) }
+        });
         ImGui::TextDisabled("%s", total.c_str());
     }
 
@@ -313,10 +325,10 @@ void GlobalSettingsPanel::renderInstanceSelector()
             if (ImGui::SmallButton(remove_id.c_str()))
             {
                 registry_.removeWindow(win);
-                
+
                 // Update the windows list after removal
                 auto updated_windows = collectAllWindows(registry_);
-                
+
                 // Reset state after removal
                 if (updated_windows.empty())
                 {
@@ -327,10 +339,10 @@ void GlobalSettingsPanel::renderInstanceSelector()
                     // If we removed the selected window, clamp to valid range
                     selected_index_ = std::clamp(selected_index_, 0, static_cast<int>(updated_windows.size()) - 1);
                 }
-                
+
                 previous_selected_index_ = -1;
                 rename_buffer_.fill('\0');
-                
+
                 ImGui::EndTable();
                 if (disable_remove)
                     ImGui::EndDisabled();
@@ -367,29 +379,29 @@ void GlobalSettingsPanel::renderDQXClaritySection()
 {
     if (!dqxc_launcher_)
         return;
-    
+
     // Get current status
     DQXClarityStatus status = dqxc_launcher_->getStatus();
     std::string status_str = dqxc_launcher_->getStatusString();
-    
+
     // Determine color based on status
     ImVec4 status_color;
     switch (status)
     {
-        case DQXClarityStatus::Running:
-            status_color = UITheme::successColor();
-            break;
-        case DQXClarityStatus::Connected:
-            status_color = UITheme::successColor();
-            break;
-        case DQXClarityStatus::Disconnected:
-            status_color = UITheme::errorColor();
-            break;
-        case DQXClarityStatus::Stopped:
-            status_color = UITheme::disabledColor();
-            break;
+    case DQXClarityStatus::Running:
+        status_color = UITheme::successColor();
+        break;
+    case DQXClarityStatus::Connected:
+        status_color = UITheme::successColor();
+        break;
+    case DQXClarityStatus::Disconnected:
+        status_color = UITheme::errorColor();
+        break;
+    case DQXClarityStatus::Stopped:
+        status_color = UITheme::disabledColor();
+        break;
     }
-    
+
     // Display concise status only
     ImGui::TextColored(status_color, "●");
     ImGui::SameLine();
@@ -423,27 +435,35 @@ void GlobalSettingsPanel::renderDebugSection()
         if (is_stopped)
         {
             bool disable = is_busy || !dqx_running;
-            if (disable) ImGui::BeginDisabled();
+            if (disable)
+                ImGui::BeginDisabled();
             std::string label = std::string(i18n::get("common.start")) + "##dqxc_dbg";
             if (ImGui::Button(label.c_str(), ImVec2(120, 0)))
             {
                 dqxc_launcher_->launch();
             }
-            if (disable) {
+            if (disable)
+            {
                 ImGui::EndDisabled();
-                if (!dqx_running) { ImGui::SameLine(); ImGui::TextDisabled("%s", i18n::get("settings.dqxc.not_running_hint")); }
+                if (!dqx_running)
+                {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%s", i18n::get("settings.dqxc.not_running_hint"));
+                }
             }
         }
         else
         {
             bool disable = is_busy; // disable Stop during Starting/Stopping
-            if (disable) ImGui::BeginDisabled();
+            if (disable)
+                ImGui::BeginDisabled();
             std::string label = std::string(i18n::get("common.stop")) + "##dqxc_dbg";
             if (ImGui::Button(label.c_str(), ImVec2(120, 0)))
             {
                 dqxc_launcher_->stop();
             }
-            if (disable) ImGui::EndDisabled();
+            if (disable)
+                ImGui::EndDisabled();
         }
     }
 
@@ -460,16 +480,10 @@ void GlobalSettingsPanel::renderDebugSection()
         cached_log_content_ = readLogFile(log_path);
         last_log_refresh_time_ = current_time;
     }
-    
+
     // Display log content in a read-only text box
-    ImGui::InputTextMultiline(
-        "##dqxc_logs",
-        const_cast<char*>(cached_log_content_.c_str()),
-        cached_log_content_.size(),
-        ImVec2(-1, 300),
-        ImGuiInputTextFlags_ReadOnly
-    );
-    
+    ImGui::InputTextMultiline("##dqxc_logs", const_cast<char*>(cached_log_content_.c_str()), cached_log_content_.size(),
+                              ImVec2(-1, 300), ImGuiInputTextFlags_ReadOnly);
 }
 
 void GlobalSettingsPanel::renderProblemsPanel()
@@ -500,12 +514,8 @@ void GlobalSettingsPanel::renderProblemsPanel()
     }
 
     constexpr std::array<utils::ErrorCategory, 7> kOrderedCategories = {
-        utils::ErrorCategory::Initialization,
-        utils::ErrorCategory::MemoryHook,
-        utils::ErrorCategory::ProcessDetection,
-        utils::ErrorCategory::Configuration,
-        utils::ErrorCategory::IPC,
-        utils::ErrorCategory::Translation,
+        utils::ErrorCategory::Initialization, utils::ErrorCategory::MemoryHook, utils::ErrorCategory::ProcessDetection,
+        utils::ErrorCategory::Configuration,  utils::ErrorCategory::IPC,        utils::ErrorCategory::Translation,
         utils::ErrorCategory::Unknown
     };
 
@@ -520,7 +530,8 @@ void GlobalSettingsPanel::renderProblemsPanel()
         header += " (" + std::to_string(items.size()) + ")";
         if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp;
+            ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter |
+                                          ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp;
             std::string table_id = "ProblemsTable_" + std::to_string(static_cast<int>(category));
             if (ImGui::BeginTable(table_id.c_str(), 4, table_flags))
             {
@@ -594,25 +605,27 @@ std::string GlobalSettingsPanel::readLogFile(const std::string& path, size_t max
     std::ifstream file(path);
     if (!file.is_open())
     {
-return i18n::format("settings.log_viewer.not_found", {{"path", path}});
+        return i18n::format("settings.log_viewer.not_found", {
+                                                                 { "path", path }
+        });
     }
-    
+
     std::vector<std::string> lines;
     std::string line;
-    
+
     // Read all lines
     while (std::getline(file, line))
     {
         lines.push_back(line);
     }
-    
+
     // Keep only the last max_lines
     size_t start_idx = 0;
     if (lines.size() > max_lines)
     {
         start_idx = lines.size() - max_lines;
     }
-    
+
     // Join lines
     std::ostringstream oss;
     for (size_t i = start_idx; i < lines.size(); ++i)
@@ -621,7 +634,7 @@ return i18n::format("settings.log_viewer.not_found", {{"path", path}});
         if (i < lines.size() - 1)
             oss << "\n";
     }
-    
+
     return oss.str();
 }
 
@@ -631,7 +644,8 @@ void GlobalSettingsPanel::renderStatusSection()
     {
         bool dqx_running = ProcessDetector::isProcessRunning("DQXGame.exe");
         ImVec4 game_status_color = dqx_running ? UITheme::successColor() : UITheme::errorColor();
-        const char* game_status_text = dqx_running ? i18n::get("settings.status.running") : i18n::get("settings.status.not_running");
+        const char* game_status_text =
+            dqx_running ? i18n::get("settings.status.running") : i18n::get("settings.status.not_running");
 
         // DQX Game Status
         ImGui::TextColored(game_status_color, "●");
@@ -647,24 +661,24 @@ void GlobalSettingsPanel::renderStatusSection()
             ProcessLocale locale = ProcessLocaleChecker::checkProcessLocale("DQXGame.exe");
             ImVec4 locale_color;
             const char* locale_text;
-            
+
             switch (locale)
             {
-                case ProcessLocale::Japanese:
-                    locale_color = UITheme::successColor();
-                    locale_text = i18n::get("settings.status.japanese");
-                    break;
-                case ProcessLocale::NonJapanese:
-                    locale_color = UITheme::warningColor();
-                    locale_text = i18n::get("settings.status.non_japanese");
-                    break;
-                case ProcessLocale::Unknown:
-                default:
-                    locale_color = UITheme::disabledColor();
-                    locale_text = i18n::get("settings.status.unknown");
-                    break;
+            case ProcessLocale::Japanese:
+                locale_color = UITheme::successColor();
+                locale_text = i18n::get("settings.status.japanese");
+                break;
+            case ProcessLocale::NonJapanese:
+                locale_color = UITheme::warningColor();
+                locale_text = i18n::get("settings.status.non_japanese");
+                break;
+            case ProcessLocale::Unknown:
+            default:
+                locale_color = UITheme::disabledColor();
+                locale_text = i18n::get("settings.status.unknown");
+                break;
             }
-            
+
             ImGui::TextColored(locale_color, "●");
             ImGui::SameLine();
             ImGui::TextUnformatted(i18n::get("settings.status.locale_label"));
@@ -684,7 +698,8 @@ void GlobalSettingsPanel::renderWindowManagementSection()
         if (auto* cm = ConfigManager_Get())
         {
             bool default_dialog = cm->isDefaultDialogEnabled();
-            std::string dialog_label = ui::LocalizedOrFallback("settings.window.default_dialog", "Default dialog window");
+            std::string dialog_label =
+                ui::LocalizedOrFallback("settings.window.default_dialog", "Default dialog window");
             if (ImGui::Checkbox(dialog_label.c_str(), &default_dialog))
             {
                 cm->setDefaultDialogEnabled(default_dialog);
@@ -718,41 +733,42 @@ void GlobalSettingsPanel::renderAppearanceSection()
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::SliderFloat("##ui_scale_slider", &ui_scale, 0.75f, 2.0f, "%.2fx"))
         {
-            if (auto* cm = ConfigManager_Get()) cm->setUIScale(ui_scale);
+            if (auto* cm = ConfigManager_Get())
+                cm->setUIScale(ui_scale);
         }
 
         // UI Language selector (proof of concept)
         ImGui::TextUnformatted(i18n::get("settings.ui_language.label"));
-        const char* langs[] = {
-            i18n::get("settings.ui_language.option_en"),
-            i18n::get("settings.ui_language.option_zh_cn")
-        };
+        const char* langs[] = { i18n::get("settings.ui_language.option_en"),
+                                i18n::get("settings.ui_language.option_zh_cn") };
         int idx = 0;
         if (auto* cm = ConfigManager_Get())
         {
             const char* code = cm->getUILanguageCode();
-            if (code && std::string(code) == "zh-CN") idx = 1;
+            if (code && std::string(code) == "zh-CN")
+                idx = 1;
         }
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::Combo("##ui_lang_combo", &idx, langs, IM_ARRAYSIZE(langs)))
         {
             const char* new_code = (idx == 1) ? "zh-CN" : "en";
-            if (auto* cm = ConfigManager_Get()) cm->setUILanguageCode(new_code);
+            if (auto* cm = ConfigManager_Get())
+                cm->setUILanguageCode(new_code);
             i18n::set_language(new_code);
         }
 
         ImGui::TextUnformatted(i18n::get("settings.app_mode.label"));
-        const char* app_modes[] = {
-            i18n::get("settings.app_mode.items.normal"),
-            i18n::get("settings.app_mode.items.borderless"),
-            i18n::get("settings.app_mode.items.mini")
-        };
+        const char* app_modes[] = { i18n::get("settings.app_mode.items.normal"),
+                                    i18n::get("settings.app_mode.items.borderless"),
+                                    i18n::get("settings.app_mode.items.mini") };
         int app_mode_idx = 0;
-        if (auto* cm = ConfigManager_Get()) app_mode_idx = static_cast<int>(cm->getAppMode());
+        if (auto* cm = ConfigManager_Get())
+            app_mode_idx = static_cast<int>(cm->getAppMode());
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::Combo("##app_mode_combo", &app_mode_idx, app_modes, IM_ARRAYSIZE(app_modes)))
         {
-            if (auto* cm = ConfigManager_Get()) cm->setAppMode(static_cast<ConfigManager::AppMode>(app_mode_idx));
+            if (auto* cm = ConfigManager_Get())
+                cm->setAppMode(static_cast<ConfigManager::AppMode>(app_mode_idx));
         }
 
         if (auto* cm = ConfigManager_Get())
@@ -763,6 +779,5 @@ void GlobalSettingsPanel::renderAppearanceSection()
                 cm->setWindowAlwaysOnTop(always_on_top);
             }
         }
-        
     }
 }

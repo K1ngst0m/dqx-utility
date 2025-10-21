@@ -37,34 +37,47 @@
 #include <clocale>
 #endif
 
-namespace {
+namespace
+{
 
 static void SDLCALL SDLLogBridge(void* userdata, int category, SDL_LogPriority priority, const char* message)
 {
     (void)userdata;
     switch (priority)
     {
-    case SDL_LOG_PRIORITY_VERBOSE: PLOG_VERBOSE << "[SDL:" << category << "] " << message; break;
-    case SDL_LOG_PRIORITY_DEBUG:   PLOG_DEBUG   << "[SDL:" << category << "] " << message; break;
-    case SDL_LOG_PRIORITY_INFO:    PLOG_INFO    << "[SDL:" << category << "] " << message; break;
-    case SDL_LOG_PRIORITY_WARN:    PLOG_WARNING << "[SDL:" << category << "] " << message; break;
-    case SDL_LOG_PRIORITY_ERROR:   PLOG_ERROR   << "[SDL:" << category << "] " << message; break;
-    case SDL_LOG_PRIORITY_CRITICAL:PLOG_FATAL   << "[SDL:" << category << "] " << message; break;
-    default:                       PLOG_INFO    << "[SDL:" << category << "] " << message; break;
+    case SDL_LOG_PRIORITY_VERBOSE:
+        PLOG_VERBOSE << "[SDL:" << category << "] " << message;
+        break;
+    case SDL_LOG_PRIORITY_DEBUG:
+        PLOG_DEBUG << "[SDL:" << category << "] " << message;
+        break;
+    case SDL_LOG_PRIORITY_INFO:
+        PLOG_INFO << "[SDL:" << category << "] " << message;
+        break;
+    case SDL_LOG_PRIORITY_WARN:
+        PLOG_WARNING << "[SDL:" << category << "] " << message;
+        break;
+    case SDL_LOG_PRIORITY_ERROR:
+        PLOG_ERROR << "[SDL:" << category << "] " << message;
+        break;
+    case SDL_LOG_PRIORITY_CRITICAL:
+        PLOG_FATAL << "[SDL:" << category << "] " << message;
+        break;
+    default:
+        PLOG_INFO << "[SDL:" << category << "] " << message;
+        break;
     }
 }
 
 } // namespace
 
 Application::Application(int argc, char** argv)
-    : argc_(argc), argv_(argv)
+    : argc_(argc)
+    , argv_(argv)
 {
 }
 
-Application::~Application()
-{
-    cleanup();
-}
+Application::~Application() { cleanup(); }
 
 bool Application::initialize()
 {
@@ -103,8 +116,7 @@ bool Application::initializeLogging()
     std::filesystem::create_directories("logs", dir_ec);
     if (dir_ec)
     {
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
-                                            "Unable to prepare log directory",
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Unable to prepare log directory",
                                             dir_ec.message());
     }
     utils::ErrorReporter::InitializeLogFile("logs/error.log");
@@ -174,8 +186,7 @@ void Application::initializeConfig()
     config_->setForceVerboseLogging(force_verbose_pipeline_);
     if (!config_->loadAtStartup())
     {
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
-                                            "Failed to load configuration",
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration, "Failed to load configuration",
                                             config_->lastError());
     }
 
@@ -244,11 +255,11 @@ void Application::renderFrame(float deltaTime)
     PROFILE_SCOPE_FUNCTION();
 
     context_->beginFrame();
-    
+
     setupMiniModeDockspace();
     renderWindows();
     handleUIRequests();
-    
+
     if (show_settings_)
         settings_panel_->render(show_settings_);
 
@@ -273,15 +284,12 @@ void Application::handleQuitRequests()
         dqxc->shutdown();
         DQXClarityService_Set(nullptr);
     }
-    
+
     saveConfig();
     running_ = false;
 }
 
-void Application::cleanup()
-{
-    saveConfig();
-}
+void Application::cleanup() { saveConfig(); }
 
 bool Application::checkSingleInstance()
 {
@@ -291,18 +299,15 @@ bool Application::checkSingleInstance()
 
 #ifdef _WIN32
     DWORD err = GetLastError();
-    const char* msg_key = (err == ERROR_ALREADY_EXISTS)
-        ? "error.native.single_instance_message"
-        : "error.native.single_instance_generic";
-    const char* detail_key = (err == ERROR_ALREADY_EXISTS)
-        ? "error.native.single_instance_detail"
-        : "error.native.single_instance_generic_detail";
-    
+    const char* msg_key =
+        (err == ERROR_ALREADY_EXISTS) ? "error.native.single_instance_message" : "error.native.single_instance_generic";
+    const char* detail_key = (err == ERROR_ALREADY_EXISTS) ? "error.native.single_instance_detail" :
+                                                             "error.native.single_instance_generic_detail";
+
     utils::NativeMessageBox::ShowFatalError(i18n::get_str(msg_key), i18n::get_str(detail_key));
 #else
-    utils::NativeMessageBox::ShowFatalError(
-        i18n::get_str("error.native.single_instance_message"),
-        i18n::get_str("error.native.single_instance_detail"));
+    utils::NativeMessageBox::ShowFatalError(i18n::get_str("error.native.single_instance_message"),
+                                            i18n::get_str("error.native.single_instance_detail"));
 #endif
     return false;
 }
@@ -327,12 +332,12 @@ float Application::calculateDeltaTime()
 void Application::processEvents()
 {
     SDL_Event event;
-    
+
     if (SDL_WaitEventTimeout(&event, 16))
     {
         if (context_->processEvent(event))
             quit_requested_ = true;
-        
+
         while (SDL_PollEvent(&event))
         {
             if (context_->processEvent(event))
@@ -345,7 +350,7 @@ void Application::setupMiniModeDockspace()
 {
     auto current_mode = config_->getAppMode();
     ImGuiID dockspace_id = 0;
-    
+
     if (current_mode == ConfigManager::AppMode::Mini)
     {
         dockspace_id = mini_manager_->SetupDockspace();
@@ -356,7 +361,7 @@ void Application::setupMiniModeDockspace()
     {
         DockState::SetDockspace(0);
     }
-    
+
     DockState::ConsumeReDock();
 }
 
@@ -364,7 +369,7 @@ void Application::renderWindows()
 {
     for (auto& window : registry_->windows())
         window->render();
-    
+
     registry_->processRemovals();
 }
 
@@ -377,7 +382,7 @@ void Application::handleUIRequests()
         show_settings_ = true;
         config_->consumeGlobalSettingsRequest();
     }
-    
+
     if (config_->isQuitRequested())
     {
         quit_requested_ = true;
@@ -389,8 +394,7 @@ void Application::saveConfig()
 {
     if (config_ && !config_->saveAll())
     {
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration,
-                                          "Failed to save configuration",
+        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration, "Failed to save configuration",
                                           config_->lastError());
     }
 }

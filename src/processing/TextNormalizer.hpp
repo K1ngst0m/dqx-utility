@@ -2,7 +2,8 @@
 
 #include <string>
 
-namespace processing {
+namespace processing
+{
 
 [[nodiscard]] std::string collapse_newlines(const std::string& text);
 [[nodiscard]] std::string normalize_line_endings(const std::string& text);

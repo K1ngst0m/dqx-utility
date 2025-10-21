@@ -7,11 +7,11 @@
 struct ContentState
 {
     static constexpr std::size_t TitleBufferSize = 128;
-    static constexpr std::size_t BodyBufferSize  = 1024;
+    static constexpr std::size_t BodyBufferSize = 1024;
     static constexpr std::size_t EntryBufferSize = 2048;
 
     std::vector<std::array<char, EntryBufferSize>> segments;
-    std::vector<std::string> speakers;  // NPC names parallel to segments
+    std::vector<std::string> speakers; // NPC names parallel to segments
     std::array<char, EntryBufferSize> append_buffer{};
     int editing_index;
     std::array<char, BodyBufferSize> edit_buffer{};

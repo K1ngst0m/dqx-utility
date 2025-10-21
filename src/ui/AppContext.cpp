@@ -19,10 +19,7 @@
 AppContext::AppContext() = default;
 
 // Ensures SDL and ImGui state is cleaned up.
-AppContext::~AppContext()
-{
-    shutdown();
-}
+AppContext::~AppContext() { shutdown(); }
 
 // Bootstraps SDL window/renderer and ImGui backends.
 bool AppContext::initialize()
@@ -30,10 +27,14 @@ bool AppContext::initialize()
     if (initialized_)
         return true;
 
-    if (!initializeSDL()) return false;
-    if (!createWindow()) return false;
-    if (!createRenderer()) return false;
-    if (!initializeImGui()) return false;
+    if (!initializeSDL())
+        return false;
+    if (!createWindow())
+        return false;
+    if (!createRenderer())
+        return false;
+    if (!initializeImGui())
+        return false;
 
     initialized_ = true;
     return true;
@@ -69,8 +70,7 @@ bool AppContext::processEvent(const SDL_Event& event)
 {
     ImGui_ImplSDL3_ProcessEvent(&event);
 
-    if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
-        event.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED ||
+    if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED ||
         event.type == SDL_EVENT_WINDOW_RESIZED)
     {
         if (window_ && renderer_)
@@ -135,10 +135,13 @@ void AppContext::updateRendererScale()
 
     float sx = (w > 0) ? (float)pw / (float)w : 1.0f;
     float sy = (h > 0) ? (float)ph / (float)h : 1.0f;
-    if (sx <= 0.0f || !std::isfinite(sx)) sx = 1.0f;
-    if (sy <= 0.0f || !std::isfinite(sy)) sy = 1.0f;
+    if (sx <= 0.0f || !std::isfinite(sx))
+        sx = 1.0f;
+    if (sy <= 0.0f || !std::isfinite(sy))
+        sy = 1.0f;
 
-    auto quantize = [](float v) {
+    auto quantize = [](float v)
+    {
         return std::round(v * 1000.0f) / 1000.0f;
     };
     sx = quantize(sx);
@@ -159,9 +162,8 @@ void AppContext::updateRendererScale()
         }
         else
         {
-            PLOG_WARNING << "SDL_SetRenderScale(" << sx << "," << sy << ") failed: " << SDL_GetError()
-                         << " w=" << w << " h=" << h << " pw=" << pw << " ph=" << ph
-                         << " curx=" << curx << " cury=" << cury;
+            PLOG_WARNING << "SDL_SetRenderScale(" << sx << "," << sy << ") failed: " << SDL_GetError() << " w=" << w
+                         << " h=" << h << " pw=" << pw << " ph=" << ph << " curx=" << curx << " cury=" << cury;
         }
     }
 }
@@ -194,10 +196,10 @@ void AppContext::renderVignette()
 
     ImGuiIO& io = ImGui::GetIO();
     ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
-    
+
     const float half_duration = vignette_duration_ * 0.5f;
     const float max_alpha = 0.5f;
-    
+
     float alpha = 0.0f;
     if (vignette_time_ < half_duration)
     {
@@ -214,44 +216,36 @@ void AppContext::renderVignette()
 
     const float border_width = io.DisplaySize.x * 0.10f;
     const float border_height = io.DisplaySize.y * 0.10f;
-    
+
     ImU32 transparent = IM_COL32(0, 0, 0, 0);
     ImU32 mask = IM_COL32(255, 222, 33, static_cast<int>(alpha * 255.0f));
-    
-    draw_list->AddRectFilledMultiColor(
-        ImVec2(0, 0),
-        ImVec2(io.DisplaySize.x, border_height),
-        mask, mask, transparent, transparent
-    );
-    
-    draw_list->AddRectFilledMultiColor(
-        ImVec2(0, io.DisplaySize.y - border_height),
-        ImVec2(io.DisplaySize.x, io.DisplaySize.y),
-        transparent, transparent, mask, mask
-    );
-    
-    draw_list->AddRectFilledMultiColor(
-        ImVec2(0, 0),
-        ImVec2(border_width, io.DisplaySize.y),
-        mask, transparent, transparent, mask
-    );
-    
-    draw_list->AddRectFilledMultiColor(
-        ImVec2(io.DisplaySize.x - border_width, 0),
-        ImVec2(io.DisplaySize.x, io.DisplaySize.y),
-        transparent, mask, mask, transparent
-    );
+
+    draw_list->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(io.DisplaySize.x, border_height), mask, mask, transparent,
+                                       transparent);
+
+    draw_list->AddRectFilledMultiColor(ImVec2(0, io.DisplaySize.y - border_height),
+                                       ImVec2(io.DisplaySize.x, io.DisplaySize.y), transparent, transparent, mask,
+                                       mask);
+
+    draw_list->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(border_width, io.DisplaySize.y), mask, transparent,
+                                       transparent, mask);
+
+    draw_list->AddRectFilledMultiColor(ImVec2(io.DisplaySize.x - border_width, 0),
+                                       ImVec2(io.DisplaySize.x, io.DisplaySize.y), transparent, mask, mask,
+                                       transparent);
 }
 
 void AppContext::setWindowBorderless(bool borderless)
 {
-    if (!window_) return;
+    if (!window_)
+        return;
     SDL_SetWindowBordered(window_, !borderless);
 }
 
 void AppContext::setWindowAlwaysOnTop(bool topmost)
 {
-    if (!window_) return;
+    if (!window_)
+        return;
     SDL_SetWindowAlwaysOnTop(window_, topmost);
 #ifdef _WIN32
     SDL_PropertiesID props = SDL_GetWindowProperties(window_);
@@ -267,19 +261,22 @@ void AppContext::setWindowAlwaysOnTop(bool topmost)
 
 void AppContext::maximizeWindow()
 {
-    if (!window_) return;
+    if (!window_)
+        return;
     SDL_MaximizeWindow(window_);
 }
 
 void AppContext::restoreWindow()
 {
-    if (!window_) return;
+    if (!window_)
+        return;
     SDL_RestoreWindow(window_);
 }
 
 void AppContext::setWindowSize(int w, int h)
 {
-    if (!window_) return;
+    if (!window_)
+        return;
     SDL_SetWindowSize(window_, w, h);
 }
 
@@ -311,16 +308,17 @@ bool AppContext::createRenderer()
     renderer_ = SDL_CreateRenderer(window_, nullptr);
     if (!renderer_)
     {
-        reportInitError("Renderer", "app.init.renderer_failed", std::string("SDL_CreateRenderer failed: ") + SDL_GetError());
+        reportInitError("Renderer", "app.init.renderer_failed",
+                        std::string("SDL_CreateRenderer failed: ") + SDL_GetError());
         shutdown();
         return false;
     }
-    
+
     if (!SDL_SetRenderVSync(renderer_, 1))
     {
         PLOG_WARNING << "Failed to enable VSync: " << SDL_GetError() << " (will continue without VSync)";
     }
-    
+
     updateRendererScale();
     SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
     return true;
@@ -339,18 +337,20 @@ bool AppContext::initializeImGui()
 
     if (!ImGui_ImplSDL3_InitForSDLRenderer(window_, renderer_))
     {
-        reportInitError("ImGui SDL3 Backend", "app.init.ui_backend_failed", "ImGui_ImplSDL3_InitForSDLRenderer returned false");
+        reportInitError("ImGui SDL3 Backend", "app.init.ui_backend_failed",
+                        "ImGui_ImplSDL3_InitForSDLRenderer returned false");
         shutdown();
         return false;
     }
-    
+
     if (!ImGui_ImplSDLRenderer3_Init(renderer_))
     {
-        reportInitError("ImGui Renderer Backend", "app.init.ui_renderer_failed", "ImGui_ImplSDLRenderer3_Init returned false");
+        reportInitError("ImGui Renderer Backend", "app.init.ui_renderer_failed",
+                        "ImGui_ImplSDLRenderer3_Init returned false");
         shutdown();
         return false;
     }
-    
+
     return true;
 }
 

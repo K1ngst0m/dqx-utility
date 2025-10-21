@@ -4,9 +4,11 @@
 #include <string>
 #include <unordered_map>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class Signatures {
+class Signatures
+{
 public:
     static const Pattern& GetDialogTrigger();
     static const Pattern& GetIntegrityCheck();

@@ -8,11 +8,7 @@
 #include "../Localization.hpp"
 #include "../UITheme.hpp"
 
-DebugSettingsPanel::DebugSettingsPanel(
-    DialogStateManager& state,
-    FontManager& fontManager,
-    TranslateSession& session
-)
+DebugSettingsPanel::DebugSettingsPanel(DialogStateManager& state, FontManager& fontManager, TranslateSession& session)
     : state_(state)
     , fontManager_(fontManager)
     , session_(session)
@@ -22,40 +18,40 @@ DebugSettingsPanel::DebugSettingsPanel(
 void DebugSettingsPanel::render(const std::string& settingsIdSuffix)
 {
     ImGui::PushID(settingsIdSuffix.c_str());
-    
+
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    
+
     renderFontSection();
-    
+
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    
+
     renderCacheSection();
-    
+
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    
+
     ImGui::TextUnformatted(i18n::get("dialog.settings.appended_texts"));
     if (ImGui::BeginChild("SegmentsChild", ImVec2(0, 220.0f), ImGuiChildFlags_Border))
     {
         renderSegmentList();
     }
     ImGui::EndChild();
-    
+
     renderSegmentEditor();
     renderNewSegmentInput();
-    
+
     ImGui::PopID();
 }
 
 void DebugSettingsPanel::renderFontSection()
 {
     ImGui::TextUnformatted(i18n::get("dialog.settings.font_path"));
-    
+
     const ImGuiStyle& style = ImGui::GetStyle();
     float avail = ImGui::GetContentRegionAvail().x;
     float btn_w = ImGui::CalcTextSize(i18n::get("dialog.settings.reload_font")).x + style.FramePadding.x * 2.0f;
@@ -67,9 +63,9 @@ void DebugSettingsPanel::renderFontSection()
         bool loaded = fontManager_.reloadFont(state_.ui_state().font_path.data());
         state_.ui_state().has_custom_font = loaded;
     }
-    ImGui::TextDisabled("%s %s", i18n::get("dialog.settings.font_active_label"), 
-                       state_.ui_state().has_custom_font ? i18n::get("dialog.settings.font_active_custom") 
-                                                         : i18n::get("dialog.settings.font_active_default"));
+    ImGui::TextDisabled("%s %s", i18n::get("dialog.settings.font_active_label"),
+                        state_.ui_state().has_custom_font ? i18n::get("dialog.settings.font_active_custom") :
+                                                            i18n::get("dialog.settings.font_active_default"));
     if (!state_.ui_state().has_custom_font)
     {
         ImGui::TextColored(UITheme::warningColor(), "%s", i18n::get("dialog.settings.font_warning_no_cjk"));
@@ -79,30 +75,38 @@ void DebugSettingsPanel::renderFontSection()
 void DebugSettingsPanel::renderCacheSection()
 {
     ImGui::TextUnformatted(i18n::get("dialog.settings.translation_cache"));
-    
+
     {
-        std::string t = i18n::format("dialog.settings.cache_entries", 
-                                     {{"cur", std::to_string(session_.cacheEntries())}, 
-                                      {"cap", std::to_string(session_.cacheCapacity())}});
+        std::string t =
+            i18n::format("dialog.settings.cache_entries", {
+                                                              { "cur", std::to_string(session_.cacheEntries())  },
+                                                              { "cap", std::to_string(session_.cacheCapacity()) }
+        });
         ImGui::TextUnformatted(t.c_str());
     }
     {
-        std::string t = i18n::format("dialog.settings.cache_hits", 
-                                     {{"n", std::to_string(static_cast<unsigned long long>(session_.cacheHits()))}});
+        std::string t =
+            i18n::format("dialog.settings.cache_hits",
+                         {
+                             { "n", std::to_string(static_cast<unsigned long long>(session_.cacheHits())) }
+        });
         ImGui::TextUnformatted(t.c_str());
     }
     {
-        std::string t = i18n::format("dialog.settings.cache_misses", 
-                                     {{"n", std::to_string(static_cast<unsigned long long>(session_.cacheMisses()))}});
+        std::string t =
+            i18n::format("dialog.settings.cache_misses",
+                         {
+                             { "n", std::to_string(static_cast<unsigned long long>(session_.cacheMisses())) }
+        });
         ImGui::TextUnformatted(t.c_str());
     }
-    
+
     bool cache_enabled = session_.isCacheEnabled();
     if (ImGui::Checkbox(i18n::get("dialog.settings.enable_cache"), &cache_enabled))
     {
         session_.enableCache(cache_enabled);
     }
-    
+
     if (ImGui::Button(i18n::get("dialog.settings.clear_cache")))
     {
         session_.clear();
@@ -118,7 +122,7 @@ void DebugSettingsPanel::renderSegmentList()
         const ImGuiStyle& style = ImGui::GetStyle();
         float row_avail = ImGui::GetContentRegionAvail().x;
         float edit_w = ImGui::CalcTextSize(i18n::get("dialog.append.edit")).x + style.FramePadding.x * 2.0f;
-        float del_w  = ImGui::CalcTextSize(i18n::get("dialog.append.delete")).x + style.FramePadding.x * 2.0f;
+        float del_w = ImGui::CalcTextSize(i18n::get("dialog.append.delete")).x + style.FramePadding.x * 2.0f;
         float text_w = std::max(220.0f, row_avail - edit_w - del_w - style.ItemSpacing.x * 2.0f);
 
         {
@@ -160,16 +164,15 @@ void DebugSettingsPanel::renderSegmentList()
         if (ImGui::SmallButton(i18n::get("dialog.append.edit")))
         {
             state_.content_state().editing_index = i;
-            std::snprintf(state_.content_state().edit_buffer.data(), 
-                         state_.content_state().edit_buffer.size(), 
-                         "%s", state_.content_state().segments[i].data());
+            std::snprintf(state_.content_state().edit_buffer.data(), state_.content_state().edit_buffer.size(), "%s",
+                          state_.content_state().segments[i].data());
         }
         ImGui::SameLine();
         if (ImGui::SmallButton(i18n::get("dialog.append.delete")))
             to_delete = i;
         ImGui::PopID();
     }
-    
+
     if (to_delete >= 0 && to_delete < static_cast<int>(state_.content_state().segments.size()))
     {
         state_.content_state().segments.erase(state_.content_state().segments.begin() + to_delete);
@@ -180,20 +183,20 @@ void DebugSettingsPanel::renderSegmentList()
 
 void DebugSettingsPanel::renderSegmentEditor()
 {
-    if (state_.content_state().editing_index >= 0 && 
+    if (state_.content_state().editing_index >= 0 &&
         state_.content_state().editing_index < static_cast<int>(state_.content_state().segments.size()))
     {
         ImGui::Spacing();
         {
-            std::string t = i18n::format("dialog.append.editing_entry", 
-                                        {{"index", std::to_string(state_.content_state().editing_index)}});
+            std::string t = i18n::format("dialog.append.editing_entry",
+                                         {
+                                             { "index", std::to_string(state_.content_state().editing_index) }
+            });
             ImGui::TextDisabled("%s", t.c_str());
         }
         ImVec2 box(0, 160.0f);
-        ImGui::InputTextMultiline("##full_editor", 
-                                 state_.content_state().edit_buffer.data(), 
-                                 state_.content_state().edit_buffer.size(), 
-                                 box);
+        ImGui::InputTextMultiline("##full_editor", state_.content_state().edit_buffer.data(),
+                                  state_.content_state().edit_buffer.size(), box);
         if (ImGui::Button(i18n::get("common.save")))
         {
             auto& seg = state_.content_state().segments[state_.content_state().editing_index];
@@ -216,14 +219,13 @@ void DebugSettingsPanel::renderNewSegmentInput()
 {
     ImGui::Spacing();
     ImGui::TextUnformatted(i18n::get("dialog.append.new_text"));
-    
+
     const ImGuiStyle& style = ImGui::GetStyle();
     float append_avail = ImGui::GetContentRegionAvail().x;
     float btn_w = ImGui::CalcTextSize(i18n::get("dialog.append.append_button")).x + style.FramePadding.x * 2.0f;
     ImGui::SetNextItemWidth(std::max(220.0f, append_avail - btn_w - style.ItemSpacing.x));
-    ImGui::InputText("##append", 
-                    state_.content_state().append_buffer.data(), 
-                    state_.content_state().append_buffer.size());
+    ImGui::InputText("##append", state_.content_state().append_buffer.data(),
+                     state_.content_state().append_buffer.size());
     ImGui::SameLine();
     if (ImGui::Button(i18n::get("dialog.append.append_button")))
     {

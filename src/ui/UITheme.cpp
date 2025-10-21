@@ -17,7 +17,8 @@ void UITheme::popSettingsWindowStyle()
     ImGui::PopStyleVar(3);
 }
 
-void UITheme::pushDialogStyle(float background_alpha, const ImVec2& padding, float rounding, float border_thickness, bool border_enabled)
+void UITheme::pushDialogStyle(float background_alpha, const ImVec2& padding, float rounding, float border_thickness,
+                              bool border_enabled)
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, rounding);
@@ -27,10 +28,10 @@ void UITheme::pushDialogStyle(float background_alpha, const ImVec2& padding, flo
     ImVec4 dialog_bg = dialogBgColor();
     dialog_bg.w = background_alpha;
     ImGui::PushStyleColor(ImGuiCol_WindowBg, dialog_bg);
-    
+
     ImVec4 border_color = dialogBorderColor();
     ImGui::PushStyleColor(ImGuiCol_Border, border_color);
-    
+
     ImGui::PushStyleColor(ImGuiCol_Text, dialogTextColor());
 }
 
@@ -42,9 +43,12 @@ void UITheme::popDialogStyle()
 
 ImVec4 UITheme::statusColor(bool is_success, bool is_error, bool is_disabled)
 {
-    if (is_disabled) return disabled_;
-    if (is_error) return error_;
-    if (is_success) return success_;
+    if (is_disabled)
+        return disabled_;
+    if (is_error)
+        return error_;
+    if (is_success)
+        return success_;
     return caution_;
 }
 

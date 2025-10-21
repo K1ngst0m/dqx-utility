@@ -4,9 +4,11 @@
 #include <windows.h>
 #include <string>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class Console : public IConsoleSink {
+class Console : public IConsoleSink
+{
 public:
     Console() = default;
     ~Console() override = default;

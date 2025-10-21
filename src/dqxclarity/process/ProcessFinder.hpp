@@ -5,22 +5,25 @@
 #include <optional>
 
 #ifdef _WIN32
-    #include <windows.h>
-    using pid_t = DWORD;
+#include <windows.h>
+using pid_t = DWORD;
 #else
-    #include <sys/types.h>
+#include <sys/types.h>
 #endif
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-struct ProcessInfo {
+struct ProcessInfo
+{
     pid_t pid;
     std::string name;
     std::string exe_path;
     bool is_wine_process;
 };
 
-class ProcessFinder {
+class ProcessFinder
+{
 public:
     static std::vector<ProcessInfo> FindAll();
 

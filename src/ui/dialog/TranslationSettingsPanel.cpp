@@ -10,26 +10,17 @@
 #include "../UITheme.hpp"
 #include "../../config/ConfigManager.hpp"
 
-TranslationSettingsPanel::TranslationSettingsPanel(
-    DialogStateManager& state,
-    TranslateSession& session
-)
+TranslationSettingsPanel::TranslationSettingsPanel(DialogStateManager& state, TranslateSession& session)
     : state_(state)
     , session_(session)
 {
 }
 
-void TranslationSettingsPanel::render(
-    translate::ITranslator* translator,
-    std::string& applyHint,
-    float& applyHintTimer,
-    bool& testingConnection,
-    std::string& testResult,
-    std::string& testTimestamp,
-    const std::function<void()>& initTranslatorIfEnabledFn,
-    const std::function<translate::ITranslator*()>& currentTranslatorFn,
-    TranslationConfig* globalConfig
-)
+void TranslationSettingsPanel::render(translate::ITranslator* translator, std::string& applyHint, float& applyHintTimer,
+                                      bool& testingConnection, std::string& testResult, std::string& testTimestamp,
+                                      const std::function<void()>& initTranslatorIfEnabledFn,
+                                      const std::function<translate::ITranslator*()>& currentTranslatorFn,
+                                      TranslationConfig* globalConfig)
 {
     global_config_ = globalConfig;
     using_global_config_ = (global_config_ != nullptr) && state_.use_global_translation;
@@ -72,8 +63,8 @@ void TranslationSettingsPanel::render(
     bool selector_changed = renderBackendSelector(config);
     bool config_changed = renderBackendSpecificConfig(config);
 
-    bool any_field_changed = enable_changed_ || auto_apply_changed_ || backend_changed_ ||
-                             lang_changed_ || stream_filters_changed_ || config_changed || selector_changed;
+    bool any_field_changed = enable_changed_ || auto_apply_changed_ || backend_changed_ || lang_changed_ ||
+                             stream_filters_changed_ || config_changed || selector_changed;
 
     if (using_global_config_ && any_field_changed)
     {
@@ -101,15 +92,9 @@ void TranslationSettingsPanel::render(
 
     ImGui::Spacing();
 
-    translator_invalidated |= renderApplyAndTestButtons(translator,
-                                                       config,
-                                                       applyHint,
-                                                       applyHintTimer,
-                                                       testingConnection,
-                                                       testResult,
-                                                       testTimestamp,
-                                                       initTranslatorIfEnabledFn,
-                                                       any_field_changed);
+    translator_invalidated |=
+        renderApplyAndTestButtons(translator, config, applyHint, applyHintTimer, testingConnection, testResult,
+                                  testTimestamp, initTranslatorIfEnabledFn, any_field_changed);
 
     if (applyHintTimer > 0.0f)
     {
@@ -173,35 +158,33 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
     auto_apply_changed_ = ImGui::Checkbox(i18n::get("dialog.translate.auto_apply"), &config.auto_apply_changes);
     ImGui::Spacing();
 
-    bool include_dialog_changed = ImGui::Checkbox(i18n::get("dialog.translate.include_dialog"), &config.include_dialog_stream);
-    bool include_corner_changed = ImGui::Checkbox(i18n::get("dialog.translate.include_corner"), &config.include_corner_stream);
+    bool include_dialog_changed =
+        ImGui::Checkbox(i18n::get("dialog.translate.include_dialog"), &config.include_dialog_stream);
+    bool include_corner_changed =
+        ImGui::Checkbox(i18n::get("dialog.translate.include_corner"), &config.include_corner_stream);
     bool glossary_changed = ImGui::Checkbox(i18n::get("dialog.translate.use_glossary"), &config.glossary_enabled);
     stream_filters_changed_ = include_dialog_changed || include_corner_changed || glossary_changed;
     ImGui::Spacing();
-    
+
     ImGui::TextUnformatted(i18n::get("dialog.translate.backend.label"));
     const char* backend_items[] = {
-        i18n::get("dialog.translate.backend.items.openai_compat"),
-        i18n::get("dialog.translate.backend.items.google"),
-        i18n::get("dialog.translate.backend.items.glm4_zhipu"),
-        i18n::get("dialog.translate.backend.items.qwen_mt"),
-        i18n::get("dialog.translate.backend.items.niutrans"),
-        i18n::get("dialog.translate.backend.items.youdao")
+        i18n::get("dialog.translate.backend.items.openai_compat"), i18n::get("dialog.translate.backend.items.google"),
+        i18n::get("dialog.translate.backend.items.glm4_zhipu"),    i18n::get("dialog.translate.backend.items.qwen_mt"),
+        i18n::get("dialog.translate.backend.items.niutrans"),      i18n::get("dialog.translate.backend.items.youdao")
     };
     int current_backend = static_cast<int>(config.translation_backend);
     ImGui::SetNextItemWidth(220.0f);
-    backend_changed_ = ImGui::Combo("##translation_backend", &current_backend, backend_items, IM_ARRAYSIZE(backend_items));
+    backend_changed_ =
+        ImGui::Combo("##translation_backend", &current_backend, backend_items, IM_ARRAYSIZE(backend_items));
     if (backend_changed_)
     {
         config.translation_backend = static_cast<TranslationConfig::TranslationBackend>(current_backend);
     }
-    
+
     ImGui::TextUnformatted(i18n::get("dialog.settings.target_language"));
-    const char* lang_items[] = {
-        i18n::get("dialog.settings.target_lang.en_us"),
-        i18n::get("dialog.settings.target_lang.zh_cn"),
-        i18n::get("dialog.settings.target_lang.zh_tw")
-    };
+    const char* lang_items[] = { i18n::get("dialog.settings.target_lang.en_us"),
+                                 i18n::get("dialog.settings.target_lang.zh_cn"),
+                                 i18n::get("dialog.settings.target_lang.zh_tw") };
     int current_lang = static_cast<int>(config.target_lang_enum);
     ImGui::SetNextItemWidth(220.0f);
     lang_changed_ = ImGui::Combo("##target_lang", &current_lang, lang_items, IM_ARRAYSIZE(lang_items));
@@ -209,7 +192,7 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
     {
         config.target_lang_enum = static_cast<TranslationConfig::TargetLang>(current_lang);
     }
-    
+
     return enable_changed_ || auto_apply_changed_ || backend_changed_ || lang_changed_ || stream_filters_changed_;
 }
 
@@ -225,131 +208,107 @@ bool TranslationSettingsPanel::renderBackendSpecificConfig(TranslationConfig& co
     bool youdao_app_key_changed = false;
     bool youdao_app_secret_changed = false;
     bool youdao_mode_changed = false;
-    
+
     if (config.translation_backend == TranslationConfig::TranslationBackend::OpenAI)
     {
         ImGui::TextUnformatted(i18n::get("dialog.settings.base_url"));
         ImGui::SetNextItemWidth(300.0f);
-        base_url_changed = ImGui::InputText("##openai_base", 
-                                            config.openai_base_url.data(), 
-                                            config.openai_base_url.size());
+        base_url_changed =
+            ImGui::InputText("##openai_base", config.openai_base_url.data(), config.openai_base_url.size());
 
         ImGui::TextUnformatted(i18n::get("dialog.settings.model"));
         ImGui::SetNextItemWidth(300.0f);
-        model_changed = ImGui::InputText("##openai_model", 
-                                        config.openai_model.data(), 
-                                        config.openai_model.size());
+        model_changed = ImGui::InputText("##openai_model", config.openai_model.data(), config.openai_model.size());
 
         ImGui::TextUnformatted(i18n::get("dialog.settings.api_key"));
         ImGui::SetNextItemWidth(300.0f);
-        openai_key_changed = ImGui::InputText("##openai_key", 
-                                             config.openai_api_key.data(), 
-                                             config.openai_api_key.size(), 
-                                             ImGuiInputTextFlags_Password);
+        openai_key_changed = ImGui::InputText("##openai_key", config.openai_api_key.data(),
+                                              config.openai_api_key.size(), ImGuiInputTextFlags_Password);
     }
     else if (config.translation_backend == TranslationConfig::TranslationBackend::Google)
     {
         ImGui::TextUnformatted(i18n::get("dialog.settings.api_key_optional"));
         ImGui::SetNextItemWidth(300.0f);
-        google_key_changed = ImGui::InputText("##google_key", 
-                                             config.google_api_key.data(), 
-                                             config.google_api_key.size(), 
-                                             ImGuiInputTextFlags_Password);
+        google_key_changed = ImGui::InputText("##google_key", config.google_api_key.data(),
+                                              config.google_api_key.size(), ImGuiInputTextFlags_Password);
         ImGui::TextDisabled("%s", i18n::get("dialog.settings.google_note"));
     }
     else if (config.translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
     {
         ImGui::TextUnformatted(i18n::get("dialog.settings.api_key"));
         ImGui::SetNextItemWidth(300.0f);
-        zhipu_key_changed = ImGui::InputText("##zhipu_key", 
-                                            config.zhipu_api_key.data(), 
-                                            config.zhipu_api_key.size(), 
-                                            ImGuiInputTextFlags_Password);
+        zhipu_key_changed = ImGui::InputText("##zhipu_key", config.zhipu_api_key.data(), config.zhipu_api_key.size(),
+                                             ImGuiInputTextFlags_Password);
     }
     else if (config.translation_backend == TranslationConfig::TranslationBackend::QwenMT)
     {
         ImGui::TextUnformatted(i18n::get("dialog.settings.model"));
         ImGui::SetNextItemWidth(300.0f);
         int qidx = 1;
-        if (std::string(config.qwen_model.data()).find("qwen-mt-plus") == 0) qidx = 0;
+        if (std::string(config.qwen_model.data()).find("qwen-mt-plus") == 0)
+            qidx = 0;
         const char* qwen_models[] = { "qwen-mt-plus", "qwen-mt-turbo" };
         if (ImGui::Combo("##qwen_model", &qidx, qwen_models, IM_ARRAYSIZE(qwen_models)))
         {
             const char* sel = qwen_models[qidx];
-            std::snprintf(config.qwen_model.data(), 
-                         config.qwen_model.size(), 
-                         "%s", sel);
+            std::snprintf(config.qwen_model.data(), config.qwen_model.size(), "%s", sel);
             model_changed = true;
         }
 
         ImGui::TextUnformatted(i18n::get("dialog.settings.api_key"));
         ImGui::SetNextItemWidth(300.0f);
-        qwen_key_changed = ImGui::InputText("##qwen_key", 
-                                           config.qwen_api_key.data(), 
-                                           config.qwen_api_key.size(), 
-                                           ImGuiInputTextFlags_Password);
+        qwen_key_changed = ImGui::InputText("##qwen_key", config.qwen_api_key.data(), config.qwen_api_key.size(),
+                                            ImGuiInputTextFlags_Password);
     }
     else if (config.translation_backend == TranslationConfig::TranslationBackend::Niutrans)
     {
         ImGui::TextUnformatted(i18n::get("dialog.settings.api_key"));
         ImGui::SetNextItemWidth(300.0f);
-        niutrans_key_changed = ImGui::InputText("##niutrans_key", 
-                                               config.niutrans_api_key.data(), 
-                                               config.niutrans_api_key.size(), 
-                                               ImGuiInputTextFlags_Password);
+        niutrans_key_changed = ImGui::InputText("##niutrans_key", config.niutrans_api_key.data(),
+                                                config.niutrans_api_key.size(), ImGuiInputTextFlags_Password);
     }
     else if (config.translation_backend == TranslationConfig::TranslationBackend::Youdao)
     {
         ImGui::TextUnformatted(i18n::get("dialog.settings.youdao_app_key"));
         ImGui::SetNextItemWidth(300.0f);
-        youdao_app_key_changed = ImGui::InputText("##youdao_app_key",
-                                                 config.youdao_app_key.data(),
-                                                 config.youdao_app_key.size());
+        youdao_app_key_changed =
+            ImGui::InputText("##youdao_app_key", config.youdao_app_key.data(), config.youdao_app_key.size());
 
         ImGui::TextUnformatted(i18n::get("dialog.settings.youdao_app_secret"));
         ImGui::SetNextItemWidth(300.0f);
-        youdao_app_secret_changed = ImGui::InputText("##youdao_app_secret",
-                                                    config.youdao_app_secret.data(),
-                                                    config.youdao_app_secret.size(),
-                                                    ImGuiInputTextFlags_Password);
+        youdao_app_secret_changed = ImGui::InputText("##youdao_app_secret", config.youdao_app_secret.data(),
+                                                     config.youdao_app_secret.size(), ImGuiInputTextFlags_Password);
 
         ImGui::TextUnformatted(i18n::get("dialog.settings.youdao_mode_label"));
-        const char* mode_items[] = {
-            i18n::get("dialog.settings.youdao_mode_text"),
-            i18n::get("dialog.settings.youdao_mode_large")
-        };
+        const char* mode_items[] = { i18n::get("dialog.settings.youdao_mode_text"),
+                                     i18n::get("dialog.settings.youdao_mode_large") };
         int current_mode = static_cast<int>(config.youdao_mode);
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::Combo("##youdao_mode", &current_mode, mode_items, IM_ARRAYSIZE(mode_items)))
         {
-            config.youdao_mode = (current_mode == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
-                ? TranslationConfig::YoudaoMode::LargeModel
-                : TranslationConfig::YoudaoMode::Text;
+            config.youdao_mode = (current_mode == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel)) ?
+                                     TranslationConfig::YoudaoMode::LargeModel :
+                                     TranslationConfig::YoudaoMode::Text;
             youdao_mode_changed = true;
         }
     }
-    
-    return base_url_changed || model_changed || openai_key_changed || google_key_changed || 
-           zhipu_key_changed || qwen_key_changed || niutrans_key_changed ||
-           youdao_app_key_changed || youdao_app_secret_changed || youdao_mode_changed;
+
+    return base_url_changed || model_changed || openai_key_changed || google_key_changed || zhipu_key_changed ||
+           qwen_key_changed || niutrans_key_changed || youdao_app_key_changed || youdao_app_secret_changed ||
+           youdao_mode_changed;
 }
 
-bool TranslationSettingsPanel::renderApplyAndTestButtons(
-    translate::ITranslator* translator,
-    TranslationConfig& config,
-    std::string& applyHint,
-    float& applyHintTimer,
-    bool& testingConnection,
-    std::string& testResult,
-    std::string& testTimestamp,
-    const std::function<void()>& initTranslatorIfEnabledFn,
-    bool any_field_changed
-)
+bool TranslationSettingsPanel::renderApplyAndTestButtons(translate::ITranslator* translator, TranslationConfig& config,
+                                                         std::string& applyHint, float& applyHintTimer,
+                                                         bool& testingConnection, std::string& testResult,
+                                                         std::string& testTimestamp,
+                                                         const std::function<void()>& initTranslatorIfEnabledFn,
+                                                         bool any_field_changed)
 {
     (void)any_field_changed;
     (void)translator;
     bool translator_invalidated = false;
-    
+
     if (!config.auto_apply_changes)
     {
         if (ImGui::Button(i18n::get("common.apply")))
@@ -361,19 +320,25 @@ bool TranslationSettingsPanel::renderApplyAndTestButtons(
         }
         ImGui::SameLine();
     }
-    
+
     if (ImGui::Button(i18n::get("dialog.settings.test")) && !testingConnection)
     {
         testingConnection = true;
         testResult = i18n::get("dialog.settings.testing");
-        
+
         translate::BackendConfig test_cfg;
         test_cfg.backend = static_cast<translate::Backend>(config.translation_backend);
         switch (config.target_lang_enum)
         {
-        case TranslationConfig::TargetLang::EN_US: test_cfg.target_lang = "en-us"; break;
-        case TranslationConfig::TargetLang::ZH_CN: test_cfg.target_lang = "zh-cn"; break;
-        case TranslationConfig::TargetLang::ZH_TW: test_cfg.target_lang = "zh-tw"; break;
+        case TranslationConfig::TargetLang::EN_US:
+            test_cfg.target_lang = "en-us";
+            break;
+        case TranslationConfig::TargetLang::ZH_CN:
+            test_cfg.target_lang = "zh-cn";
+            break;
+        case TranslationConfig::TargetLang::ZH_TW:
+            test_cfg.target_lang = "zh-tw";
+            break;
         }
         if (config.translation_backend == TranslationConfig::TranslationBackend::OpenAI)
         {
@@ -421,7 +386,7 @@ bool TranslationSettingsPanel::renderApplyAndTestButtons(
             test_cfg.api_key = config.youdao_app_key.data();
             test_cfg.api_secret = config.youdao_app_secret.data();
         }
-        
+
         auto temp_translator = translate::createTranslator(test_cfg.backend);
         if (temp_translator && temp_translator->init(test_cfg))
         {
@@ -431,8 +396,9 @@ bool TranslationSettingsPanel::renderApplyAndTestButtons(
         {
             testResult = "Error: Failed to initialize translator for testing";
         }
-        if (temp_translator) temp_translator->shutdown();
-        
+        if (temp_translator)
+            temp_translator->shutdown();
+
         std::time_t now = std::time(nullptr);
         std::tm tm_buf;
 #ifdef _WIN32
@@ -443,24 +409,19 @@ bool TranslationSettingsPanel::renderApplyAndTestButtons(
         char time_str[16];
         std::strftime(time_str, sizeof(time_str), "%H:%M:%S", &tm_buf);
         testTimestamp = time_str;
-        
+
         testingConnection = false;
     }
 
     return translator_invalidated;
 }
 
-void TranslationSettingsPanel::renderStatusAndResults(
-    translate::ITranslator* translator,
-    const std::string& applyHint,
-    float applyHintTimer,
-    const std::string& testResult,
-    const std::string& testTimestamp
-)
+void TranslationSettingsPanel::renderStatusAndResults(translate::ITranslator* translator, const std::string& applyHint,
+                                                      float applyHintTimer, const std::string& testResult,
+                                                      const std::string& testTimestamp)
 {
-    const char* status = (translator && translator->isReady()) ? 
-                         i18n::get("dialog.settings.ready") : 
-                         i18n::get("dialog.settings.not_ready");
+    const char* status = (translator && translator->isReady()) ? i18n::get("dialog.settings.ready") :
+                                                                 i18n::get("dialog.settings.not_ready");
     ImGui::SameLine();
     ImGui::TextDisabled("%s %s", i18n::get("dialog.settings.status_label"), status);
 
@@ -469,16 +430,16 @@ void TranslationSettingsPanel::renderStatusAndResults(
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%s", applyHint.c_str());
     }
-    
+
     if (translator)
     {
         const char* err = translator->lastError();
-        if (err && err[0]) 
+        if (err && err[0])
         {
             ImGui::TextColored(UITheme::warningColor(), "%s", err);
         }
     }
-    
+
     if (!testResult.empty())
     {
         ImVec4 color;
@@ -490,17 +451,21 @@ void TranslationSettingsPanel::renderStatusAndResults(
             color = ImVec4(0.9f, 0.2f, 0.2f, 1.0f);
         else
             color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
-        
+
         if (!testTimestamp.empty())
         {
-            std::string line = i18n::format("dialog.settings.test_result", 
-                                           {{"time", testTimestamp}, {"text", testResult}});
+            std::string line =
+                i18n::format("dialog.settings.test_result", {
+                                                                { "time", testTimestamp },
+                                                                { "text", testResult    }
+            });
             ImGui::TextColored(color, "%s", line.c_str());
         }
         else
         {
-            std::string line = i18n::format("dialog.settings.test_result_no_time", 
-                                           {{"text", testResult}});
+            std::string line = i18n::format("dialog.settings.test_result_no_time", {
+                                                                                       { "text", testResult }
+            });
             ImGui::TextColored(color, "%s", line.c_str());
         }
     }

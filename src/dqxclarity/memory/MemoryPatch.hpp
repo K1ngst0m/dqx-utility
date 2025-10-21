@@ -5,9 +5,11 @@
 #include <string>
 #include <vector>
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-class MemoryPatch {
+class MemoryPatch
+{
 public:
     static bool WriteWithProtect(IProcessMemory& mem, uintptr_t address, const uint8_t* data, size_t size,
                                  MemoryProtectionFlags temp = MemoryProtectionFlags::ReadWriteExecute,
@@ -15,7 +17,8 @@ public:
 
     static bool WriteWithProtect(IProcessMemory& mem, uintptr_t address, const std::vector<uint8_t>& bytes,
                                  MemoryProtectionFlags temp = MemoryProtectionFlags::ReadWriteExecute,
-                                 MemoryProtectionFlags restore = MemoryProtectionFlags::ReadExecute) {
+                                 MemoryProtectionFlags restore = MemoryProtectionFlags::ReadExecute)
+    {
         return WriteWithProtect(mem, address, bytes.data(), bytes.size(), temp, restore);
     }
 

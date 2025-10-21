@@ -17,8 +17,8 @@
 #include <iostream>
 #include <cstdlib>
 
-static std::atomic<std::atomic<bool>*> g_fatal_flag{nullptr};
-static std::atomic<void(*)()> g_fatal_cleanup{nullptr};
+static std::atomic<std::atomic<bool>*> g_fatal_flag{ nullptr };
+static std::atomic<void (*)()> g_fatal_cleanup{ nullptr };
 static std::terminate_handler g_prev_terminate = nullptr;
 
 static thread_local const char* g_current_operation = nullptr;
@@ -36,7 +36,13 @@ static void CrashTerminateHandler()
     NotifyFatalObserver();
     if (auto fn = g_fatal_cleanup.load(std::memory_order_acquire))
     {
-        try { fn(); } catch (...) {}
+        try
+        {
+            fn();
+        }
+        catch (...)
+        {
+        }
     }
     if (g_prev_terminate)
     {
@@ -50,27 +56,48 @@ static const char* ExceptionCodeToString(DWORD code)
 {
     switch (code)
     {
-        case EXCEPTION_ACCESS_VIOLATION: return "ACCESS_VIOLATION";
-        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: return "ARRAY_BOUNDS_EXCEEDED";
-        case EXCEPTION_BREAKPOINT: return "BREAKPOINT";
-        case EXCEPTION_DATATYPE_MISALIGNMENT: return "DATATYPE_MISALIGNMENT";
-        case EXCEPTION_FLT_DENORMAL_OPERAND: return "FLT_DENORMAL_OPERAND";
-        case EXCEPTION_FLT_DIVIDE_BY_ZERO: return "FLT_DIVIDE_BY_ZERO";
-        case EXCEPTION_FLT_INEXACT_RESULT: return "FLT_INEXACT_RESULT";
-        case EXCEPTION_FLT_INVALID_OPERATION: return "FLT_INVALID_OPERATION";
-        case EXCEPTION_FLT_OVERFLOW: return "FLT_OVERFLOW";
-        case EXCEPTION_FLT_STACK_CHECK: return "FLT_STACK_CHECK";
-        case EXCEPTION_FLT_UNDERFLOW: return "FLT_UNDERFLOW";
-        case EXCEPTION_ILLEGAL_INSTRUCTION: return "ILLEGAL_INSTRUCTION";
-        case EXCEPTION_IN_PAGE_ERROR: return "IN_PAGE_ERROR";
-        case EXCEPTION_INT_DIVIDE_BY_ZERO: return "INT_DIVIDE_BY_ZERO";
-        case EXCEPTION_INT_OVERFLOW: return "INT_OVERFLOW";
-        case EXCEPTION_INVALID_DISPOSITION: return "INVALID_DISPOSITION";
-        case EXCEPTION_NONCONTINUABLE_EXCEPTION: return "NONCONTINUABLE_EXCEPTION";
-        case EXCEPTION_PRIV_INSTRUCTION: return "PRIV_INSTRUCTION";
-        case EXCEPTION_SINGLE_STEP: return "SINGLE_STEP";
-        case EXCEPTION_STACK_OVERFLOW: return "STACK_OVERFLOW";
-        default: return "UNKNOWN_EXCEPTION";
+    case EXCEPTION_ACCESS_VIOLATION:
+        return "ACCESS_VIOLATION";
+    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+        return "ARRAY_BOUNDS_EXCEEDED";
+    case EXCEPTION_BREAKPOINT:
+        return "BREAKPOINT";
+    case EXCEPTION_DATATYPE_MISALIGNMENT:
+        return "DATATYPE_MISALIGNMENT";
+    case EXCEPTION_FLT_DENORMAL_OPERAND:
+        return "FLT_DENORMAL_OPERAND";
+    case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+        return "FLT_DIVIDE_BY_ZERO";
+    case EXCEPTION_FLT_INEXACT_RESULT:
+        return "FLT_INEXACT_RESULT";
+    case EXCEPTION_FLT_INVALID_OPERATION:
+        return "FLT_INVALID_OPERATION";
+    case EXCEPTION_FLT_OVERFLOW:
+        return "FLT_OVERFLOW";
+    case EXCEPTION_FLT_STACK_CHECK:
+        return "FLT_STACK_CHECK";
+    case EXCEPTION_FLT_UNDERFLOW:
+        return "FLT_UNDERFLOW";
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+        return "ILLEGAL_INSTRUCTION";
+    case EXCEPTION_IN_PAGE_ERROR:
+        return "IN_PAGE_ERROR";
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+        return "INT_DIVIDE_BY_ZERO";
+    case EXCEPTION_INT_OVERFLOW:
+        return "INT_OVERFLOW";
+    case EXCEPTION_INVALID_DISPOSITION:
+        return "INVALID_DISPOSITION";
+    case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+        return "NONCONTINUABLE_EXCEPTION";
+    case EXCEPTION_PRIV_INSTRUCTION:
+        return "PRIV_INSTRUCTION";
+    case EXCEPTION_SINGLE_STEP:
+        return "SINGLE_STEP";
+    case EXCEPTION_STACK_OVERFLOW:
+        return "STACK_OVERFLOW";
+    default:
+        return "UNKNOWN_EXCEPTION";
     }
 }
 
@@ -79,7 +106,13 @@ static LONG WINAPI CrashHandlerFunction(EXCEPTION_POINTERS* ex)
     NotifyFatalObserver();
     if (auto fn = g_fatal_cleanup.load(std::memory_order_acquire))
     {
-        try { fn(); } catch (...) {}
+        try
+        {
+            fn();
+        }
+        catch (...)
+        {
+        }
     }
     // Basic header
     PLOG_FATAL << "=== APPLICATION CRASHED ===";
@@ -106,7 +139,8 @@ static LONG WINAPI CrashHandlerFunction(EXCEPTION_POINTERS* ex)
 
         std::string trace = trace_ss.str();
 
-        auto trim_path = [](const std::string& filename) -> std::string {
+        auto trim_path = [](const std::string& filename) -> std::string
+        {
             // Prefer to show path starting after /src/ or \src\, otherwise show basename.
             size_t pos_back = filename.find("\\src\\");
             size_t pos_slash = filename.find("/src/");
@@ -174,11 +208,14 @@ static LONG WINAPI CrashHandlerFunction(EXCEPTION_POINTERS* ex)
                 }
 
                 // Trim whitespace helpers
-                auto trim_ws = [](std::string& s) {
+                auto trim_ws = [](std::string& s)
+                {
                     size_t l = 0;
-                    while (l < s.size() && std::isspace(static_cast<unsigned char>(s[l]))) ++l;
+                    while (l < s.size() && std::isspace(static_cast<unsigned char>(s[l])))
+                        ++l;
                     size_t r = s.size();
-                    while (r > l && std::isspace(static_cast<unsigned char>(s[r - 1]))) --r;
+                    while (r > l && std::isspace(static_cast<unsigned char>(s[r - 1])))
+                        --r;
                     s = s.substr(l, r - l);
                 };
 
@@ -192,7 +229,8 @@ static LONG WINAPI CrashHandlerFunction(EXCEPTION_POINTERS* ex)
                 {
                     // Find last colon that looks like the separator before line number.
                     size_t colon = fileline.find_last_of(':');
-                    if (colon != std::string::npos && colon + 1 < fileline.size() && std::isdigit(static_cast<unsigned char>(fileline[colon + 1])))
+                    if (colon != std::string::npos && colon + 1 < fileline.size() &&
+                        std::isdigit(static_cast<unsigned char>(fileline[colon + 1])))
                     {
                         lineNum = fileline.substr(colon + 1);
                         short_file = fileline.substr(0, colon);
@@ -247,8 +285,7 @@ static LONG WINAPI CrashHandlerFunction(EXCEPTION_POINTERS* ex)
         mdei.ExceptionPointers = ex;
         mdei.ClientPointers = FALSE;
 
-        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file,
-                         MiniDumpNormal, &mdei, NULL, NULL);
+        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file, MiniDumpNormal, &mdei, NULL, NULL);
 
         CloseHandle(file);
         PLOG_FATAL << "Dump: " << filename;

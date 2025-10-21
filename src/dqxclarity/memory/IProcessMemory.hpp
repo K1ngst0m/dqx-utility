@@ -6,15 +6,17 @@
 #include <vector>
 
 #ifdef _WIN32
-    #include <windows.h>
-    using pid_t = DWORD;
+#include <windows.h>
+using pid_t = DWORD;
 #else
-    #include <sys/types.h>
+#include <sys/types.h>
 #endif
 
-namespace dqxclarity {
+namespace dqxclarity
+{
 
-enum class MemoryProtectionFlags {
+enum class MemoryProtectionFlags
+{
     Read = 1,
     Write = 2,
     Execute = 4,
@@ -23,7 +25,8 @@ enum class MemoryProtectionFlags {
     ReadWriteExecute = Read | Write | Execute
 };
 
-class IProcessMemory {
+class IProcessMemory
+{
 public:
     virtual ~IProcessMemory() = default;
 

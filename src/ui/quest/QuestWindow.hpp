@@ -10,7 +10,10 @@
 #include "../../translate/TranslateSession.hpp"
 #include "../WindowAnimator.hpp"
 
-namespace translate { class ITranslator; }
+namespace translate
+{
+class ITranslator;
+}
 class FontManager;
 class QuestSettingsView;
 
@@ -21,24 +24,39 @@ public:
     ~QuestWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Quest; }
+
     const char* displayName() const override { return name_.c_str(); }
+
     const char* windowLabel() const override { return window_label_.c_str(); }
+
     void rename(const char* new_name) override;
+
     bool isDefaultInstance() const { return is_default_instance_; }
+
     void setDefaultInstance(bool value) { is_default_instance_ = value; }
 
     void render() override;
     void renderSettings() override;
+
     bool shouldBeRemoved() const { return should_be_removed_; }
 
     QuestStateManager& state() { return state_; }
+
     void initTranslatorIfEnabled();
     void refreshFontBinding();
 
 private:
-    enum class QuestField { SubQuest = 0, Title = 1, Description = 2, Rewards = 3, RepeatRewards = 4 };
+    enum class QuestField
+    {
+        SubQuest = 0,
+        Title = 1,
+        Description = 2,
+        Rewards = 3,
+        RepeatRewards = 4
+    };
 
-    struct FieldStatus {
+    struct FieldStatus
+    {
         bool has_translation = false;
         bool failed = false;
         std::string text;

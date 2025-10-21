@@ -44,10 +44,11 @@ bool ProcessDetector::isAnotherDQXU(const std::string& processName)
 }
 
 #ifdef _WIN32
-namespace {
-    std::atomic<bool> g_snapshot_warning_reported{false};
-    std::atomic<bool> g_process_iter_warning_reported{false};
-}
+namespace
+{
+std::atomic<bool> g_snapshot_warning_reported{ false };
+std::atomic<bool> g_process_iter_warning_reported{ false };
+} // namespace
 
 bool ProcessDetector::isProcessRunningWindows(const std::string& processName)
 {
@@ -58,9 +59,8 @@ bool ProcessDetector::isProcessRunningWindows(const std::string& processName)
         {
             DWORD err = GetLastError();
             PLOG_WARNING << "CreateToolhelp32Snapshot failed: " << err;
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
-                "Process scan failed",
-                std::string("CreateToolhelp32Snapshot error ") + std::to_string(err));
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection, "Process scan failed",
+                                                std::string("CreateToolhelp32Snapshot error ") + std::to_string(err));
         }
         return false;
     }
@@ -75,22 +75,27 @@ bool ProcessDetector::isProcessRunningWindows(const std::string& processName)
         {
             DWORD err = GetLastError();
             PLOG_WARNING << "Process32First failed: " << err;
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
-                "Process scan failed",
-                std::string("Process32First error ") + std::to_string(err));
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection, "Process scan failed",
+                                                std::string("Process32First error ") + std::to_string(err));
         }
         return false;
     }
 
     std::string targetName = processName;
     std::transform(targetName.begin(), targetName.end(), targetName.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+                   [](unsigned char c)
+                   {
+                       return std::tolower(c);
+                   });
 
     do
     {
         std::string currentName = entry.szExeFile;
         std::transform(currentName.begin(), currentName.end(), currentName.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c)
+                       {
+                           return std::tolower(c);
+                       });
 
         if (currentName == targetName)
         {
@@ -112,9 +117,8 @@ bool ProcessDetector::isAnotherDQXUWindows(const std::string& processName)
         {
             DWORD err = GetLastError();
             PLOG_WARNING << "CreateToolhelp32Snapshot failed: " << err;
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
-                "Process scan failed",
-                std::string("CreateToolhelp32Snapshot error ") + std::to_string(err));
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection, "Process scan failed",
+                                                std::string("CreateToolhelp32Snapshot error ") + std::to_string(err));
         }
         return false;
     }
@@ -129,16 +133,18 @@ bool ProcessDetector::isAnotherDQXUWindows(const std::string& processName)
         {
             DWORD err = GetLastError();
             PLOG_WARNING << "Process32First failed: " << err;
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
-                "Process scan failed",
-                std::string("Process32First error ") + std::to_string(err));
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection, "Process scan failed",
+                                                std::string("Process32First error ") + std::to_string(err));
         }
         return false;
     }
 
     std::string targetName = processName;
     std::transform(targetName.begin(), targetName.end(), targetName.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+                   [](unsigned char c)
+                   {
+                       return std::tolower(c);
+                   });
 
     DWORD current_pid = GetCurrentProcessId();
 
@@ -146,7 +152,10 @@ bool ProcessDetector::isAnotherDQXUWindows(const std::string& processName)
     {
         std::string currentName = entry.szExeFile;
         std::transform(currentName.begin(), currentName.end(), currentName.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c)
+                       {
+                           return std::tolower(c);
+                       });
 
         if (currentName == targetName && entry.th32ProcessID != current_pid)
         {
@@ -159,21 +168,21 @@ bool ProcessDetector::isAnotherDQXUWindows(const std::string& processName)
     return false;
 }
 #else
-namespace {
-    std::atomic<bool> g_procdir_warning_reported{false};
+namespace
+{
+std::atomic<bool> g_procdir_warning_reported{ false };
 }
 
 bool ProcessDetector::isProcessRunningUnix(const std::string& processName)
 {
     std::filesystem::path proc_dir("/proc");
-    
+
     if (!std::filesystem::exists(proc_dir))
     {
         if (!g_procdir_warning_reported.exchange(true))
         {
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
-                "Process scan unavailable",
-                "/proc directory not found");
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection, "Process scan unavailable",
+                                                "/proc directory not found");
         }
         return false;
     }
@@ -210,9 +219,8 @@ bool ProcessDetector::isAnotherDQXUUnix(const std::string& processName)
     {
         if (!g_procdir_warning_reported.exchange(true))
         {
-            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection,
-                "Process scan unavailable",
-                "/proc directory not found");
+            utils::ErrorReporter::ReportWarning(utils::ErrorCategory::ProcessDetection, "Process scan unavailable",
+                                                "/proc directory not found");
         }
         return false;
     }

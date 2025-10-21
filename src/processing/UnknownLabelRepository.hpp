@@ -3,7 +3,8 @@
 #include <string>
 #include <unordered_set>
 
-class UnknownLabelRepository {
+class UnknownLabelRepository
+{
 public:
     explicit UnknownLabelRepository(const std::string& path = "unknown_labels.txt");
     bool load(std::unordered_set<std::string>& out_labels) const;
