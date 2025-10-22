@@ -119,14 +119,39 @@ bool Application::initializeLogging()
         utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Unable to prepare log directory",
                                             dir_ec.message());
     }
-    utils::ErrorReporter::InitializeLogFile("logs/error.log");
-    processing::Diagnostics::InitializeLogger();
+
+    // Early read of append_logs setting from config.toml and set global flag
+    bool append_logs = true; // Default to append mode
+    try
+    {
+        auto cfg = toml::parse_file("config.toml");
+        if (auto global = cfg["global"].as_table())
+        {
+            if (auto append = (*global)["append_logs"].value<bool>())
+            {
+                append_logs = *append;
+            }
+        }
+    }
+    catch (...)
+    {
+    }
+
+    utils::ErrorReporter::InitializeLogFile("logs/error.log", append_logs);
+    processing::Diagnostics::InitializeLogger(append_logs);
 
 #if DQX_PROFILING_LEVEL >= 1
-    profiling::InitializeProfilingLogger();
+    profiling::InitializeProfilingLogger(append_logs);
 #endif
 
     parseCommandLineArgs();
+
+    if (!append_logs)
+    {
+        std::ofstream("logs/run.log", std::ios::trunc).close();
+        std::ofstream("logs/quest.log", std::ios::trunc).close();
+        std::ofstream("logs/network.log", std::ios::trunc).close();
+    }
 
     static plog::RollingFileAppender<plog::TxtFormatter> file_appender("logs/run.log", 1024 * 1024 * 10, 3);
     static plog::ConsoleAppender<plog::TxtFormatter> console_appender;

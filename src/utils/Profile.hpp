@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <limits>
 #include <string>
 #include <string_view>
@@ -42,16 +43,24 @@ constexpr int kProfilingLogInstance = 2;
  * Creates a separate plog instance that writes to logs/profiling.log
  * Uses rolling file appender with 10MB max size and 3 backup files.
  * Thread-safe via std::once_flag.
+ * @param append If true, append to existing log; if false, clear the log first
  */
-inline void InitializeProfilingLogger()
+inline void InitializeProfilingLogger(bool append = true)
 {
     static std::once_flag logger_once;
     std::call_once(
         logger_once,
-        []
+        [append]
         {
             try
             {
+                // Clear log file if not appending
+                if (!append)
+                {
+                    std::ofstream clear_file("logs/profiling.log", std::ios::trunc);
+                    clear_file.close();
+                }
+
                 static plog::RollingFileAppender<plog::TxtFormatter> profiling_appender("logs/profiling.log",
                                                                                         1024 * 1024 * 10, 3);
                 plog::init<kProfilingLogInstance>(plog::debug, &profiling_appender);

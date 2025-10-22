@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
 
 #include <plog/Appenders/RollingFileAppender.h>
@@ -20,11 +21,11 @@ namespace
 std::once_flag g_logger_once;
 }
 
-void Diagnostics::InitializeLogger()
+void Diagnostics::InitializeLogger(bool append)
 {
     std::call_once(
         g_logger_once,
-        []
+        [append]
         {
             std::error_code ec;
             std::filesystem::create_directories("logs", ec);
@@ -32,6 +33,13 @@ void Diagnostics::InitializeLogger()
             {
                 utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
                                                     "Failed to create diagnostics log directory", ec.message());
+            }
+
+            // Clear log file if not appending
+            if (!append)
+            {
+                std::ofstream clear_file("logs/dialog.log", std::ios::trunc);
+                clear_file.close();
             }
 
             try

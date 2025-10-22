@@ -127,8 +127,10 @@ public:
 
     /**
      * @brief Initialize the error log file path and emit a run separator.
+     * @param path Path to the log file
+     * @param append If true, append to existing log; if false, clear the log first
      */
-    static void InitializeLogFile(const std::string& path);
+    static void InitializeLogFile(const std::string& path, bool append = true);
 
     /**
      * @brief Get string representation of error category

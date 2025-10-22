@@ -144,11 +144,12 @@ void ErrorReporter::ClearHistory()
     s_error_history.clear();
 }
 
-void ErrorReporter::InitializeLogFile(const std::string& path)
+void ErrorReporter::InitializeLogFile(const std::string& path, bool append)
 {
     std::lock_guard<std::mutex> lock(s_mutex);
     s_log_path = path;
-    std::ofstream ofs(s_log_path, std::ios::app);
+    auto mode = append ? std::ios::app : std::ios::trunc;
+    std::ofstream ofs(s_log_path, mode);
     if (ofs)
     {
         ofs << "\n=== Run started " << GetTimestamp() << " ===\n";
