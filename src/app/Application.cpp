@@ -225,20 +225,18 @@ void Application::mainLoop()
 
     while (running_)
     {
-        PROFILE_SCOPE_CUSTOM("MainLoopTick");
-
         float delta_time = calculateDeltaTime();
         processEvents();
         handleModeChanges();
         renderFrame(delta_time);
         handleQuitRequests();
+
+        PROFILE_FRAME_STATS(frame_stats_);
     }
 }
 
 void Application::handleModeChanges()
 {
-    PROFILE_SCOPE_FUNCTION();
-
     auto current_mode = config_->getAppMode();
     if (current_mode != mode_manager_->GetCurrentMode())
     {
@@ -255,7 +253,7 @@ void Application::handleModeChanges()
 
 void Application::renderFrame(float deltaTime)
 {
-    PROFILE_SCOPE_FUNCTION();
+    PROFILE_SCOPE_FRAME(); 
 
     context_->beginFrame();
 
@@ -277,8 +275,6 @@ void Application::renderFrame(float deltaTime)
 
 void Application::handleQuitRequests()
 {
-    PROFILE_SCOPE_FUNCTION();
-
     if (!quit_requested_)
         return;
 
