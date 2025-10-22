@@ -4,7 +4,7 @@ project("DQX Utility" VERSION 0.1.0 LANGUAGES CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-set(PROFILING_LEVEL "0" CACHE STRING "Profiling level: 0=disabled, 1=timer+plog, 2=tracy+timer")
+set(PROFILING_LEVEL "1" CACHE STRING "Profiling level: 0=disabled, 1=timer+plog, 2=tracy+timer")
 set_property(CACHE PROFILING_LEVEL PROPERTY STRINGS "0" "1" "2")
 if(NOT PROFILING_LEVEL MATCHES "^[0-2]$")
   message(FATAL_ERROR "PROFILING_LEVEL must be 0, 1, or 2 (got: ${PROFILING_LEVEL})")
