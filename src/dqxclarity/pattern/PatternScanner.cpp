@@ -180,14 +180,16 @@ std::optional<uintptr_t> PatternScanner::ScanProcess(const Pattern& pattern, boo
     }
 
     std::vector<MemoryRegion> regions;
+    size_t total_regions = 0;
     {
         PROFILE_SCOPE_CUSTOM("ScanProcess.ParseRegions");
         regions = MemoryRegionParser::ParseMapsFiltered(m_memory->GetAttachedPid(), true, require_executable);
+        total_regions = regions.size();
     }
 
     for (const auto& region : regions)
     {
-        PROFILE_SCOPE_CUSTOM("ScanProcess.RegionScan");
+        PROFILE_SCOPE_CUSTOM("ScanProcess.RegionIteration");
         auto result = ScanRegion(region, pattern);
         if (result)
         {
@@ -207,9 +209,12 @@ std::optional<uintptr_t> PatternScanner::ScanModule(const Pattern& pattern, cons
     }
 
     std::vector<MemoryRegion> regions;
+    size_t total_regions = 0;
+    size_t matched_regions = 0;
     {
         PROFILE_SCOPE_CUSTOM("ScanModule.ParseMaps");
         regions = MemoryRegionParser::ParseMaps(m_memory->GetAttachedPid());
+        total_regions = regions.size();
     }
 
     for (const auto& region : regions)
@@ -224,9 +229,10 @@ std::optional<uintptr_t> PatternScanner::ScanModule(const Pattern& pattern, cons
             continue;
         }
 
+        matched_regions++;
         std::optional<uintptr_t> result;
         {
-            PROFILE_SCOPE_CUSTOM("ScanModule.ScanRegion");
+            PROFILE_SCOPE_CUSTOM("ScanModule.RegionIteration");
             result = ScanRegion(region, pattern);
         }
         if (result)

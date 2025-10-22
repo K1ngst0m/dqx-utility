@@ -77,6 +77,7 @@ bool Engine::start_hook()
 
 bool Engine::start_hook(StartPolicy policy)
 {
+    PROFILE_SCOPE_FUNCTION();
     if (status_ == Status::Hooked || status_ == Status::Starting)
         return true;
     status_ = Status::Starting;
@@ -89,78 +90,87 @@ bool Engine::start_hook(StartPolicy policy)
     }
 
     // Find DQXGame.exe
-    auto pids = dqxclarity::ProcessFinder::FindByName("DQXGame.exe", false);
-    if (pids.empty())
     {
-        if (impl_->log.error)
-            impl_->log.error("DQXGame.exe not found");
-        status_ = Status::Error;
-        return false;
-    }
+        PROFILE_SCOPE_CUSTOM("Engine.FindProcess");
+        auto pids = dqxclarity::ProcessFinder::FindByName("DQXGame.exe", false);
+        if (pids.empty())
+        {
+            if (impl_->log.error)
+                impl_->log.error("DQXGame.exe not found");
+            status_ = Status::Error;
+            return false;
+        }
 
-    // Create memory interface and attach
-    auto mem_unique = dqxclarity::MemoryFactory::CreatePlatformMemory();
-    impl_->memory = std::shared_ptr<IProcessMemory>(std::move(mem_unique));
-    if (!impl_->memory || !impl_->memory->AttachProcess(pids[0]))
-    {
-        if (impl_->log.error)
-            impl_->log.error("Failed to attach to DQXGame.exe");
-        status_ = Status::Error;
-        return false;
+        // Create memory interface and attach
+        auto mem_unique = dqxclarity::MemoryFactory::CreatePlatformMemory();
+        impl_->memory = std::shared_ptr<IProcessMemory>(std::move(mem_unique));
+        if (!impl_->memory || !impl_->memory->AttachProcess(pids[0]))
+        {
+            if (impl_->log.error)
+                impl_->log.error("Failed to attach to DQXGame.exe");
+            status_ = Status::Error;
+            return false;
+        }
     }
 
     // Prepare the dialog hook FIRST but do not enable patch yet (we need its original bytes)
-    impl_->hook = std::make_unique<dqxclarity::DialogHook>(impl_->memory);
-    impl_->hook->SetVerbose(impl_->cfg.verbose);
-    impl_->hook->SetLogger(impl_->log);
-    impl_->hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
-    impl_->hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-    impl_->hook->SetOriginalBytesChangedCallback(
-        [this](uintptr_t addr, const std::vector<uint8_t>& bytes)
-        {
-            if (impl_->integrity)
-            {
-                impl_->integrity->UpdateRestoreTarget(addr, bytes);
-            }
-            if (impl_->monitor)
-            {
-                impl_->monitor->UpdateRestoreTarget(addr, bytes);
-            }
-        });
-    impl_->hook->SetHookSiteChangedCallback(
-        [this](uintptr_t old_addr, uintptr_t new_addr, const std::vector<uint8_t>& bytes)
-        {
-            if (impl_->integrity)
-            {
-                impl_->integrity->MoveRestoreTarget(old_addr, new_addr, bytes);
-            }
-            if (impl_->monitor)
-            {
-                impl_->monitor->MoveRestoreTarget(old_addr, new_addr, bytes);
-            }
-        });
-    if (!impl_->hook->InstallHook(/*enable_patch=*/false))
     {
-        if (impl_->log.error)
-            impl_->log.error("Failed to prepare dialog hook");
-        impl_->hook.reset();
-        status_ = Status::Error;
-        return false;
+        PROFILE_SCOPE_CUSTOM("Engine.InstallDialogHook");
+        impl_->hook = std::make_unique<dqxclarity::DialogHook>(impl_->memory);
+        impl_->hook->SetVerbose(impl_->cfg.verbose);
+        impl_->hook->SetLogger(impl_->log);
+        impl_->hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
+        impl_->hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+        impl_->hook->SetOriginalBytesChangedCallback(
+            [this](uintptr_t addr, const std::vector<uint8_t>& bytes)
+            {
+                if (impl_->integrity)
+                {
+                    impl_->integrity->UpdateRestoreTarget(addr, bytes);
+                }
+                if (impl_->monitor)
+                {
+                    impl_->monitor->UpdateRestoreTarget(addr, bytes);
+                }
+            });
+        impl_->hook->SetHookSiteChangedCallback(
+            [this](uintptr_t old_addr, uintptr_t new_addr, const std::vector<uint8_t>& bytes)
+            {
+                if (impl_->integrity)
+                {
+                    impl_->integrity->MoveRestoreTarget(old_addr, new_addr, bytes);
+                }
+                if (impl_->monitor)
+                {
+                    impl_->monitor->MoveRestoreTarget(old_addr, new_addr, bytes);
+                }
+            });
+        if (!impl_->hook->InstallHook(/*enable_patch=*/false))
+        {
+            if (impl_->log.error)
+                impl_->log.error("Failed to prepare dialog hook");
+            impl_->hook.reset();
+            status_ = Status::Error;
+            return false;
+        }
     }
     // Do NOT change page protection at startup (keeps login stable on this build)
 
     // Do NOT pre-change page protections at startup; some builds crash on login if code pages change protection.
 
-    impl_->quest_hook = std::make_unique<dqxclarity::QuestHook>(impl_->memory);
-    impl_->quest_hook->SetVerbose(impl_->cfg.verbose);
-    impl_->quest_hook->SetLogger(impl_->log);
-    impl_->quest_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
-    impl_->quest_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-    if (impl_->quest_hook && !impl_->quest_hook->InstallHook(/*enable_patch=*/false))
     {
-        if (impl_->log.warn)
-            impl_->log.warn("Failed to prepare quest hook; continuing without quest capture");
-        impl_->quest_hook.reset();
+        PROFILE_SCOPE_CUSTOM("Engine.InstallQuestHook");
+        impl_->quest_hook = std::make_unique<dqxclarity::QuestHook>(impl_->memory);
+        impl_->quest_hook->SetVerbose(impl_->cfg.verbose);
+        impl_->quest_hook->SetLogger(impl_->log);
+        impl_->quest_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
+        impl_->quest_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+        if (impl_->quest_hook && !impl_->quest_hook->InstallHook(/*enable_patch=*/false))
+        {
+            if (impl_->log.warn)
+                impl_->log.warn("Failed to prepare quest hook; continuing without quest capture");
+            impl_->quest_hook.reset();
+        }
     }
 
     // temporarily disabled due to unused
@@ -176,66 +186,72 @@ bool Engine::start_hook(StartPolicy policy)
   }
 #endif
 
-    impl_->corner_hook = std::make_unique<dqxclarity::CornerTextHook>(impl_->memory);
-    impl_->corner_hook->SetVerbose(impl_->cfg.verbose);
-    impl_->corner_hook->SetLogger(impl_->log);
-    impl_->corner_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
-    impl_->corner_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-    if (impl_->corner_hook && !impl_->corner_hook->InstallHook(/*enable_patch=*/false))
     {
-        if (impl_->log.warn)
-            impl_->log.warn("Failed to prepare corner text hook; continuing without capture");
-        impl_->corner_hook.reset();
+        PROFILE_SCOPE_CUSTOM("Engine.InstallCornerTextHook");
+        impl_->corner_hook = std::make_unique<dqxclarity::CornerTextHook>(impl_->memory);
+        impl_->corner_hook->SetVerbose(impl_->cfg.verbose);
+        impl_->corner_hook->SetLogger(impl_->log);
+        impl_->corner_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
+        impl_->corner_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+        if (impl_->corner_hook && !impl_->corner_hook->InstallHook(/*enable_patch=*/false))
+        {
+            if (impl_->log.warn)
+                impl_->log.warn("Failed to prepare corner text hook; continuing without capture");
+            impl_->corner_hook.reset();
+        }
     }
 
     // Install integrity detour and configure it to restore dialog hook bytes during checks
-    impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
-    impl_->integrity->SetVerbose(impl_->cfg.verbose);
-    impl_->integrity->SetLogger(impl_->log);
-    impl_->integrity->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
-    // Provide restoration info so integrity trampoline can unhook temporarily
-    if (impl_->hook && impl_->hook->GetHookAddress() != 0)
     {
-        impl_->integrity->AddRestoreTarget(impl_->hook->GetHookAddress(), impl_->hook->GetOriginalBytes());
-    }
-    if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0)
-    {
-        impl_->integrity->AddRestoreTarget(impl_->quest_hook->GetHookAddress(), impl_->quest_hook->GetOriginalBytes());
-    }
-    if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0)
-    {
-        impl_->integrity->AddRestoreTarget(impl_->network_hook->GetHookAddress(),
-                                           impl_->network_hook->GetOriginalBytes());
-    }
-    if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0)
-    {
-        impl_->integrity->AddRestoreTarget(impl_->corner_hook->GetHookAddress(),
-                                           impl_->corner_hook->GetOriginalBytes());
-    }
-    if (!impl_->integrity->Install())
-    {
-        if (impl_->log.error)
-            impl_->log.error("Failed to install integrity detour");
-        impl_->integrity.reset();
-        if (impl_->quest_hook)
+        PROFILE_SCOPE_CUSTOM("Engine.InstallIntegrityDetour");
+        impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
+        impl_->integrity->SetVerbose(impl_->cfg.verbose);
+        impl_->integrity->SetLogger(impl_->log);
+        impl_->integrity->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
+        // Provide restoration info so integrity trampoline can unhook temporarily
+        if (impl_->hook && impl_->hook->GetHookAddress() != 0)
         {
-            impl_->quest_hook->RemoveHook();
-            impl_->quest_hook.reset();
+            impl_->integrity->AddRestoreTarget(impl_->hook->GetHookAddress(), impl_->hook->GetOriginalBytes());
         }
-        if (impl_->network_hook)
+        if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0)
         {
-            impl_->network_hook->RemoveHook();
-            impl_->network_hook.reset();
+            impl_->integrity->AddRestoreTarget(impl_->quest_hook->GetHookAddress(), impl_->quest_hook->GetOriginalBytes());
         }
-        if (impl_->corner_hook)
+        if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0)
         {
-            impl_->corner_hook->RemoveHook();
-            impl_->corner_hook.reset();
+            impl_->integrity->AddRestoreTarget(impl_->network_hook->GetHookAddress(),
+                                               impl_->network_hook->GetOriginalBytes());
         }
-        impl_->hook.reset();
-        impl_->memory.reset();
-        status_ = Status::Error;
-        return false;
+        if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0)
+        {
+            impl_->integrity->AddRestoreTarget(impl_->corner_hook->GetHookAddress(),
+                                               impl_->corner_hook->GetOriginalBytes());
+        }
+        if (!impl_->integrity->Install())
+        {
+            if (impl_->log.error)
+                impl_->log.error("Failed to install integrity detour");
+            impl_->integrity.reset();
+            if (impl_->quest_hook)
+            {
+                impl_->quest_hook->RemoveHook();
+                impl_->quest_hook.reset();
+            }
+            if (impl_->network_hook)
+            {
+                impl_->network_hook->RemoveHook();
+                impl_->network_hook.reset();
+            }
+            if (impl_->corner_hook)
+            {
+                impl_->corner_hook->RemoveHook();
+                impl_->corner_hook.reset();
+            }
+            impl_->hook.reset();
+            impl_->memory.reset();
+            status_ = Status::Error;
+            return false;
+        }
     }
 
     // Optionally enable the dialog hook immediately (will be restored during integrity)

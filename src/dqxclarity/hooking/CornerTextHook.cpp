@@ -2,6 +2,7 @@
 
 #include "../signatures/Signatures.hpp"
 #include "../pattern/PatternFinder.hpp"
+#include "../util/Profile.hpp"
 
 #include <cstring>
 #include <sstream>
@@ -256,25 +257,47 @@ bool CornerTextHook::PollCornerText()
 
 bool CornerTextHook::FindCornerTriggerAddress()
 {
+    PROFILE_SCOPE_FUNCTION();
     PatternFinder finder(m_memory);
     const auto& pattern = Signatures::GetCornerText();
 
-    if (auto addr = finder.FindInModule(pattern, "DQXGame.exe"))
+    // Tier 1: Module-restricted scan
     {
-        m_hook_address = *addr;
-        return true;
+        PROFILE_SCOPE_CUSTOM("CornerTextHook.FindInModule");
+        if (auto addr = finder.FindInModule(pattern, "DQXGame.exe"))
+        {
+            m_hook_address = *addr;
+            if (m_verbose && m_logger.info)
+                m_logger.info("Corner text trigger found via FindInModule (Tier 1)");
+            return true;
+        }
     }
 
-    if (auto addr = finder.FindInProcessExec(pattern))
+    // Tier 2: Executable region scan
     {
-        m_hook_address = *addr;
-        return true;
+        PROFILE_SCOPE_CUSTOM("CornerTextHook.FindInProcessExec");
+        if (auto addr = finder.FindInProcessExec(pattern))
+        {
+            m_hook_address = *addr;
+            if (m_verbose && m_logger.info)
+                m_logger.info("Corner text trigger found via FindInProcessExec (Tier 2)");
+            return true;
+        }
     }
 
-    if (auto addr = finder.FindWithFallback(pattern, "DQXGame.exe", 64u * 1024u * 1024u))
+    // Tier 3: Naive fallback scan (SLOW)
     {
-        m_hook_address = *addr;
-        return true;
+        PROFILE_SCOPE_CUSTOM("CornerTextHook.FindWithFallback");
+        if (m_logger.warn)
+            m_logger.warn("Corner text trigger not found in Tier 1/2, falling back to naive scan (Tier 3)");
+
+        if (auto addr = finder.FindWithFallback(pattern, "DQXGame.exe", 64u * 1024u * 1024u))
+        {
+            m_hook_address = *addr;
+            if (m_verbose && m_logger.info)
+                m_logger.info("Corner text trigger found via FindWithFallback (Tier 3 - naive scan)");
+            return true;
+        }
     }
 
     return false;

@@ -2,6 +2,7 @@
 #include "../signatures/Signatures.hpp"
 #include "../pattern/PatternFinder.hpp"
 #include "Codegen.hpp"
+#include "../util/Profile.hpp"
 #include <iostream>
 #include <cstdio>
 #include <sstream>
@@ -198,6 +199,7 @@ bool DialogHook::RemoveHook()
 
 bool DialogHook::FindDialogTriggerAddress()
 {
+    PROFILE_SCOPE_FUNCTION();
     auto pattern = Signatures::GetDialogTrigger();
 
     if (m_verbose)
@@ -216,21 +218,39 @@ bool DialogHook::FindDialogTriggerAddress()
 
     PatternFinder finder(m_memory);
     bool found = false;
-    // Prefer module-restricted scan
-    if (auto addr = finder.FindInModule(pattern, "DQXGame.exe"))
+
+    // Tier 1: Prefer module-restricted scan
     {
-        m_hook_address = *addr;
-        found = true;
-    }
-    else if (auto addr2 = finder.FindInProcessExec(pattern))
-    {
-        m_hook_address = *addr2;
-        found = true;
+        PROFILE_SCOPE_CUSTOM("DialogHook.FindInModule");
+        if (auto addr = finder.FindInModule(pattern, "DQXGame.exe"))
+        {
+            m_hook_address = *addr;
+            found = true;
+            if (m_verbose && m_logger.info)
+                m_logger.info("Dialog trigger found via FindInModule (Tier 1)");
+        }
     }
 
-    // Fallback: manual chunk scan from module base (avoids VirtualQuery page guard issues)
+    // Tier 2: Fallback to executable region scan
     if (!found)
     {
+        PROFILE_SCOPE_CUSTOM("DialogHook.FindInProcessExec");
+        if (auto addr2 = finder.FindInProcessExec(pattern))
+        {
+            m_hook_address = *addr2;
+            found = true;
+            if (m_verbose && m_logger.info)
+                m_logger.info("Dialog trigger found via FindInProcessExec (Tier 2)");
+        }
+    }
+
+    // Tier 3: Fallback to naive scan (SLOW)
+    if (!found)
+    {
+        PROFILE_SCOPE_CUSTOM("DialogHook.FindWithFallback");
+        if (m_logger.warn)
+            m_logger.warn("Dialog trigger not found in Tier 1/2, falling back to naive scan (Tier 3)");
+
         uintptr_t base = m_memory->GetModuleBaseAddress("DQXGame.exe");
         if (base == 0)
         {
@@ -243,6 +263,8 @@ bool DialogHook::FindDialogTriggerAddress()
         {
             m_hook_address = *fb;
             found = true;
+            if (m_verbose && m_logger.info)
+                m_logger.info("Dialog trigger found via FindWithFallback (Tier 3 - naive scan)");
         }
     }
 
