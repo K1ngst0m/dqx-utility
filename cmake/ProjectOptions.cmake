@@ -16,8 +16,8 @@ else()
   target_compile_options(project_warnings INTERFACE -Wall -Wextra -Wpedantic)
 endif()
 
-if(ENABLE_PROFILING)
-  target_compile_definitions(project_options INTERFACE DQX_ENABLE_PROFILING)
+if(PROFILING_LEVEL GREATER 0)
+  target_compile_definitions(project_options INTERFACE DQX_PROFILING_LEVEL=${PROFILING_LEVEL})
 endif()
 
 if(WIN32)

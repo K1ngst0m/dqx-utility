@@ -122,6 +122,10 @@ bool Application::initializeLogging()
     utils::ErrorReporter::InitializeLogFile("logs/error.log");
     processing::Diagnostics::InitializeLogger();
 
+#if DQX_PROFILING_LEVEL >= 1
+    profiling::InitializeProfilingLogger();
+#endif
+
     parseCommandLineArgs();
 
     static plog::RollingFileAppender<plog::TxtFormatter> file_appender("logs/run.log", 1024 * 1024 * 10, 3);

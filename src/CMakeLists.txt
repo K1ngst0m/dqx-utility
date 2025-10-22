@@ -160,7 +160,7 @@ target_link_libraries(dqxu_core
     project_warnings
 )
 
-if(ENABLE_PROFILING)
+if(PROFILING_LEVEL GREATER_EQUAL 2)
   target_link_libraries(dqxu_core PUBLIC Tracy::TracyClient)
 endif()
 

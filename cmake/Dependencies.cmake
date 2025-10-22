@@ -144,8 +144,8 @@ CPMAddPackage(
     "CPPTRACE_STATIC_LIB ON"
 )
 
-# Tracy - Real-time profiler
-if(ENABLE_PROFILING)
+# Tracy - Real-time profiler (only for PROFILING_LEVEL >= 2)
+if(PROFILING_LEVEL GREATER_EQUAL 2)
   CPMAddPackage(
     NAME tracy
     GITHUB_REPOSITORY wolfpld/tracy
@@ -198,7 +198,7 @@ if(NOT nlohmann_json_ADDED)
   message(FATAL_ERROR "Required dependency nlohmann_json was not acquired.")
 endif()
 
-if(ENABLE_PROFILING)
+if(PROFILING_LEVEL GREATER_EQUAL 2)
   if(NOT tracy_ADDED)
     message(FATAL_ERROR "Required dependency tracy was not acquired.")
   endif()
