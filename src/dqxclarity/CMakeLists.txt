@@ -68,6 +68,10 @@ else()
   target_compile_options(dqxclarity PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+if(PROFILING_LEVEL GREATER 0)
+  target_compile_definitions(dqxclarity PUBLIC DQX_PROFILING_LEVEL=${PROFILING_LEVEL})
+endif()
+
 if(PROFILING_LEVEL GREATER_EQUAL 2)
   target_link_libraries(dqxclarity PUBLIC Tracy::TracyClient)
 endif()

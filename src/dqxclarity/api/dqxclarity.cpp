@@ -13,6 +13,7 @@
 #include "dialog_stream.hpp"
 #include "quest_message.hpp"
 #include "../util/SPSCRing.hpp"
+#include "../util/Profile.hpp"
 
 #include <chrono>
 #include <thread>
@@ -59,6 +60,12 @@ bool Engine::initialize(const Config& cfg, Logger loggers)
     impl_->cfg = cfg;
     impl_->log = std::move(loggers);
     status_ = Status::Stopped;
+
+#if DQX_PROFILING_LEVEL >= 1
+    // Set profiling logger to route profiling output through dqxclarity's Logger
+    profiling::SetProfilingLogger(&impl_->log);
+#endif
+
     return true;
 }
 

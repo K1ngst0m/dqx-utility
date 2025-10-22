@@ -5,6 +5,7 @@
 
 #include "../utils/ErrorReporter.hpp"
 #include "../utils/CrashHandler.hpp"
+#include "../utils/Profile.hpp"
 
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "dqxclarity/api/dialog_message.hpp"
@@ -191,7 +192,17 @@ DQXClarityLauncher::DQXClarityLauncher()
     dqxclarity::Logger log{};
     log.info = [](const std::string& m)
     {
-        PLOG_INFO << m;
+#if DQX_PROFILING_LEVEL >= 1
+        // Route dqxclarity profiling logs to logs/profiling.log
+        if (m.find("[PROFILE]") != std::string::npos)
+        {
+            PLOG_DEBUG_(profiling::kProfilingLogInstance) << m;
+        }
+        else
+#endif
+        {
+            PLOG_INFO << m;
+        }
     };
     log.warn = [](const std::string& m)
     {

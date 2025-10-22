@@ -2,7 +2,7 @@
 #include "PatternScanner.hpp"
 #include <vector>
 
-#include "../../utils/Profile.hpp"
+#include "../util/Profile.hpp"
 
 namespace dqxclarity
 {

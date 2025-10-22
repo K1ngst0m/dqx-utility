@@ -5,7 +5,7 @@
 #include "../signatures/Signatures.hpp"
 #include "Codegen.hpp"
 #include "../memory/MemoryPatch.hpp"
-#include "../../utils/Profile.hpp"
+#include "../util/Profile.hpp"
 #include <algorithm>
 #include <cctype>
 
