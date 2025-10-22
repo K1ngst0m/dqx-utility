@@ -2,6 +2,8 @@
 
 Utility for Dragon Quest X.
 
+![showcase.png](./screenshot.webp)
+
 ## Features
 
 ### Real-Time Translation From Game
