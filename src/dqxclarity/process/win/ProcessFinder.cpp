@@ -1,16 +1,23 @@
 #include "../ProcessFinder.hpp"
+#include "../../util/Profile.hpp"
 #include <windows.h>
 #include <tlhelp32.h>
 #include <psapi.h>
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 namespace dqxclarity
 {
 
-std::vector<pid_t> ProcessFinder::EnumerateProcesses()
+// Cached process snapshot to avoid repeated CreateToolhelp32Snapshot calls
+static std::unordered_map<pid_t, std::string> g_process_cache;
+static bool g_cache_valid = false;
+
+static void RefreshProcessCache()
 {
-    std::vector<pid_t> pids;
+    PROFILE_SCOPE_CUSTOM("ProcessFinder.RefreshCache");
+    g_process_cache.clear();
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot != INVALID_HANDLE_VALUE)
     {
@@ -22,12 +29,29 @@ std::vector<pid_t> ProcessFinder::EnumerateProcesses()
             {
                 if (pe.th32ProcessID > 0)
                 {
-                    pids.push_back(pe.th32ProcessID);
+                    g_process_cache[pe.th32ProcessID] = std::string(pe.szExeFile);
                 }
             } while (Process32Next(snapshot, &pe));
         }
         CloseHandle(snapshot);
     }
+    g_cache_valid = true;
+}
+
+std::vector<pid_t> ProcessFinder::EnumerateProcesses()
+{
+    if (!g_cache_valid)
+    {
+        RefreshProcessCache();
+    }
+
+    std::vector<pid_t> pids;
+    pids.reserve(g_process_cache.size());
+    for (const auto& [pid, name] : g_process_cache)
+    {
+        pids.push_back(pid);
+    }
+
     // Ensure current process is included
     DWORD self = GetCurrentProcessId();
     if (std::find(pids.begin(), pids.end(), static_cast<pid_t>(self)) == pids.end())
@@ -41,28 +65,17 @@ std::string ProcessFinder::ReadProcFile(pid_t, const std::string&) { return ""; 
 
 std::string ProcessFinder::GetProcessName(pid_t pid)
 {
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snapshot == INVALID_HANDLE_VALUE)
+    if (!g_cache_valid)
     {
-        return "";
+        RefreshProcessCache();
     }
 
-    PROCESSENTRY32 pe{};
-    pe.dwSize = sizeof(PROCESSENTRY32);
-
-    if (Process32First(snapshot, &pe))
+    auto it = g_process_cache.find(pid);
+    if (it != g_process_cache.end())
     {
-        do
-        {
-            if (pe.th32ProcessID == pid)
-            {
-                CloseHandle(snapshot);
-                return std::string(pe.szExeFile);
-            }
-        } while (Process32Next(snapshot, &pe));
+        return it->second;
     }
 
-    CloseHandle(snapshot);
     return "";
 }
 
