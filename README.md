@@ -66,7 +66,7 @@ Special thanks to the [dqxclarity project](https://github.com/dqx-translation-pr
 
 ## License
 
-This project is provided as-is for educational and personal use.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
