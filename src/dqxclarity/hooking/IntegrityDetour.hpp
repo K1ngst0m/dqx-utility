@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../memory/IProcessMemory.hpp"
+#include "../pattern/MemoryRegion.hpp"
 #include "../api/dqxclarity.hpp"
 #include <cstdint>
 #include <memory>
@@ -35,6 +36,9 @@ public:
     void SetLogger(const dqxclarity::Logger& log) { m_log = log; }
 
     void SetDiagnosticsEnabled(bool d) { m_diag = d; }
+
+    // Set pre-parsed memory regions to avoid repeated ParseMaps calls
+    void SetCachedRegions(const std::vector<MemoryRegion>& regions) { m_cached_regions = regions; }
 
     // Provide a list of hook sites to temporarily restore during integrity.
     // Each call adds one site with its original bytes.
@@ -92,6 +96,9 @@ private:
     std::vector<uint8_t> m_original_bytes; // stolen original bytes (instruction-safe)
     std::vector<RestoreSite> m_restore_sites; // hook sites to temporarily restore
     mutable std::mutex m_restore_mutex;
+
+    // Cached memory regions
+    std::vector<MemoryRegion> m_cached_regions;
 
     bool FindIntegrityAddress(uintptr_t& out_addr);
     bool BuildAndWriteTrampoline();

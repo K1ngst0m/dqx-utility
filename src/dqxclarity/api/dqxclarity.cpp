@@ -219,6 +219,7 @@ bool Engine::start_hook(StartPolicy policy)
         impl_->integrity->SetVerbose(impl_->cfg.verbose);
         impl_->integrity->SetLogger(impl_->log);
         impl_->integrity->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
+        impl_->integrity->SetCachedRegions(cached_regions);
         // Provide restoration info so integrity trampoline can unhook temporarily
         if (impl_->hook && impl_->hook->GetHookAddress() != 0)
         {

@@ -108,7 +108,18 @@ bool IntegrityDetour::FindIntegrityAddress(uintptr_t& out_addr)
         m_log.info("Integrity scan step: module scan DQXGame.exe");
     {
         PROFILE_SCOPE_CUSTOM("IntegrityScan.Module");
-        if (auto a = finder.FindInModule(pat, "DQXGame.exe"))
+        std::optional<uintptr_t> a;
+
+        if (!m_cached_regions.empty())
+        {
+            a = finder.FindInModuleWithRegions(pat, "DQXGame.exe", m_cached_regions);
+        }
+        else
+        {
+            a = finder.FindInModule(pat, "DQXGame.exe");
+        }
+
+        if (a)
         {
             out_addr = *a;
             if (m_diag && m_log.info)
