@@ -3,96 +3,13 @@
 [global]
 app_mode = 0             # 0=Normal, 1=Borderless, 2=Mini
 append_logs = false
-borderless_windows = false
 dialog_fade_enabled = true
 dialog_fade_timeout = 20.0
 ui_language = "en"       # UI language: en or zh-CN
 ui_scale = 1.0
-verbose_logging = false
-window_always_on_top = false
 
 [global.translation]
 auto_apply_changes = false
 target_lang = "en-us"    # en-us, zh-cn, zh-tw
 translate_enabled = false # start disabled; enable in UI when ready
 translation_backend = 0   # 0=OpenAI, 1=Google, 2=Zhipu, 3=Qwen-MT, 4=Niutrans
-
-[global.translation.google]
-api_key = ""
-
-[global.translation.niutrans]
-api_key = ""
-
-[global.translation.openai]
-api_key = ""
-base_url = "https://api.openai.com"
-model = ""
-
-[global.translation.qwen]
-api_key = ""
-model = "qwen-mt-turbo"
-
-[global.translation.youdao]
-app_key = ""
-app_secret = ""
-mode = 0
-
-[global.translation.zhipu]
-api_key = ""
-base_url = "https://open.bigmodel.cn"
-model = ""
-
-# One sample dialog window (copy to add more)
-[[dialogs]]
-name = "Dialog A"
-
-[dialogs.behavior]
-auto_scroll_to_new = true
-
-[dialogs.translation]
-auto_apply_changes = false
-target_lang = "en-us"
-translate_enabled = false
-translation_backend = 0
-use_global_translation = true
-
-[dialogs.translation.google]
-api_key = ""
-
-[dialogs.translation.niutrans]
-api_key = ""
-
-[dialogs.translation.openai]
-api_key = ""
-base_url = "https://api.openai.com"
-model = ""
-
-[dialogs.translation.qwen]
-api_key = ""
-model = "qwen-mt-turbo"
-
-[dialogs.translation.youdao]
-app_key = ""
-app_secret = ""
-mode = 0
-
-[dialogs.translation.zhipu]
-api_key = ""
-base_url = "https://open.bigmodel.cn"
-model = ""
-
-[dialogs.appearance]
-background_alpha = 0.78
-border_thickness = 2.0
-fade_enabled = true
-fade_timeout = 20.0
-font_path = ""
-font_size = 28.0
-height = 220.0
-padding_x = 24.0
-padding_y = 18.0
-pos_x = 0.0
-pos_y = 0.0
-rounding = 16.0
-vignette_thickness = 12.0
-width = 580.0
