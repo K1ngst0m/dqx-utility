@@ -187,7 +187,6 @@ void Application::initializeConfig()
     PROFILE_SCOPE_FUNCTION();
 
     config_->setRegistry(registry_.get());
-    config_->setForceVerboseLogging(force_verbose_pipeline_);
     if (!config_->loadAtStartup())
     {
         utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration, "Failed to load configuration",
@@ -318,11 +317,7 @@ bool Application::checkSingleInstance()
 
 void Application::parseCommandLineArgs()
 {
-    for (int i = 1; i < argc_; ++i)
-    {
-        if (std::strcmp(argv_[i], "--verbose") == 0)
-            force_verbose_pipeline_ = true;
-    }
+    // Reserved for future CLI argument parsing
 }
 
 float Application::calculateDeltaTime()

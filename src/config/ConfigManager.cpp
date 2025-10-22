@@ -6,6 +6,7 @@
 #include "../state/DialogStateManager.hpp"
 #include "../utils/ErrorReporter.hpp"
 #include "../processing/Diagnostics.hpp"
+#include "../utils/Profile.hpp"
 
 #include <toml++/toml.h>
 #include <plog/Log.h>
@@ -429,7 +430,7 @@ ConfigManager::ConfigManager()
     config_path_ = "config.toml";
     last_mtime_ = file_mtime_ms(config_path_);
     global_translation_config_.applyDefaults();
-    applyVerboseSetting();
+    // Logging level will be applied when config is loaded via setLoggingLevel()
 }
 
 ConfigManager::~ConfigManager() = default;
@@ -628,7 +629,6 @@ bool ConfigManager::saveAll()
     global.insert("ui_language", ui_language_);
     global.insert("dialog_fade_enabled", dialog_fade_enabled_);
     global.insert("dialog_fade_timeout", dialog_fade_timeout_);
-    global.insert("verbose_logging", verbose_logging_);
     global.insert("default_dialog_enabled", default_dialog_enabled_);
     global.insert("default_quest_enabled", default_quest_enabled_);
 
@@ -686,6 +686,14 @@ bool ConfigManager::saveAll()
     global.insert("translation", std::move(translation));
 
     root.insert("global", std::move(global));
+
+    // [app.debug] section
+    toml::table app;
+    toml::table debug;
+    debug.insert("profiling_level", profiling_level_);
+    debug.insert("logging_level", logging_level_);
+    app.insert("debug", std::move(debug));
+    root.insert("app", std::move(app));
 
     if (auto* current_default_dialog = registry_->defaultDialogWindow())
     {
@@ -792,8 +800,6 @@ bool ConfigManager::loadAndApply()
                 dialog_fade_enabled_ = *v;
             if (auto v = (*g)["dialog_fade_timeout"].value<double>())
                 dialog_fade_timeout_ = static_cast<float>(*v);
-            if (auto v = (*g)["verbose_logging"].value<bool>())
-                setVerboseLogging(*v);
             if (auto v = (*g)["default_dialog_enabled"].value<bool>())
                 setDefaultDialogEnabled(*v);
             if (auto v = (*g)["default_quest_enabled"].value<bool>())
@@ -930,7 +936,15 @@ bool ConfigManager::loadAndApply()
             }
             markGlobalTranslationDirty();
         }
-        applyVerboseSetting();
+
+        // Parse [app.debug] section
+        if (auto* dbg = root["app"]["debug"].as_table())
+        {
+            if (auto v = (*dbg)["profiling_level"].value<int>())
+                setProfilingLevel(*v);
+            if (auto v = (*dbg)["logging_level"].value<int>())
+                setLoggingLevel(*v);
+        }
 
         default_dialog_state_.reset();
         if (auto* arr = root["dialogs"].as_array())
@@ -1156,21 +1170,62 @@ void ConfigManager::pollAndApply()
     }
 }
 
-void ConfigManager::setVerboseLogging(bool enabled)
+void ConfigManager::setProfilingLevel(int level)
 {
-    verbose_logging_ = enabled;
-    applyVerboseSetting();
+    // Clamp to valid range [0, 2]
+    level = std::max(0, std::min(2, level));
+
+    // Cap at build-time profiling level
+#ifndef DQX_PROFILING_LEVEL
+#define DQX_PROFILING_LEVEL 0
+#endif
+    profiling_level_ = std::min(level, DQX_PROFILING_LEVEL);
+
+    // Update profiling logger (instance 2) severity based on profiling level
+#if DQX_PROFILING_LEVEL >= 1
+    if (auto* prof_logger = plog::get<profiling::kProfilingLogInstance>())
+    {
+        if (profiling_level_ == 0)
+        {
+            // Disable profiling logs completely
+            prof_logger->setMaxSeverity(plog::none);
+        }
+        else
+        {
+            // Enable profiling logs (level 1=timer, level 2=tracy+timer both use debug severity)
+            prof_logger->setMaxSeverity(plog::debug);
+        }
+    }
+#endif
+
+    // Note: Runtime profiling level control is limited by compile-time DQX_PROFILING_LEVEL
+    // When DQX_PROFILING_LEVEL=0, profiling macros compile to no-ops regardless of runtime setting
 }
 
-void ConfigManager::setForceVerboseLogging(bool enabled)
+void ConfigManager::setLoggingLevel(int level)
 {
-    force_verbose_logging_ = enabled;
-    applyVerboseSetting();
-}
+    // Validate severity range [0=none, 6=verbose]
+    level = std::max(0, std::min(6, level));
+    logging_level_ = level;
 
-void ConfigManager::applyVerboseSetting()
-{
-    processing::Diagnostics::SetVerbose(force_verbose_logging_ || verbose_logging_);
+    auto severity = static_cast<plog::Severity>(level);
+
+    // Apply logging level to all plog instances
+    if (auto* logger = plog::get())
+    {
+        logger->setMaxSeverity(severity); // Instance 0: main logger (logs/run.log)
+    }
+
+    if (auto* diag_logger = plog::get<processing::Diagnostics::kLogInstance>())
+    {
+        diag_logger->setMaxSeverity(severity); // Instance 1: diagnostics logger (logs/dialog.log)
+    }
+
+    // Note: Profiling logger (instance 2) severity is controlled by profiling_level, not logging_level
+    // See setProfilingLevel() for profiling logger control
+
+    // Also update Diagnostics verbose mode (use debug or verbose level)
+    processing::Diagnostics::SetVerbose(level >= 5); // 5=debug, 6=verbose
 }
 
 void ConfigManager::markGlobalTranslationDirty()

@@ -35,12 +35,12 @@ public:
     // Append logs option
     bool getAppendLogs() const { return append_logs_; }
 
-    bool getVerboseLogging() const { return verbose_logging_; }
+    // Debug configuration
+    int getProfilingLevel() const { return profiling_level_; }
+    void setProfilingLevel(int level);
 
-    void setVerboseLogging(bool enabled);
-    void setForceVerboseLogging(bool enabled);
-
-    bool isForceVerboseLogging() const { return force_verbose_logging_; }
+    int getLoggingLevel() const { return logging_level_; }
+    void setLoggingLevel(int level);
 
     // Application mode
     AppMode getAppMode() const { return app_mode_; }
@@ -112,7 +112,6 @@ public:
 private:
     bool loadAndApply();
     bool applyDialogs(const struct DialogsSnapshot& snap); // fwd declen't exist, will implement inline
-    void applyVerboseSetting();
     void enforceDefaultDialogState();
     void enforceDefaultQuestState();
     void enforceDefaultWindowStates();
@@ -129,8 +128,11 @@ private:
     AppMode app_mode_ = AppMode::Normal;
     bool window_always_on_top_ = false;
     std::string ui_language_ = "en"; // GUI localization language code
-    bool verbose_logging_ = false;
-    bool force_verbose_logging_ = false;
+
+    // Debug configuration
+    int profiling_level_ = 0; // 0=disabled, 1=timer, 2=tracy+timer (capped by build-time DQX_PROFILING_LEVEL)
+    int logging_level_ = 4;   // plog severity: 0=none, 1=fatal, 2=error, 3=warning, 4=info, 5=debug, 6=verbose
+
     bool default_dialog_enabled_ = true;
     bool default_quest_enabled_ = true;
     std::string default_dialog_name_;
