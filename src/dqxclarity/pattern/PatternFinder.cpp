@@ -16,6 +16,16 @@ std::optional<uintptr_t> PatternFinder::FindInModule(const Pattern& pattern, con
     return scanner.ScanModule(pattern, module_name);
 }
 
+std::optional<uintptr_t> PatternFinder::FindInModuleWithRegions(const Pattern& pattern, const std::string& module_name,
+                                                                const std::vector<MemoryRegion>& regions)
+{
+    PROFILE_SCOPE_FUNCTION();
+    if (!memory_ || !memory_->IsProcessAttached())
+        return std::nullopt;
+    PatternScanner scanner(memory_);
+    return scanner.ScanModuleWithRegions(pattern, module_name, regions);
+}
+
 std::optional<uintptr_t> PatternFinder::FindInProcessExec(const Pattern& pattern)
 {
     PROFILE_SCOPE_FUNCTION();

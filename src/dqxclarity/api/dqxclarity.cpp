@@ -14,6 +14,7 @@
 #include "quest_message.hpp"
 #include "../util/SPSCRing.hpp"
 #include "../util/Profile.hpp"
+#include "../pattern/MemoryRegion.hpp"
 
 #include <chrono>
 #include <thread>
@@ -113,6 +114,13 @@ bool Engine::start_hook(StartPolicy policy)
         }
     }
 
+    // Parse memory regions once to avoid repeated parsing (optimization)
+    std::vector<MemoryRegion> cached_regions;
+    {
+        PROFILE_SCOPE_CUSTOM("Engine.ParseMemoryRegions");
+        cached_regions = MemoryRegionParser::ParseMaps(impl_->memory->GetAttachedPid());
+    }
+
     // Prepare the dialog hook FIRST but do not enable patch yet (we need its original bytes)
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallDialogHook");
@@ -121,6 +129,7 @@ bool Engine::start_hook(StartPolicy policy)
         impl_->hook->SetLogger(impl_->log);
         impl_->hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
         impl_->hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+        impl_->hook->SetCachedRegions(cached_regions);
         impl_->hook->SetOriginalBytesChangedCallback(
             [this](uintptr_t addr, const std::vector<uint8_t>& bytes)
             {
@@ -165,6 +174,7 @@ bool Engine::start_hook(StartPolicy policy)
         impl_->quest_hook->SetLogger(impl_->log);
         impl_->quest_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
         impl_->quest_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+        impl_->quest_hook->SetCachedRegions(cached_regions);
         if (impl_->quest_hook && !impl_->quest_hook->InstallHook(/*enable_patch=*/false))
         {
             if (impl_->log.warn)
@@ -193,6 +203,7 @@ bool Engine::start_hook(StartPolicy policy)
         impl_->corner_hook->SetLogger(impl_->log);
         impl_->corner_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
         impl_->corner_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+        impl_->corner_hook->SetCachedRegions(cached_regions);
         if (impl_->corner_hook && !impl_->corner_hook->InstallHook(/*enable_patch=*/false))
         {
             if (impl_->log.warn)

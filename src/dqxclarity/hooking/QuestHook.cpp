@@ -352,10 +352,21 @@ bool QuestHook::FindQuestTriggerAddress()
     PatternFinder finder(m_memory);
     const auto& pattern = Signatures::GetQuestText();
 
-    // Tier 1: Module-restricted scan
+    // Tier 1: Module-restricted scan (use cached regions if available)
     {
         PROFILE_SCOPE_CUSTOM("QuestHook.FindInModule");
-        if (auto addr = finder.FindInModule(pattern, "DQXGame.exe"))
+        std::optional<uintptr_t> addr;
+
+        if (!m_cached_regions.empty())
+        {
+            addr = finder.FindInModuleWithRegions(pattern, "DQXGame.exe", m_cached_regions);
+        }
+        else
+        {
+            addr = finder.FindInModule(pattern, "DQXGame.exe");
+        }
+
+        if (addr)
         {
             m_hook_address = *addr;
             if (m_verbose && m_logger.info)

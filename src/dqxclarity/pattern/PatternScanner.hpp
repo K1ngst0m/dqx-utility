@@ -23,6 +23,9 @@ public:
 
     std::optional<uintptr_t> ScanModule(const Pattern& pattern, const std::string& module_name);
 
+    std::optional<uintptr_t> ScanModuleWithRegions(const Pattern& pattern, const std::string& module_name,
+                                                   const std::vector<MemoryRegion>& regions);
+
     std::vector<uintptr_t> ScanProcessAll(const Pattern& pattern, bool require_executable = true);
 
 private:

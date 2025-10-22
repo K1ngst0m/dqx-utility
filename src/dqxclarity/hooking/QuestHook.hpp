@@ -4,6 +4,7 @@
 #include "Codegen.hpp"
 #include "../memory/MemoryPatch.hpp"
 #include "../api/dqxclarity.hpp"
+#include "../pattern/MemoryRegion.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -42,6 +43,9 @@ public:
 
     void SetReadbackBytes(size_t n) { m_readback_n = n; }
 
+    // Set pre-parsed memory regions to avoid repeated ParseMaps calls
+    void SetCachedRegions(const std::vector<MemoryRegion>& regions) { m_cached_regions = regions; }
+
     bool PollQuestData();
 
     const QuestData& GetLastQuest() const { return m_last_data; }
@@ -74,6 +78,9 @@ private:
     bool m_instr_safe = true;
     size_t m_readback_n = 16;
     dqxclarity::Logger m_logger{};
+
+    // Cached memory regions
+    std::vector<MemoryRegion> m_cached_regions;
 
     QuestData m_last_data;
 

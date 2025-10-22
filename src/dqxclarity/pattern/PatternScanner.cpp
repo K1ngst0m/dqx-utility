@@ -217,6 +217,21 @@ std::optional<uintptr_t> PatternScanner::ScanModule(const Pattern& pattern, cons
         total_regions = regions.size();
     }
 
+    return ScanModuleWithRegions(pattern, module_name, regions);
+}
+
+std::optional<uintptr_t> PatternScanner::ScanModuleWithRegions(const Pattern& pattern, const std::string& module_name,
+                                                               const std::vector<MemoryRegion>& regions)
+{
+    PROFILE_SCOPE_FUNCTION();
+    if (!m_memory->IsProcessAttached())
+    {
+        return std::nullopt;
+    }
+
+    size_t matched_regions = 0;
+    constexpr size_t MAX_REGION_SIZE = 10 * 1024 * 1024; // 10MB - skip huge regions
+
     for (const auto& region : regions)
     {
         if (region.pathname.find(module_name) == std::string::npos)
@@ -225,6 +240,12 @@ std::optional<uintptr_t> PatternScanner::ScanModule(const Pattern& pattern, cons
         }
 
         if (!region.IsReadable())
+        {
+            continue;
+        }
+
+        // Skip unreasonably large regions (likely data, not code)
+        if (region.Size() > MAX_REGION_SIZE)
         {
             continue;
         }

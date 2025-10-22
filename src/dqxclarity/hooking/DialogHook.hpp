@@ -5,6 +5,7 @@
 #include "../console/IConsoleSink.hpp"
 #include "../api/dqxclarity.hpp"
 #include "../memory/MemoryPatch.hpp"
+#include "../pattern/MemoryRegion.hpp"
 #include <memory>
 #include <vector>
 #include <string>
@@ -53,6 +54,9 @@ public:
 
     void SetReadbackBytes(size_t n) { m_readback_n = n; }
 
+    // Set pre-parsed memory regions to avoid repeated ParseMaps calls
+    void SetCachedRegions(const std::vector<MemoryRegion>& regions) { m_cached_regions = regions; }
+
     // Poll for new dialog data (call this periodically in a loop)
     bool PollDialogData();
 
@@ -85,6 +89,9 @@ private:
     dqxclarity::Logger m_logger{};
     bool m_instr_safe = true;
     size_t m_readback_n = 16;
+
+    // Cached memory regions
+    std::vector<MemoryRegion> m_cached_regions;
 
     // Dialog data
     mutable std::string m_last_dialog_text;

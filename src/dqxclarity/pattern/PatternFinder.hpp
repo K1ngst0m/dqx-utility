@@ -23,6 +23,10 @@ public:
     // Scan a specific module's mapped regions
     std::optional<uintptr_t> FindInModule(const Pattern& pattern, const std::string& module_name);
 
+    // Optimized: scan with pre-parsed regions (avoids repeated ParseMaps calls)
+    std::optional<uintptr_t> FindInModuleWithRegions(const Pattern& pattern, const std::string& module_name,
+                                                     const std::vector<MemoryRegion>& regions);
+
     // Scan all process regions that are executable
     std::optional<uintptr_t> FindInProcessExec(const Pattern& pattern);
 
