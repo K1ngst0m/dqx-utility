@@ -126,6 +126,8 @@ target_sources(dqxu_core
     utils/CrashHandler.hpp
     utils/ErrorReporter.cpp
     utils/ErrorReporter.hpp
+    utils/LogManager.cpp
+    utils/LogManager.hpp
     utils/HttpCommon.cpp
     utils/HttpCommon.hpp
     utils/NativeMessageBox.cpp

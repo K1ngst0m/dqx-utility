@@ -22,26 +22,52 @@ namespace
 constexpr std::size_t kMaxLogFileSize = 10u * 1024u * 1024u;
 constexpr std::size_t kLogFileBackups = 3;
 
+bool ShouldAppendQuestLog()
+{
+    static bool append_mode = true;
+    static std::once_flag check_once;
+    std::call_once(check_once, []
+    {
+        std::ifstream marker(".dqx_append_logs");
+        if (marker.is_open())
+        {
+            std::string value;
+            if (std::getline(marker, value) && value == "false")
+            {
+                append_mode = false;
+            }
+        }
+    });
+    return append_mode;
+}
+
 void WriteQuestLog(const QuestHook::QuestData& data)
 {
     static std::once_flag once;
     static std::mutex log_mutex;
+    static bool first_write = true;
 
-    std::call_once(once,
-                   []
-                   {
-                       try
-                       {
-                           std::filesystem::create_directories("logs");
-                       }
-                       catch (...)
-                       {
-                       }
-                   });
+    std::call_once(once, []
+    {
+        try
+        {
+            std::filesystem::create_directories("logs");
+        }
+        catch (...)
+        {
+        }
+    });
 
     std::lock_guard<std::mutex> lock(log_mutex);
 
-    std::ofstream stream("logs/quest.log", std::ios::app);
+    auto mode = std::ios::app;
+    if (first_write)
+    {
+        mode = ShouldAppendQuestLog() ? std::ios::app : std::ios::trunc;
+        first_write = false;
+    }
+
+    std::ofstream stream("logs/quest.log", mode);
     if (!stream.is_open())
     {
         return;

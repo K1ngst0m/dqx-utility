@@ -16,54 +16,8 @@ namespace processing
 std::atomic<bool> Diagnostics::verbose_{ false };
 std::atomic<std::size_t> Diagnostics::max_preview_{ 160 };
 
-namespace
-{
-std::once_flag g_logger_once;
-}
-
-void Diagnostics::InitializeLogger(bool append)
-{
-    std::call_once(
-        g_logger_once,
-        [append]
-        {
-            std::error_code ec;
-            std::filesystem::create_directories("logs", ec);
-            if (ec)
-            {
-                utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
-                                                    "Failed to create diagnostics log directory", ec.message());
-            }
-
-            // Clear log file if not appending
-            if (!append)
-            {
-                std::ofstream clear_file("logs/dialog.log", std::ios::trunc);
-                clear_file.close();
-            }
-
-            try
-            {
-                static plog::RollingFileAppender<plog::TxtFormatter> dialog_appender("logs/dialog.log",
-                                                                                     1024 * 1024 * 10, 3);
-                plog::init<kLogInstance>(plog::info, &dialog_appender);
-            }
-            catch (const std::exception& ex)
-            {
-                utils::ErrorReporter::ReportError(utils::ErrorCategory::Initialization,
-                                                  "Failed to initialize diagnostics logger", ex.what());
-            }
-            catch (...)
-            {
-                utils::ErrorReporter::ReportError(utils::ErrorCategory::Initialization,
-                                                  "Failed to initialize diagnostics logger", "Unknown exception");
-            }
-        });
-}
-
 void Diagnostics::SetVerbose(bool enabled) noexcept
 {
-    InitializeLogger();
     verbose_.store(enabled, std::memory_order_relaxed);
 }
 
@@ -80,7 +34,6 @@ std::size_t Diagnostics::MaxPreview() noexcept { return max_preview_.load(std::m
 
 std::string Diagnostics::Preview(std::string_view text)
 {
-    InitializeLogger();
     const std::size_t limit = MaxPreview();
     std::string out;
     out.reserve(std::min(text.size(), limit) + 16);

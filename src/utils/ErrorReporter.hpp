@@ -130,7 +130,7 @@ public:
      * @param path Path to the log file
      * @param append If true, append to existing log; if false, clear the log first
      */
-    static void InitializeLogFile(const std::string& path, bool append = true);
+    static void InitializeLogFile(const std::string& path, std::ios::openmode mode = std::ios::app);
 
     /**
      * @brief Get string representation of error category

@@ -13,7 +13,6 @@ class Diagnostics
 public:
     static constexpr int kLogInstance = 1;
 
-    static void InitializeLogger(bool append = true);
     static void SetVerbose(bool enabled) noexcept;
     [[nodiscard]] static bool IsVerbose() noexcept;
 

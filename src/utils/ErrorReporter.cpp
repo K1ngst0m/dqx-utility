@@ -144,11 +144,10 @@ void ErrorReporter::ClearHistory()
     s_error_history.clear();
 }
 
-void ErrorReporter::InitializeLogFile(const std::string& path, bool append)
+void ErrorReporter::InitializeLogFile(const std::string& path, std::ios::openmode mode)
 {
     std::lock_guard<std::mutex> lock(s_mutex);
     s_log_path = path;
-    auto mode = append ? std::ios::app : std::ios::trunc;
     std::ofstream ofs(s_log_path, mode);
     if (ofs)
     {

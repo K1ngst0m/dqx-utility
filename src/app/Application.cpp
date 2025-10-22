@@ -12,6 +12,7 @@
 #include "utils/CrashHandler.hpp"
 #include "ui/Localization.hpp"
 #include "utils/ErrorReporter.hpp"
+#include "utils/LogManager.hpp"
 #include "services/DQXClarityService.hpp"
 #include "processing/Diagnostics.hpp"
 #include "utils/Profile.hpp"
@@ -112,52 +113,32 @@ bool Application::initializeLogging()
 {
     PROFILE_SCOPE_FUNCTION();
 
-    std::error_code dir_ec;
-    std::filesystem::create_directories("logs", dir_ec);
-    if (dir_ec)
+    if (!utils::LogManager::Initialize())
     {
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Unable to prepare log directory",
-                                            dir_ec.message());
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
+                                           "Failed to initialize logging system", "");
+        return false;
     }
 
-    // Early read of append_logs setting from config.toml and set global flag
-    bool append_logs = true; // Default to append mode
-    try
-    {
-        auto cfg = toml::parse_file("config.toml");
-        if (auto global = cfg["global"].as_table())
-        {
-            if (auto append = (*global)["append_logs"].value<bool>())
-            {
-                append_logs = *append;
-            }
-        }
-    }
-    catch (...)
-    {
-    }
+    utils::LogManager::RegisterLogger<0>({
+        .name = "main",
+        .filepath = "logs/run.log",
+        .add_console_appender = true
+    });
 
-    utils::ErrorReporter::InitializeLogFile("logs/error.log", append_logs);
-    processing::Diagnostics::InitializeLogger(append_logs);
+    utils::LogManager::RegisterLogger<1>({
+        .name = "diagnostics",
+        .filepath = "logs/dialog.log"
+    });
 
 #if DQX_PROFILING_LEVEL >= 1
-    profiling::InitializeProfilingLogger(append_logs);
+    utils::LogManager::RegisterLogger<2>({
+        .name = "profiling",
+        .filepath = "logs/profiling.log",
+    });
 #endif
 
     parseCommandLineArgs();
-
-    if (!append_logs)
-    {
-        std::ofstream("logs/run.log", std::ios::trunc).close();
-        std::ofstream("logs/quest.log", std::ios::trunc).close();
-        std::ofstream("logs/network.log", std::ios::trunc).close();
-    }
-
-    static plog::RollingFileAppender<plog::TxtFormatter> file_appender("logs/run.log", 1024 * 1024 * 10, 3);
-    static plog::ConsoleAppender<plog::TxtFormatter> console_appender;
-    plog::init(plog::info, &file_appender);
-    if (auto logger = plog::get())
-        logger->addAppender(&console_appender);
 
     return true;
 }
