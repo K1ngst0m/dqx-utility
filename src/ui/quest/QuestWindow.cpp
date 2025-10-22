@@ -417,6 +417,30 @@ std::string buildRewardDisplay(const std::vector<RewardEntry>& base_entries, con
     return result;
 }
 
+/// @brief Strip count suffixes from reward text before translation
+/// @param text Raw reward text (e.g., "猫の鎖5こ\n・経験値1000")
+/// @return Text without counts (e.g., "猫の鎖\n・経験値") suitable for translation
+std::string stripCountsFromRewardText(const std::string& text)
+{
+    auto entries = parseRewardEntries(text);
+    if (entries.empty())
+        return text;
+
+    std::string result;
+    for (const auto& entry : entries)
+    {
+        if (!result.empty())
+            result += '\n';
+
+        if (entry.has_bullet)
+            result += kBullet;
+
+        result += entry.name;
+    }
+
+    return result;
+}
+
 bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string& reason)
 {
     using translate::Backend;
@@ -796,13 +820,15 @@ void QuestWindow::renderQuestContent(float wrap_width)
         ImGui::Spacing();
     }
 
-    ImVec2 title_size = ImGui::CalcTextSize(quest_label.c_str(), nullptr, false, wrap_width);
-    ImVec2 title_pos = ImGui::GetCursorScreenPos();
-    title_pos.x = ImGui::GetWindowPos().x + state_.ui_state().padding.x + (wrap_width - title_size.x) * 0.5f;
-    title_pos.y = ImGui::GetCursorScreenPos().y;
     const float base_font_size = ImGui::GetFontSize();
     const float title_font_scale = 1.25f;
     const float title_font_size = base_font_size * title_font_scale;
+    ImVec2 title_size = ImGui::CalcTextSize(quest_label.c_str(), nullptr, false, wrap_width);
+    // Scale title size for actual rendered size at larger font
+    title_size.x *= title_font_scale;
+    float start_x = ImGui::GetCursorPosX() + std::max(0.0f, (wrap_width - title_size.x) * 0.5f);
+    ImVec2 title_pos = ImGui::GetCursorScreenPos();
+    title_pos.x = ImGui::GetWindowPos().x + start_x;
     ui::RenderOutlinedText(quest_label.c_str(), title_pos, ImGui::GetFont(), title_font_size, wrap_width);
     const float title_height = ImGui::GetTextLineHeightWithSpacing() * title_font_scale;
     ImGui::Dummy(ImVec2(0.0f, title_height));
@@ -1281,8 +1307,9 @@ void QuestWindow::submitTranslationRequest()
     submitFieldTranslation(QuestField::SubQuest, state_.quest.subquest_name, config);
     submitFieldTranslation(QuestField::Title, state_.quest.quest_name, config);
     submitFieldTranslation(QuestField::Description, state_.quest.description, config);
-    submitFieldTranslation(QuestField::Rewards, state_.quest.rewards, config);
-    submitFieldTranslation(QuestField::RepeatRewards, state_.quest.repeat_rewards, config);
+    // Strip counts from rewards before translation to avoid duplicate counting (e.g., "5こ" and "×5")
+    submitFieldTranslation(QuestField::Rewards, stripCountsFromRewardText(state_.quest.rewards), config);
+    submitFieldTranslation(QuestField::RepeatRewards, stripCountsFromRewardText(state_.quest.repeat_rewards), config);
 
     refreshTranslationFlags();
 }
