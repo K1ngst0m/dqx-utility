@@ -1,9 +1,20 @@
 #include "PatternScanner.hpp"
 
 #include "../util/Profile.hpp"
+#include <algorithm>
+#include <cctype>
 
 namespace dqxclarity
 {
+
+// Helper function for case-insensitive string comparison
+static std::string ToLowerCase(const std::string& str)
+{
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return result;
+}
 
 PatternScanner::PatternScanner(std::shared_ptr<IProcessMemory> memory)
     : m_memory(memory)
@@ -232,9 +243,15 @@ std::optional<uintptr_t> PatternScanner::ScanModuleWithRegions(const Pattern& pa
     size_t matched_regions = 0;
     constexpr size_t MAX_REGION_SIZE = 10 * 1024 * 1024; // 10MB - skip huge regions
 
+    // Case-insensitive module name for matching
+    std::string module_name_lower = ToLowerCase(module_name);
+    std::vector<std::string> matched_pathnames;
+
     for (const auto& region : regions)
     {
-        if (region.pathname.find(module_name) == std::string::npos)
+        // Case-insensitive pathname matching
+        std::string pathname_lower = ToLowerCase(region.pathname);
+        if (pathname_lower.find(module_name_lower) == std::string::npos)
         {
             continue;
         }
@@ -251,6 +268,13 @@ std::optional<uintptr_t> PatternScanner::ScanModuleWithRegions(const Pattern& pa
         }
 
         matched_regions++;
+
+        // Store first 3 matched pathnames for diagnostics
+        if (matched_pathnames.size() < 3)
+        {
+            matched_pathnames.push_back(region.pathname);
+        }
+
         std::optional<uintptr_t> result;
         {
             PROFILE_SCOPE_CUSTOM("ScanModule.RegionIteration");
