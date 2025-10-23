@@ -711,26 +711,54 @@ void IntegrityDetour::Remove()
 {
     if (!m_installed)
         return;
-    if (m_integrity_addr != 0 && !m_original_bytes.empty())
+
+    try
     {
-        // restore original bytes
-        (void)m_memory->WriteMemory(m_integrity_addr, m_original_bytes.data(), m_original_bytes.size());
-        m_memory->FlushInstructionCache(m_integrity_addr, m_original_bytes.size());
-        if (m_verbose)
-            LogBytes("Integrity restored", m_integrity_addr, (std::max<size_t>)(m_original_bytes.size(), (size_t)8));
+        if (m_integrity_addr != 0 && !m_original_bytes.empty())
+        {
+            // restore original bytes
+            if (!m_memory->WriteMemory(m_integrity_addr, m_original_bytes.data(), m_original_bytes.size()))
+            {
+                if (m_log.error)
+                    m_log.error("Failed to restore original bytes at integrity address during cleanup");
+            }
+            m_memory->FlushInstructionCache(m_integrity_addr, m_original_bytes.size());
+            if (m_verbose)
+                LogBytes("Integrity restored", m_integrity_addr, (std::max<size_t>)(m_original_bytes.size(), (size_t)8));
+        }
+        if (m_trampoline_addr)
+        {
+            if (!m_memory->FreeMemory(m_trampoline_addr, 128))
+            {
+                if (m_log.error)
+                    m_log.error("Failed to free trampoline memory during cleanup");
+            }
+            m_trampoline_addr = 0;
+        }
+        if (m_state_addr)
+        {
+            if (!m_memory->FreeMemory(m_state_addr, 8))
+            {
+                if (m_log.error)
+                    m_log.error("Failed to free state memory during cleanup");
+            }
+            m_state_addr = 0;
+        }
+        m_original_bytes.clear();
+        m_installed = false;
     }
-    if (m_trampoline_addr)
+    catch (const std::exception& e)
     {
-        (void)m_memory->FreeMemory(m_trampoline_addr, 128);
-        m_trampoline_addr = 0;
+        if (m_log.error)
+            m_log.error("Exception during IntegrityDetour cleanup: " + std::string(e.what()));
+        m_installed = false; // Mark as not installed even on failure
     }
-    if (m_state_addr)
+    catch (...)
     {
-        (void)m_memory->FreeMemory(m_state_addr, 8);
-        m_state_addr = 0;
+        if (m_log.error)
+            m_log.error("Unknown exception during IntegrityDetour cleanup");
+        m_installed = false;
     }
-    m_original_bytes.clear();
-    m_installed = false;
 }
 
 size_t IntegrityDetour::DecodeInstrLen(const uint8_t* p, size_t max)

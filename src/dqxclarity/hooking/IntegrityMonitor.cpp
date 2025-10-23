@@ -15,10 +15,12 @@ bool IntegrityMonitor::start()
         [this]
         {
             using namespace std::chrono_literals;
-            bool first = true;
-            uint32_t hits = 0;
-            while (!stop_.load())
+            try
             {
+                bool first = true;
+                uint32_t hits = 0;
+                while (!stop_.load())
+                {
                 uint8_t flag = 0;
                 if (memory_->ReadMemory(state_addr_, &flag, 1) && flag == 1)
                 {
@@ -42,12 +44,46 @@ bool IntegrityMonitor::start()
                     // Delay before re-applying the dialog hook to avoid racing the checker
                     std::this_thread::sleep_for(std::chrono::milliseconds(2500));
                     if (on_integrity_)
-                        on_integrity_(first);
+                    {
+                        try
+                        {
+                            on_integrity_(first);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            if (log_.error)
+                            {
+                                log_.error("Integrity callback threw exception: " + std::string(e.what()));
+                            }
+                        }
+                        catch (...)
+                        {
+                            if (log_.error)
+                            {
+                                log_.error("Integrity callback threw unknown exception");
+                            }
+                        }
+                    }
                     first = false;
                     uint8_t zero = 0;
                     (void)memory_->WriteMemory(state_addr_, &zero, 1);
                 }
                 std::this_thread::sleep_for(1ms);
+            }
+            }
+            catch (const std::exception& e)
+            {
+                if (log_.error)
+                {
+                    log_.error("IntegrityMonitor thread crashed with exception: " + std::string(e.what()));
+                }
+            }
+            catch (...)
+            {
+                if (log_.error)
+                {
+                    log_.error("IntegrityMonitor thread crashed with unknown exception");
+                }
             }
         });
     return true;

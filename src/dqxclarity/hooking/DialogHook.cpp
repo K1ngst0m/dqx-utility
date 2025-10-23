@@ -174,27 +174,52 @@ bool DialogHook::RemoveHook()
         return true;
     }
 
-    if (m_verbose)
-        std::cout << "Removing dialog hook...\n";
-    RestoreOriginalFunction();
-
-    // Free allocated memory
-    if (m_detour_address != 0)
+    try
     {
-        m_memory->FreeMemory(m_detour_address, 4096);
-        m_detour_address = 0;
-    }
+        if (m_verbose)
+            std::cout << "Removing dialog hook...\n";
+        RestoreOriginalFunction();
 
-    if (m_backup_address != 0)
+        // Free allocated memory
+        if (m_detour_address != 0)
+        {
+            if (!m_memory->FreeMemory(m_detour_address, 4096))
+            {
+                if (m_logger.error)
+                    m_logger.error("Failed to free detour memory during cleanup");
+            }
+            m_detour_address = 0;
+        }
+
+        if (m_backup_address != 0)
+        {
+            if (!m_memory->FreeMemory(m_backup_address, 256))
+            {
+                if (m_logger.error)
+                    m_logger.error("Failed to free backup memory during cleanup");
+            }
+            m_backup_address = 0;
+        }
+
+        m_is_installed = false;
+        if (m_verbose)
+            std::cout << "Dialog hook removed successfully!\n";
+        return true;
+    }
+    catch (const std::exception& e)
     {
-        m_memory->FreeMemory(m_backup_address, 256);
-        m_backup_address = 0;
+        if (m_logger.error)
+            m_logger.error("Exception during DialogHook cleanup: " + std::string(e.what()));
+        m_is_installed = false; // Mark as not installed even on failure
+        return false;
     }
-
-    m_is_installed = false;
-    if (m_verbose)
-        std::cout << "Dialog hook removed successfully!\n";
-    return true;
+    catch (...)
+    {
+        if (m_logger.error)
+            m_logger.error("Unknown exception during DialogHook cleanup");
+        m_is_installed = false;
+        return false;
+    }
 }
 
 bool DialogHook::FindDialogTriggerAddress()
@@ -558,7 +583,11 @@ void DialogHook::RestoreOriginalFunction()
 {
     if (m_hook_address != 0 && !m_original_bytes.empty())
     {
-        m_memory->WriteMemory(m_hook_address, m_original_bytes.data(), m_original_bytes.size());
+        if (!m_memory->WriteMemory(m_hook_address, m_original_bytes.data(), m_original_bytes.size()))
+        {
+            if (m_logger.error)
+                m_logger.error("Failed to restore original bytes at hook address during cleanup");
+        }
     }
 }
 

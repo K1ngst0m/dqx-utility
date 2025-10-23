@@ -95,7 +95,7 @@ Engine::Engine()
 {
 }
 
-Engine::~Engine() { stop_hook(); }
+Engine::~Engine() noexcept { stop_hook(); }
 
 bool Engine::initialize(const Config& cfg, Logger loggers)
 {
@@ -545,17 +545,20 @@ bool Engine::start_hook(StartPolicy policy)
         [this]
         {
             using namespace std::chrono_literals;
-            while (!impl_->poll_stop.load())
+            try
             {
+                while (!impl_->poll_stop.load())
+                {
                 auto now = std::chrono::steady_clock::now();
 
                 // Phase 1: Capture from both sources to pending queue (no immediate publish)
 
-                // Hook-based capture
-                if (impl_->hook && impl_->hook->PollDialogData())
+                // Hook-based capture (safe pointer capture to avoid TOCTOU race)
+                auto hook_ptr = impl_->hook.get();
+                if (hook_ptr && hook_ptr->PollDialogData())
                 {
-                    std::string text = impl_->hook->GetLastDialogText();
-                    std::string speaker = impl_->hook->GetLastNpcName();
+                    std::string text = hook_ptr->GetLastDialogText();
+                    std::string speaker = hook_ptr->GetLastNpcName();
                     if (!text.empty())
                     {
                         // Add to pending queue
@@ -591,11 +594,12 @@ bool Engine::start_hook(StartPolicy policy)
                     }
                 }
 
-                // Memory reader capture
-                if (impl_->memory_reader && impl_->memory_reader->PollDialogData())
+                // Memory reader capture (safe pointer capture to avoid TOCTOU race)
+                auto memory_reader_ptr = impl_->memory_reader.get();
+                if (memory_reader_ptr && memory_reader_ptr->PollDialogData())
                 {
-                    std::string text = impl_->memory_reader->GetLastDialogText();
-                    std::string speaker = impl_->memory_reader->GetLastNpcName();
+                    std::string text = memory_reader_ptr->GetLastDialogText();
+                    std::string speaker = memory_reader_ptr->GetLastNpcName();
                     if (!text.empty())
                     {
                         // Add to pending queue
@@ -781,10 +785,12 @@ bool Engine::start_hook(StartPolicy policy)
                         }
                     }
                 }
-                if (impl_->quest_hook && impl_->quest_hook->PollQuestData())
+                // Quest hook polling (safe pointer capture to avoid TOCTOU race)
+                auto quest_hook_ptr = impl_->quest_hook.get();
+                if (quest_hook_ptr && quest_hook_ptr->PollQuestData())
                 {
                     QuestMessage snapshot;
-                    const auto& quest = impl_->quest_hook->GetLastQuest();
+                    const auto& quest = quest_hook_ptr->GetLastQuest();
                     snapshot.subquest_name = quest.subquest_name;
                     snapshot.quest_name = quest.quest_name;
                     snapshot.description = quest.description;
@@ -798,13 +804,17 @@ bool Engine::start_hook(StartPolicy policy)
                         impl_->quest_valid = true;
                     }
                 }
-                if (impl_->network_hook)
+                // Network hook polling (safe pointer capture to avoid TOCTOU race)
+                auto network_hook_ptr = impl_->network_hook.get();
+                if (network_hook_ptr)
                 {
-                    (void)impl_->network_hook->PollNetworkText();
+                    (void)network_hook_ptr->PollNetworkText();
                 }
-                if (impl_->corner_hook && impl_->corner_hook->PollCornerText())
+                // Corner hook polling (safe pointer capture to avoid TOCTOU race)
+                auto corner_hook_ptr = impl_->corner_hook.get();
+                if (corner_hook_ptr && corner_hook_ptr->PollCornerText())
                 {
-                    const std::string& captured = impl_->corner_hook->GetLastText();
+                    const std::string& captured = corner_hook_ptr->GetLastText();
                     if (!captured.empty())
                     {
                         DialogStreamItem stream_item;
@@ -817,6 +827,23 @@ bool Engine::start_hook(StartPolicy policy)
                 }
                 std::this_thread::sleep_for(100ms);
             }
+            }
+            catch (const std::exception& e)
+            {
+                if (impl_->log.error)
+                {
+                    impl_->log.error("Polling thread crashed with exception: " + std::string(e.what()));
+                }
+                status_ = Status::Error;
+            }
+            catch (...)
+            {
+                if (impl_->log.error)
+                {
+                    impl_->log.error("Polling thread crashed with unknown exception");
+                }
+                status_ = Status::Error;
+            }
         });
 
     status_ = Status::Hooked;
@@ -828,50 +855,72 @@ bool Engine::stop_hook()
     if (status_ == Status::Stopped || status_ == Status::Stopping)
         return true;
     status_ = Status::Stopping;
-    impl_->poll_stop.store(true);
-    if (impl_->poller.joinable())
-        impl_->poller.join();
 
+    try
     {
-        std::lock_guard<std::mutex> lock(impl_->quest_mutex);
-        impl_->quest_valid = false;
-    }
+        impl_->poll_stop.store(true);
+        if (impl_->poller.joinable())
+            impl_->poller.join();
 
-    if (impl_->monitor)
-    {
-        impl_->monitor->stop();
-        impl_->monitor.reset();
+        {
+            std::lock_guard<std::mutex> lock(impl_->quest_mutex);
+            impl_->quest_valid = false;
+        }
+
+        if (impl_->monitor)
+        {
+            impl_->monitor->stop();
+            impl_->monitor.reset();
+        }
+        if (impl_->quest_hook)
+        {
+            impl_->quest_hook->RemoveHook();
+            impl_->quest_hook.reset();
+        }
+        if (impl_->network_hook)
+        {
+            impl_->network_hook->RemoveHook();
+            impl_->network_hook.reset();
+        }
+        if (impl_->corner_hook)
+        {
+            impl_->corner_hook->RemoveHook();
+            impl_->corner_hook.reset();
+        }
+        if (impl_->hook)
+        {
+            impl_->hook->RemoveHook();
+            impl_->hook.reset();
+        }
+        if (impl_->integrity)
+        {
+            impl_->integrity->Remove();
+            impl_->integrity.reset();
+        }
+        impl_->memory.reset();
+        if (impl_->log.info)
+            impl_->log.info("Hook removed");
+        status_ = Status::Stopped;
+        return true;
     }
-    if (impl_->quest_hook)
+    catch (const std::exception& e)
     {
-        impl_->quest_hook->RemoveHook();
-        impl_->quest_hook.reset();
+        if (impl_->log.error)
+        {
+            impl_->log.error("Exception during hook cleanup: " + std::string(e.what()));
+        }
+        status_ = Status::Error;
+        return false;
     }
-    if (impl_->network_hook)
+    catch (...)
     {
-        impl_->network_hook->RemoveHook();
-        impl_->network_hook.reset();
+        if (impl_->log.error)
+        {
+            impl_->log.error("Unknown exception during hook cleanup");
+        }
+        status_ = Status::Error;
+        return false;
     }
-    if (impl_->corner_hook)
-    {
-        impl_->corner_hook->RemoveHook();
-        impl_->corner_hook.reset();
-    }
-    if (impl_->hook)
-    {
-        impl_->hook->RemoveHook();
-        impl_->hook.reset();
-    }
-    if (impl_->integrity)
-    {
-        impl_->integrity->Remove();
-        impl_->integrity.reset();
-    }
-    impl_->memory.reset();
-    if (impl_->log.info)
-        impl_->log.info("Hook removed");
-    status_ = Status::Stopped;
-    return true;
 }
 
 bool Engine::drain(std::vector<DialogMessage>& out) { return impl_->ring.pop_all(out) > 0; }
