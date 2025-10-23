@@ -42,13 +42,13 @@ bool LogManager::Initialize()
     return true;
 }
 
-template<int InstanceId>
+template <int InstanceId>
 bool LogManager::RegisterLogger(const LoggerConfig& config)
 {
     if (!s_initialized)
     {
         ErrorReporter::ReportError(ErrorCategory::Initialization,
-                                  "LogManager not initialized before registering logger", config.name);
+                                   "LogManager not initialized before registering logger", config.name);
         return false;
     }
 
@@ -82,8 +82,8 @@ bool LogManager::RegisterLogger(const LoggerConfig& config)
     }
     catch (const std::exception& ex)
     {
-        ErrorReporter::ReportError(ErrorCategory::Initialization,
-                                  "Failed to register logger: " + config.name, ex.what());
+        ErrorReporter::ReportError(ErrorCategory::Initialization, "Failed to register logger: " + config.name,
+                                   ex.what());
         return false;
     }
 }
@@ -101,15 +101,9 @@ void LogManager::Shutdown()
     s_initialized = false;
 }
 
-bool LogManager::IsAppendMode()
-{
-    return s_append_logs;
-}
+bool LogManager::IsAppendMode() { return s_append_logs; }
 
-plog::Severity LogManager::GetDefaultLogLevel()
-{
-    return s_default_level;
-}
+plog::Severity LogManager::GetDefaultLogLevel() { return s_default_level; }
 
 void LogManager::PrepareLogDirectory()
 {
@@ -117,8 +111,7 @@ void LogManager::PrepareLogDirectory()
     std::filesystem::create_directories("logs", ec);
     if (ec)
     {
-        ErrorReporter::ReportWarning(ErrorCategory::Initialization,
-                                     "Unable to prepare log directory", ec.message());
+        ErrorReporter::ReportWarning(ErrorCategory::Initialization, "Unable to prepare log directory", ec.message());
     }
 }
 

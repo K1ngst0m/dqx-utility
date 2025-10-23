@@ -60,8 +60,7 @@ public:
     {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start_);
-        PLOG_DEBUG_(profiling::kProfilingLogInstance) << "[PROFILE] " << name_ << " took " << duration.count()
-                                                      << " μs";
+        PLOG_DEBUG_(profiling::kProfilingLogInstance) << "[PROFILE] " << name_ << " took " << duration.count() << " μs";
     }
 
     // Non-copyable, non-movable
@@ -182,7 +181,7 @@ inline void SetThreadName(const char* name) noexcept
 #define PROFILE_SCOPE() ((void)0)
 #define PROFILE_SCOPE_FUNCTION() ((void)0)
 #define PROFILE_SCOPE_CUSTOM(nameExpr) ((void)sizeof(nameExpr))
-#define PROFILE_SCOPE_FRAME() ((void)0) 
+#define PROFILE_SCOPE_FRAME() ((void)0)
 #define PROFILE_THREAD_NAME(nameExpr) ((void)0)
 #define PROFILE_FRAME_MARK() ((void)0)
 #define PROFILE_FRAME_STATS(accumulator) ((void)0)
@@ -192,27 +191,27 @@ inline void SetThreadName(const char* name) noexcept
 #define PROFILE_SCOPE() ::profiling::detail::ScopeTimer __profiling_timer(__FUNCTION__)
 #define PROFILE_SCOPE_FUNCTION() ::profiling::detail::ScopeTimer __profiling_timer(__FUNCTION__)
 #define PROFILE_SCOPE_CUSTOM(nameExpr) ::profiling::detail::ScopeTimer __profiling_timer(nameExpr)
-#define PROFILE_SCOPE_FRAME() ((void)0) 
+#define PROFILE_SCOPE_FRAME() ((void)0)
 #define PROFILE_THREAD_NAME(nameExpr) ((void)0)
 #define PROFILE_FRAME_MARK() ((void)0)
 #define PROFILE_FRAME_STATS(accumulator) (accumulator).recordFrame()
 
 #elif DQX_PROFILING_LEVEL >= 2
 // Level 2: Tracy + Timer - Full profiling with real-time visualization and logging
-#define PROFILE_SCOPE()                                                                                       \
-    ZoneScoped;                                                                                               \
+#define PROFILE_SCOPE() \
+    ZoneScoped;         \
     ::profiling::detail::ScopeTimer __profiling_timer(__FUNCTION__)
 
-#define PROFILE_SCOPE_FUNCTION()                                                                              \
-    ZoneScopedN(__FUNCTION__);                                                                                \
+#define PROFILE_SCOPE_FUNCTION() \
+    ZoneScopedN(__FUNCTION__);   \
     ::profiling::detail::ScopeTimer __profiling_timer(__FUNCTION__)
 
-#define PROFILE_SCOPE_CUSTOM(nameExpr)                                                                        \
-    ZoneScoped;                                                                                               \
-    ::profiling::detail::ScopeTimer __profiling_timer(nameExpr);                                              \
+#define PROFILE_SCOPE_CUSTOM(nameExpr)                                                                              \
+    ZoneScoped;                                                                                                     \
+    ::profiling::detail::ScopeTimer __profiling_timer(nameExpr);                                                    \
     if (auto __profiling_scope_name = ::profiling::detail::ToStringView(nameExpr); !__profiling_scope_name.empty()) \
-    {                                                                                                         \
-        ZoneName(__profiling_scope_name.data(), ::profiling::detail::clampLength(__profiling_scope_name.size())); \
+    {                                                                                                               \
+        ZoneName(__profiling_scope_name.data(), ::profiling::detail::clampLength(__profiling_scope_name.size()));   \
     }
 
 #define PROFILE_SCOPE_FRAME() ZoneScopedN(__FUNCTION__)

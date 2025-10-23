@@ -26,18 +26,19 @@ bool ShouldAppendQuestLog()
 {
     static bool append_mode = true;
     static std::once_flag check_once;
-    std::call_once(check_once, []
-    {
-        std::ifstream marker(".dqx_append_logs");
-        if (marker.is_open())
-        {
-            std::string value;
-            if (std::getline(marker, value) && value == "false")
-            {
-                append_mode = false;
-            }
-        }
-    });
+    std::call_once(check_once,
+                   []
+                   {
+                       std::ifstream marker(".dqx_append_logs");
+                       if (marker.is_open())
+                       {
+                           std::string value;
+                           if (std::getline(marker, value) && value == "false")
+                           {
+                               append_mode = false;
+                           }
+                       }
+                   });
     return append_mode;
 }
 
@@ -47,16 +48,17 @@ void WriteQuestLog(const QuestHook::QuestData& data)
     static std::mutex log_mutex;
     static bool first_write = true;
 
-    std::call_once(once, []
-    {
-        try
-        {
-            std::filesystem::create_directories("logs");
-        }
-        catch (...)
-        {
-        }
-    });
+    std::call_once(once,
+                   []
+                   {
+                       try
+                       {
+                           std::filesystem::create_directories("logs");
+                       }
+                       catch (...)
+                       {
+                       }
+                   });
 
     std::lock_guard<std::mutex> lock(log_mutex);
 

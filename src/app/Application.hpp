@@ -71,7 +71,7 @@ private:
     bool last_window_topmost_ = false;
 
 #if DQX_PROFILING_LEVEL == 1
-    profiling::detail::FrameStatsAccumulator frame_stats_{60};  // Log every 60 frames (~1 second)
+    profiling::detail::FrameStatsAccumulator frame_stats_{ 60 }; // Log every 60 frames (~1 second)
 #endif
 
     int argc_ = 0;

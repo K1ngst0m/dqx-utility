@@ -75,9 +75,8 @@ private:
     // Dialog pattern to search for (from Python decompiled code)
     // Pattern: \xFF\xFF\xFF\x7F\xFF\xFF\xFF\x7F\x00\x00\x00\x00\x00\x00\x00\x00\xFD.\xA8\x99
     static constexpr uint8_t kDialogPattern[] = {
-        0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFF, 0x7F,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0xFD, 0xFF, 0xA8, 0x99  // 0xFF is wildcard for second-to-last byte
+        0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFF, 0x7F, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFD, 0xFF, 0xA8, 0x99 // 0xFF is wildcard for second-to-last byte
     };
     static constexpr size_t kPatternSize = sizeof(kDialogPattern);
     static constexpr size_t kPointerOffset = 36; // Offset from pattern to pointer (32 + 4)
@@ -96,7 +95,7 @@ private:
     std::string last_dialog_text_;
     std::string last_npc_name_;
     std::chrono::steady_clock::time_point last_dialog_time_;
-    static constexpr std::chrono::milliseconds kStateTimeout{5000}; // Clear state after 5s of inactivity
+    static constexpr std::chrono::milliseconds kStateTimeout{ 5000 }; // Clear state after 5s of inactivity
 
     /**
      * @brief Find the dialog pattern in memory (fast path: cached region, slow path: full scan)

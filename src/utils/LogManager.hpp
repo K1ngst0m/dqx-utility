@@ -30,7 +30,7 @@ public:
 
     static bool Initialize();
 
-    template<int InstanceId = 0>
+    template <int InstanceId = 0>
     static bool RegisterLogger(const LoggerConfig& config);
 
     static void Shutdown();

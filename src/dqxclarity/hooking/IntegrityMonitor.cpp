@@ -21,55 +21,55 @@ bool IntegrityMonitor::start()
                 uint32_t hits = 0;
                 while (!stop_.load())
                 {
-                uint8_t flag = 0;
-                if (memory_->ReadMemory(state_addr_, &flag, 1) && flag == 1)
-                {
-                    // Out-of-process restore of hook sites immediately on signal
-                    std::vector<RestoreSite> restore_copy;
+                    uint8_t flag = 0;
+                    if (memory_->ReadMemory(state_addr_, &flag, 1) && flag == 1)
                     {
-                        std::lock_guard<std::mutex> lock(restore_mutex_);
-                        restore_copy = restore_;
-                    }
-                    for (const auto& site : restore_copy)
-                    {
-                        if (!site.bytes.empty())
+                        // Out-of-process restore of hook sites immediately on signal
+                        std::vector<RestoreSite> restore_copy;
                         {
-                            (void)memory_->WriteMemory(site.addr, site.bytes.data(), site.bytes.size());
+                            std::lock_guard<std::mutex> lock(restore_mutex_);
+                            restore_copy = restore_;
                         }
-                    }
-                    ++hits;
-                    if (log_.info)
-                        log_.info(std::string("Integrity signal observed; hits=") + std::to_string(hits) +
-                                  "; restoring");
-                    // Delay before re-applying the dialog hook to avoid racing the checker
-                    std::this_thread::sleep_for(std::chrono::milliseconds(2500));
-                    if (on_integrity_)
-                    {
-                        try
+                        for (const auto& site : restore_copy)
                         {
-                            on_integrity_(first);
-                        }
-                        catch (const std::exception& e)
-                        {
-                            if (log_.error)
+                            if (!site.bytes.empty())
                             {
-                                log_.error("Integrity callback threw exception: " + std::string(e.what()));
+                                (void)memory_->WriteMemory(site.addr, site.bytes.data(), site.bytes.size());
                             }
                         }
-                        catch (...)
+                        ++hits;
+                        if (log_.info)
+                            log_.info(std::string("Integrity signal observed; hits=") + std::to_string(hits) +
+                                      "; restoring");
+                        // Delay before re-applying the dialog hook to avoid racing the checker
+                        std::this_thread::sleep_for(std::chrono::milliseconds(2500));
+                        if (on_integrity_)
                         {
-                            if (log_.error)
+                            try
                             {
-                                log_.error("Integrity callback threw unknown exception");
+                                on_integrity_(first);
+                            }
+                            catch (const std::exception& e)
+                            {
+                                if (log_.error)
+                                {
+                                    log_.error("Integrity callback threw exception: " + std::string(e.what()));
+                                }
+                            }
+                            catch (...)
+                            {
+                                if (log_.error)
+                                {
+                                    log_.error("Integrity callback threw unknown exception");
+                                }
                             }
                         }
+                        first = false;
+                        uint8_t zero = 0;
+                        (void)memory_->WriteMemory(state_addr_, &zero, 1);
                     }
-                    first = false;
-                    uint8_t zero = 0;
-                    (void)memory_->WriteMemory(state_addr_, &zero, 1);
+                    std::this_thread::sleep_for(1ms);
                 }
-                std::this_thread::sleep_for(1ms);
-            }
             }
             catch (const std::exception& e)
             {

@@ -115,21 +115,14 @@ bool Application::initializeLogging()
 
     if (!utils::LogManager::Initialize())
     {
-        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization,
-                                           "Failed to initialize logging system", "");
+        utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Initialization, "Failed to initialize logging system",
+                                            "");
         return false;
     }
 
-    utils::LogManager::RegisterLogger<0>({
-        .name = "main",
-        .filepath = "logs/run.log",
-        .add_console_appender = true
-    });
+    utils::LogManager::RegisterLogger<0>({ .name = "main", .filepath = "logs/run.log", .add_console_appender = true });
 
-    utils::LogManager::RegisterLogger<1>({
-        .name = "diagnostics",
-        .filepath = "logs/dialog.log"
-    });
+    utils::LogManager::RegisterLogger<1>({ .name = "diagnostics", .filepath = "logs/dialog.log" });
 
 #if DQX_PROFILING_LEVEL >= 1
     utils::LogManager::RegisterLogger<2>({
@@ -259,7 +252,7 @@ void Application::handleModeChanges()
 
 void Application::renderFrame(float deltaTime)
 {
-    PROFILE_SCOPE_FRAME(); 
+    PROFILE_SCOPE_FRAME();
 
     context_->beginFrame();
 

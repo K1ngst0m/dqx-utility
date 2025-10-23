@@ -18,7 +18,7 @@
 #endif
 
 #if DQX_PROFILING_LEVEL >= 1
-#include "../api/dqxclarity.hpp"  // For Logger struct definition
+#include "../api/dqxclarity.hpp" // For Logger struct definition
 #endif
 
 namespace dqxclarity::profiling
@@ -119,20 +119,21 @@ inline std::string_view ToStringView(const char* name) noexcept
 
 #elif DQX_PROFILING_LEVEL >= 2
 // Level 2: Tracy + Timer - Full profiling with real-time visualization and logging
-#define PROFILE_SCOPE()                                                                                       \
-    ZoneScoped;                                                                                               \
+#define PROFILE_SCOPE() \
+    ZoneScoped;         \
     ::dqxclarity::profiling::ScopeTimer __profiling_timer(__FUNCTION__)
 
-#define PROFILE_SCOPE_FUNCTION()                                                                              \
-    ZoneScopedN(__FUNCTION__);                                                                                \
+#define PROFILE_SCOPE_FUNCTION() \
+    ZoneScopedN(__FUNCTION__);   \
     ::dqxclarity::profiling::ScopeTimer __profiling_timer(__FUNCTION__)
 
-#define PROFILE_SCOPE_CUSTOM(nameExpr)                                                                                     \
-    ZoneScoped;                                                                                                            \
-    ::dqxclarity::profiling::ScopeTimer __profiling_timer(nameExpr);                                                       \
-    if (auto __profiling_scope_name = ::dqxclarity::profiling::ToStringView(nameExpr); !__profiling_scope_name.empty()) \
-    {                                                                                                                      \
-        ZoneName(__profiling_scope_name.data(), ::dqxclarity::profiling::clampLength(__profiling_scope_name.size()));     \
+#define PROFILE_SCOPE_CUSTOM(nameExpr)                                                                                \
+    ZoneScoped;                                                                                                       \
+    ::dqxclarity::profiling::ScopeTimer __profiling_timer(nameExpr);                                                  \
+    if (auto __profiling_scope_name = ::dqxclarity::profiling::ToStringView(nameExpr);                                \
+        !__profiling_scope_name.empty())                                                                              \
+    {                                                                                                                 \
+        ZoneName(__profiling_scope_name.data(), ::dqxclarity::profiling::clampLength(__profiling_scope_name.size())); \
     }
 
 #define PROFILE_THREAD_NAME(nameExpr) tracy::SetThreadName(nameExpr)

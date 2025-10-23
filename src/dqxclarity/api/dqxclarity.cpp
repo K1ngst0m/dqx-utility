@@ -33,6 +33,7 @@ struct PendingDialog
     std::string text;
     std::string speaker;
     std::chrono::steady_clock::time_point capture_time;
+
     enum Source
     {
         Hook,
@@ -75,9 +76,10 @@ struct Engine::Impl
         std::string text;
         std::chrono::steady_clock::time_point publish_time;
     };
+
     std::vector<PublishedDialog> published_cache;
     std::mutex cache_mutex;
-    static constexpr std::chrono::milliseconds CACHE_EXPIRY_MS{5000}; // 5 seconds
+    static constexpr std::chrono::milliseconds CACHE_EXPIRY_MS{ 5000 }; // 5 seconds
 
     // Diagnostics: latency tracking for both capture methods
     struct CaptureTimings
@@ -87,6 +89,7 @@ struct Engine::Impl
         bool hook_valid = false;
         bool memory_reader_valid = false;
     } last_capture_timings;
+
     std::mutex diagnostics_mutex;
 };
 
@@ -329,7 +332,8 @@ bool Engine::start_hook(StartPolicy policy)
         }
         if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0)
         {
-            impl_->integrity->AddRestoreTarget(impl_->quest_hook->GetHookAddress(), impl_->quest_hook->GetOriginalBytes());
+            impl_->integrity->AddRestoreTarget(impl_->quest_hook->GetHookAddress(),
+                                               impl_->quest_hook->GetOriginalBytes());
         }
         if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0)
         {
@@ -549,284 +553,289 @@ bool Engine::start_hook(StartPolicy policy)
             {
                 while (!impl_->poll_stop.load())
                 {
-                auto now = std::chrono::steady_clock::now();
+                    auto now = std::chrono::steady_clock::now();
 
-                // Phase 1: Capture from both sources to pending queue (no immediate publish)
+                    // Phase 1: Capture from both sources to pending queue (no immediate publish)
 
-                // Hook-based capture (safe pointer capture to avoid TOCTOU race)
-                auto hook_ptr = impl_->hook.get();
-                if (hook_ptr && hook_ptr->PollDialogData())
-                {
-                    std::string text = hook_ptr->GetLastDialogText();
-                    std::string speaker = hook_ptr->GetLastNpcName();
-                    if (!text.empty())
+                    // Hook-based capture (safe pointer capture to avoid TOCTOU race)
+                    auto hook_ptr = impl_->hook.get();
+                    if (hook_ptr && hook_ptr->PollDialogData())
                     {
-                        // Add to pending queue
+                        std::string text = hook_ptr->GetLastDialogText();
+                        std::string speaker = hook_ptr->GetLastNpcName();
+                        if (!text.empty())
                         {
-                            std::lock_guard<std::mutex> lock(impl_->pending_mutex);
-                            PendingDialog pending;
-                            pending.text = text;
-                            pending.speaker = speaker;
-                            pending.capture_time = now;
-                            pending.source = PendingDialog::Hook;
-                            impl_->pending_dialogs.push_back(std::move(pending));
-                        }
-
-                        // Diagnostics: track hook capture time
-                        {
-                            std::lock_guard<std::mutex> lock(impl_->diagnostics_mutex);
-                            impl_->last_capture_timings.hook_captured = now;
-                            impl_->last_capture_timings.hook_valid = true;
-
-                            // Log latency if memory reader captured recently
-                            if (impl_->cfg.verbose && impl_->log.info &&
-                                impl_->last_capture_timings.memory_reader_valid)
+                            // Add to pending queue
                             {
-                                auto latency = now - impl_->last_capture_timings.memory_reader_captured;
-                                if (latency < 1000ms)
+                                std::lock_guard<std::mutex> lock(impl_->pending_mutex);
+                                PendingDialog pending;
+                                pending.text = text;
+                                pending.speaker = speaker;
+                                pending.capture_time = now;
+                                pending.source = PendingDialog::Hook;
+                                impl_->pending_dialogs.push_back(std::move(pending));
+                            }
+
+                            // Diagnostics: track hook capture time
+                            {
+                                std::lock_guard<std::mutex> lock(impl_->diagnostics_mutex);
+                                impl_->last_capture_timings.hook_captured = now;
+                                impl_->last_capture_timings.hook_valid = true;
+
+                                // Log latency if memory reader captured recently
+                                if (impl_->cfg.verbose && impl_->log.info &&
+                                    impl_->last_capture_timings.memory_reader_valid)
                                 {
-                                    auto latency_ms = std::chrono::duration_cast<std::chrono::milliseconds>(latency).count();
-                                    impl_->log.info("Hook captured +" + std::to_string(latency_ms) +
-                                                   "ms after memory reader");
+                                    auto latency = now - impl_->last_capture_timings.memory_reader_captured;
+                                    if (latency < 1000ms)
+                                    {
+                                        auto latency_ms =
+                                            std::chrono::duration_cast<std::chrono::milliseconds>(latency).count();
+                                        impl_->log.info("Hook captured +" + std::to_string(latency_ms) +
+                                                        "ms after memory reader");
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // Memory reader capture (safe pointer capture to avoid TOCTOU race)
-                auto memory_reader_ptr = impl_->memory_reader.get();
-                if (memory_reader_ptr && memory_reader_ptr->PollDialogData())
-                {
-                    std::string text = memory_reader_ptr->GetLastDialogText();
-                    std::string speaker = memory_reader_ptr->GetLastNpcName();
-                    if (!text.empty())
+                    // Memory reader capture (safe pointer capture to avoid TOCTOU race)
+                    auto memory_reader_ptr = impl_->memory_reader.get();
+                    if (memory_reader_ptr && memory_reader_ptr->PollDialogData())
                     {
-                        // Add to pending queue
+                        std::string text = memory_reader_ptr->GetLastDialogText();
+                        std::string speaker = memory_reader_ptr->GetLastNpcName();
+                        if (!text.empty())
                         {
-                            std::lock_guard<std::mutex> lock(impl_->pending_mutex);
-                            PendingDialog pending;
-                            pending.text = text;
-                            pending.speaker = speaker;
-                            pending.capture_time = now;
-                            pending.source = PendingDialog::MemoryReader;
-                            impl_->pending_dialogs.push_back(std::move(pending));
-                        }
-
-                        // Diagnostics: track memory reader capture time
-                        {
-                            std::lock_guard<std::mutex> lock(impl_->diagnostics_mutex);
-                            impl_->last_capture_timings.memory_reader_captured = now;
-                            impl_->last_capture_timings.memory_reader_valid = true;
-
-                            if (impl_->cfg.verbose && impl_->log.info)
+                            // Add to pending queue
                             {
-                                impl_->log.info("Memory reader captured dialog");
+                                std::lock_guard<std::mutex> lock(impl_->pending_mutex);
+                                PendingDialog pending;
+                                pending.text = text;
+                                pending.speaker = speaker;
+                                pending.capture_time = now;
+                                pending.source = PendingDialog::MemoryReader;
+                                impl_->pending_dialogs.push_back(std::move(pending));
                             }
-                        }
-                    }
-                }
 
-                // Phase 2: Hook-priority processing with immediate publish
-                {
-                    std::lock_guard<std::mutex> lock(impl_->pending_mutex);
-
-                    auto hook_wait_ms = std::chrono::milliseconds(impl_->cfg.hook_wait_timeout_ms);
-                    std::vector<PendingDialog> ready_to_publish;
-
-                    // Pass 1: Separate hooks and memory readers (avoids iterator invalidation)
-                    std::vector<PendingDialog> hooks;
-                    std::vector<PendingDialog> memory_readers;
-
-                    for (auto& dialog : impl_->pending_dialogs)
-                    {
-                        if (dialog.source == PendingDialog::Hook)
-                        {
-                            hooks.push_back(std::move(dialog));
-                        }
-                        else
-                        {
-                            memory_readers.push_back(std::move(dialog));
-                        }
-                    }
-                    impl_->pending_dialogs.clear();
-
-                    // Pass 2: Process hooks and mark memory reader duplicates
-                    std::set<size_t> memory_reader_indices_to_skip;
-
-                    for (auto& hook : hooks)
-                    {
-                        // Check if memory reader already captured same text
-                        bool found_duplicate = false;
-                        for (size_t i = 0; i < memory_readers.size(); ++i)
-                        {
-                            if (memory_readers[i].text == hook.text)
+                            // Diagnostics: track memory reader capture time
                             {
-                                // Found memory reader duplicate - hook upgrades it
+                                std::lock_guard<std::mutex> lock(impl_->diagnostics_mutex);
+                                impl_->last_capture_timings.memory_reader_captured = now;
+                                impl_->last_capture_timings.memory_reader_valid = true;
+
                                 if (impl_->cfg.verbose && impl_->log.info)
                                 {
-                                    auto upgrade_latency = now - memory_readers[i].capture_time;
-                                    auto latency_ms = std::chrono::duration_cast<std::chrono::milliseconds>(upgrade_latency).count();
-                                    impl_->log.info("Hook upgraded memory reader capture (+" +
-                                                   std::to_string(latency_ms) + "ms, has NPC name)");
+                                    impl_->log.info("Memory reader captured dialog");
                                 }
-                                memory_reader_indices_to_skip.insert(i);
-                                found_duplicate = true;
-                                break;
                             }
-                        }
-
-                        // Publish hook immediately (higher priority, has NPC name)
-                        ready_to_publish.push_back(std::move(hook));
-                    }
-
-                    // Pass 3: Process memory reader timeouts (skip those upgraded by hooks)
-                    for (size_t i = 0; i < memory_readers.size(); ++i)
-                    {
-                        if (memory_reader_indices_to_skip.count(i) > 0)
-                        {
-                            continue; // Skip - was upgraded by hook
-                        }
-
-                        auto age = now - memory_readers[i].capture_time;
-                        if (age >= hook_wait_ms)
-                        {
-                            // Memory reader timeout - hook didn't capture, publish memory reader version
-                            if (impl_->cfg.verbose && impl_->log.info)
-                            {
-                                auto wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(age).count();
-                                impl_->log.info("Memory reader timeout (waited " +
-                                               std::to_string(wait_ms) + "ms, hook didn't capture)");
-                            }
-                            ready_to_publish.push_back(std::move(memory_readers[i]));
-                        }
-                        else
-                        {
-                            // Not timed out yet - put back in pending queue
-                            impl_->pending_dialogs.push_back(std::move(memory_readers[i]));
                         }
                     }
 
-                    // Cleanup expired entries from global cache
+                    // Phase 2: Hook-priority processing with immediate publish
                     {
-                        std::lock_guard<std::mutex> cache_lock(impl_->cache_mutex);
-                        auto cache_it = impl_->published_cache.begin();
-                        while (cache_it != impl_->published_cache.end())
+                        std::lock_guard<std::mutex> lock(impl_->pending_mutex);
+
+                        auto hook_wait_ms = std::chrono::milliseconds(impl_->cfg.hook_wait_timeout_ms);
+                        std::vector<PendingDialog> ready_to_publish;
+
+                        // Pass 1: Separate hooks and memory readers (avoids iterator invalidation)
+                        std::vector<PendingDialog> hooks;
+                        std::vector<PendingDialog> memory_readers;
+
+                        for (auto& dialog : impl_->pending_dialogs)
                         {
-                            auto cache_age = now - cache_it->publish_time;
-                            if (cache_age > impl_->CACHE_EXPIRY_MS)
+                            if (dialog.source == PendingDialog::Hook)
                             {
-                                cache_it = impl_->published_cache.erase(cache_it);
+                                hooks.push_back(std::move(dialog));
                             }
                             else
                             {
-                                ++cache_it;
+                                memory_readers.push_back(std::move(dialog));
                             }
                         }
-                    }
+                        impl_->pending_dialogs.clear();
 
-                    // Publish dialogs to ring buffer (with global cache check)
-                    for (auto& dialog : ready_to_publish)
-                    {
-                        // Check global cache to prevent cross-batch duplicates
-                        bool is_duplicate = false;
+                        // Pass 2: Process hooks and mark memory reader duplicates
+                        std::set<size_t> memory_reader_indices_to_skip;
+
+                        for (auto& hook : hooks)
                         {
-                            std::lock_guard<std::mutex> cache_lock(impl_->cache_mutex);
-                            for (const auto& cached : impl_->published_cache)
+                            // Check if memory reader already captured same text
+                            bool found_duplicate = false;
+                            for (size_t i = 0; i < memory_readers.size(); ++i)
                             {
-                                if (cached.text == dialog.text)
+                                if (memory_readers[i].text == hook.text)
                                 {
-                                    is_duplicate = true;
+                                    // Found memory reader duplicate - hook upgrades it
                                     if (impl_->cfg.verbose && impl_->log.info)
                                     {
-                                        impl_->log.info("Blocked duplicate dialog (found in global cache)");
+                                        auto upgrade_latency = now - memory_readers[i].capture_time;
+                                        auto latency_ms =
+                                            std::chrono::duration_cast<std::chrono::milliseconds>(upgrade_latency)
+                                                .count();
+                                        impl_->log.info("Hook upgraded memory reader capture (+" +
+                                                        std::to_string(latency_ms) + "ms, has NPC name)");
                                     }
+                                    memory_reader_indices_to_skip.insert(i);
+                                    found_duplicate = true;
                                     break;
+                                }
+                            }
+
+                            // Publish hook immediately (higher priority, has NPC name)
+                            ready_to_publish.push_back(std::move(hook));
+                        }
+
+                        // Pass 3: Process memory reader timeouts (skip those upgraded by hooks)
+                        for (size_t i = 0; i < memory_readers.size(); ++i)
+                        {
+                            if (memory_reader_indices_to_skip.count(i) > 0)
+                            {
+                                continue; // Skip - was upgraded by hook
+                            }
+
+                            auto age = now - memory_readers[i].capture_time;
+                            if (age >= hook_wait_ms)
+                            {
+                                // Memory reader timeout - hook didn't capture, publish memory reader version
+                                if (impl_->cfg.verbose && impl_->log.info)
+                                {
+                                    auto wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(age).count();
+                                    impl_->log.info("Memory reader timeout (waited " + std::to_string(wait_ms) +
+                                                    "ms, hook didn't capture)");
+                                }
+                                ready_to_publish.push_back(std::move(memory_readers[i]));
+                            }
+                            else
+                            {
+                                // Not timed out yet - put back in pending queue
+                                impl_->pending_dialogs.push_back(std::move(memory_readers[i]));
+                            }
+                        }
+
+                        // Cleanup expired entries from global cache
+                        {
+                            std::lock_guard<std::mutex> cache_lock(impl_->cache_mutex);
+                            auto cache_it = impl_->published_cache.begin();
+                            while (cache_it != impl_->published_cache.end())
+                            {
+                                auto cache_age = now - cache_it->publish_time;
+                                if (cache_age > impl_->CACHE_EXPIRY_MS)
+                                {
+                                    cache_it = impl_->published_cache.erase(cache_it);
+                                }
+                                else
+                                {
+                                    ++cache_it;
                                 }
                             }
                         }
 
-                        if (is_duplicate)
+                        // Publish dialogs to ring buffer (with global cache check)
+                        for (auto& dialog : ready_to_publish)
                         {
-                            continue; // Skip publishing this duplicate
-                        }
+                            // Check global cache to prevent cross-batch duplicates
+                            bool is_duplicate = false;
+                            {
+                                std::lock_guard<std::mutex> cache_lock(impl_->cache_mutex);
+                                for (const auto& cached : impl_->published_cache)
+                                {
+                                    if (cached.text == dialog.text)
+                                    {
+                                        is_duplicate = true;
+                                        if (impl_->cfg.verbose && impl_->log.info)
+                                        {
+                                            impl_->log.info("Blocked duplicate dialog (found in global cache)");
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
 
-                        // Publish to ring buffers
-                        DialogMessage msg;
-                        msg.seq = ++impl_->seq;
-                        msg.text = dialog.text;
-                        msg.speaker = dialog.speaker;
-                        msg.lang.clear();
-                        impl_->ring.try_push(std::move(msg));
+                            if (is_duplicate)
+                            {
+                                continue; // Skip publishing this duplicate
+                            }
 
-                        DialogStreamItem stream_item;
-                        stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
-                        stream_item.type = DialogStreamType::Dialog;
-                        stream_item.text = dialog.text;
-                        stream_item.speaker = dialog.speaker;
-                        impl_->stream_ring.try_push(std::move(stream_item));
+                            // Publish to ring buffers
+                            DialogMessage msg;
+                            msg.seq = ++impl_->seq;
+                            msg.text = dialog.text;
+                            msg.speaker = dialog.speaker;
+                            msg.lang.clear();
+                            impl_->ring.try_push(std::move(msg));
 
-                        // Add to global cache
-                        {
-                            std::lock_guard<std::mutex> cache_lock(impl_->cache_mutex);
-                            impl_->published_cache.push_back({dialog.text, now});
-                        }
+                            DialogStreamItem stream_item;
+                            stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+                            stream_item.type = DialogStreamType::Dialog;
+                            stream_item.text = dialog.text;
+                            stream_item.speaker = dialog.speaker;
+                            impl_->stream_ring.try_push(std::move(stream_item));
 
-                        // Diagnostics: log publication latency
-                        if (impl_->cfg.verbose && impl_->log.info)
-                        {
-                            std::lock_guard<std::mutex> diag_lock(impl_->diagnostics_mutex);
-                            auto capture_to_publish = now - dialog.capture_time;
-                            auto capture_ms = std::chrono::duration_cast<std::chrono::milliseconds>(capture_to_publish).count();
+                            // Add to global cache
+                            {
+                                std::lock_guard<std::mutex> cache_lock(impl_->cache_mutex);
+                                impl_->published_cache.push_back({ dialog.text, now });
+                            }
 
-                            impl_->log.info("Published dialog (source: " +
-                                           std::string(dialog.source == PendingDialog::Hook ? "Hook" : "MemoryReader") +
-                                           ", latency: " + std::to_string(capture_ms) + "ms)");
+                            // Diagnostics: log publication latency
+                            if (impl_->cfg.verbose && impl_->log.info)
+                            {
+                                std::lock_guard<std::mutex> diag_lock(impl_->diagnostics_mutex);
+                                auto capture_to_publish = now - dialog.capture_time;
+                                auto capture_ms =
+                                    std::chrono::duration_cast<std::chrono::milliseconds>(capture_to_publish).count();
+
+                                impl_->log.info(
+                                    "Published dialog (source: " +
+                                    std::string(dialog.source == PendingDialog::Hook ? "Hook" : "MemoryReader") +
+                                    ", latency: " + std::to_string(capture_ms) + "ms)");
+                            }
                         }
                     }
-                }
-                // Quest hook polling (safe pointer capture to avoid TOCTOU race)
-                auto quest_hook_ptr = impl_->quest_hook.get();
-                if (quest_hook_ptr && quest_hook_ptr->PollQuestData())
-                {
-                    QuestMessage snapshot;
-                    const auto& quest = quest_hook_ptr->GetLastQuest();
-                    snapshot.subquest_name = quest.subquest_name;
-                    snapshot.quest_name = quest.quest_name;
-                    snapshot.description = quest.description;
-                    snapshot.rewards = quest.rewards;
-                    snapshot.repeat_rewards = quest.repeat_rewards;
-                    snapshot.seq = impl_->quest_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
-
+                    // Quest hook polling (safe pointer capture to avoid TOCTOU race)
+                    auto quest_hook_ptr = impl_->quest_hook.get();
+                    if (quest_hook_ptr && quest_hook_ptr->PollQuestData())
                     {
-                        std::lock_guard<std::mutex> lock(impl_->quest_mutex);
-                        impl_->quest_snapshot = std::move(snapshot);
-                        impl_->quest_valid = true;
+                        QuestMessage snapshot;
+                        const auto& quest = quest_hook_ptr->GetLastQuest();
+                        snapshot.subquest_name = quest.subquest_name;
+                        snapshot.quest_name = quest.quest_name;
+                        snapshot.description = quest.description;
+                        snapshot.rewards = quest.rewards;
+                        snapshot.repeat_rewards = quest.repeat_rewards;
+                        snapshot.seq = impl_->quest_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+
+                        {
+                            std::lock_guard<std::mutex> lock(impl_->quest_mutex);
+                            impl_->quest_snapshot = std::move(snapshot);
+                            impl_->quest_valid = true;
+                        }
                     }
-                }
-                // Network hook polling (safe pointer capture to avoid TOCTOU race)
-                auto network_hook_ptr = impl_->network_hook.get();
-                if (network_hook_ptr)
-                {
-                    (void)network_hook_ptr->PollNetworkText();
-                }
-                // Corner hook polling (safe pointer capture to avoid TOCTOU race)
-                auto corner_hook_ptr = impl_->corner_hook.get();
-                if (corner_hook_ptr && corner_hook_ptr->PollCornerText())
-                {
-                    const std::string& captured = corner_hook_ptr->GetLastText();
-                    if (!captured.empty())
+                    // Network hook polling (safe pointer capture to avoid TOCTOU race)
+                    auto network_hook_ptr = impl_->network_hook.get();
+                    if (network_hook_ptr)
                     {
-                        DialogStreamItem stream_item;
-                        stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
-                        stream_item.type = DialogStreamType::CornerText;
-                        stream_item.text = captured;
-                        stream_item.speaker.clear();
-                        impl_->stream_ring.try_push(std::move(stream_item));
+                        (void)network_hook_ptr->PollNetworkText();
                     }
+                    // Corner hook polling (safe pointer capture to avoid TOCTOU race)
+                    auto corner_hook_ptr = impl_->corner_hook.get();
+                    if (corner_hook_ptr && corner_hook_ptr->PollCornerText())
+                    {
+                        const std::string& captured = corner_hook_ptr->GetLastText();
+                        if (!captured.empty())
+                        {
+                            DialogStreamItem stream_item;
+                            stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+                            stream_item.type = DialogStreamType::CornerText;
+                            stream_item.text = captured;
+                            stream_item.speaker.clear();
+                            impl_->stream_ring.try_push(std::move(stream_item));
+                        }
+                    }
+                    std::this_thread::sleep_for(100ms);
                 }
-                std::this_thread::sleep_for(100ms);
-            }
             }
             catch (const std::exception& e)
             {

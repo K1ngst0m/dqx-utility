@@ -16,10 +16,7 @@ namespace processing
 std::atomic<bool> Diagnostics::verbose_{ false };
 std::atomic<std::size_t> Diagnostics::max_preview_{ 160 };
 
-void Diagnostics::SetVerbose(bool enabled) noexcept
-{
-    verbose_.store(enabled, std::memory_order_relaxed);
-}
+void Diagnostics::SetVerbose(bool enabled) noexcept { verbose_.store(enabled, std::memory_order_relaxed); }
 
 bool Diagnostics::IsVerbose() noexcept { return verbose_.load(std::memory_order_relaxed); }
 
