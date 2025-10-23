@@ -8,19 +8,22 @@ Utility for Dragon Quest X.
 
 ### Real-Time Translation From Game
 
+- Dialog, Quest, Follower Dialogue (Right Top Corner text, mainly after version 6.x story)
 - Automatically translates dialog and quest text as you play DQX
 - Supports multiple translation services (OpenAI, Google, Qwen, Youdao, Niutrans, ZhipuGLM...)
 - Multi-language (`en-US`, `zh-CN`, `zh-TW`) support
 - Glossary system for consistent character names and game-specific terms
 - Customizable Dialog and Quest translation window ui appearance
-- Global/individual translation for each component (Dialog, Quest, Right Top Corner text) 
+- Global/individual translation for each component
 
 ## Quick Start
 
 1. Download the latest release, Extract the archive
-2. Edit `config.toml` to configure your preferences and translation API keys
+2. Configure your preferences and translation API keys, you have two ways: 
+  a. Open the dqx-utility and right click to open setting
+  b. Edit `config.toml` 
 3. Run `dqx-utility.exe` (Windows) or `dqx-utility` (Linux)
-4. Start Dragon Quest X and play! (you could also start after game launch)
+4. Start Dragon Quest X and play! (you could also start dqx-utility after game launch)
 
 ## Configuration
 
