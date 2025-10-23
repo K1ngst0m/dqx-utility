@@ -2,6 +2,7 @@
 
 #include "../memory/MemoryFactory.hpp"
 #include "../memory/IProcessMemory.hpp"
+#include "../memory/DialogMemoryReader.hpp"
 #include "../process/ProcessFinder.hpp"
 #include "../hooking/DialogHook.hpp"
 #include "../hooking/CornerTextHook.hpp"
@@ -30,6 +31,7 @@ struct Engine::Impl
     Logger log{};
     std::shared_ptr<IProcessMemory> memory;
     std::unique_ptr<DialogHook> hook;
+    std::unique_ptr<DialogMemoryReader> memory_reader; // Alternative non-invasive dialog reader
     std::unique_ptr<QuestHook> quest_hook;
     std::unique_ptr<NetworkTextHook> network_hook;
     std::unique_ptr<CornerTextHook> corner_hook;
@@ -122,6 +124,9 @@ bool Engine::start_hook(StartPolicy policy)
     }
 
     // Prepare the dialog hook FIRST but do not enable patch yet (we need its original bytes)
+    // OR use memory reader if force_memory_mode is enabled
+    bool hook_installed = false;
+    if (!impl_->cfg.force_memory_mode)
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallDialogHook");
         impl_->hook = std::make_unique<dqxclarity::DialogHook>(impl_->memory);
@@ -154,14 +159,50 @@ bool Engine::start_hook(StartPolicy policy)
                     impl_->monitor->MoveRestoreTarget(old_addr, new_addr, bytes);
                 }
             });
-        if (!impl_->hook->InstallHook(/*enable_patch=*/false))
+        if (impl_->hook->InstallHook(/*enable_patch=*/false))
         {
-            if (impl_->log.error)
-                impl_->log.error("Failed to prepare dialog hook");
-            impl_->hook.reset();
-            status_ = Status::Error;
-            return false;
+            hook_installed = true;
         }
+        else
+        {
+            if (impl_->log.warn)
+                impl_->log.warn("Failed to prepare dialog hook; will try memory reader fallback");
+            impl_->hook.reset();
+        }
+    }
+    else
+    {
+        if (impl_->log.info)
+            impl_->log.info("force_memory_mode enabled; skipping dialog hook installation");
+    }
+
+    // Fallback to memory reader if hook failed or force_memory_mode is enabled
+    if (!hook_installed && impl_->cfg.enable_memory_fallback)
+    {
+        PROFILE_SCOPE_CUSTOM("Engine.InitializeMemoryReader");
+        impl_->memory_reader = std::make_unique<dqxclarity::DialogMemoryReader>(impl_->memory);
+        impl_->memory_reader->SetVerbose(impl_->cfg.verbose);
+        impl_->memory_reader->SetLogger(impl_->log);
+        if (impl_->memory_reader->Initialize())
+        {
+            if (impl_->log.info)
+                impl_->log.info("Dialog memory reader initialized successfully (fallback mode)");
+        }
+        else
+        {
+            if (impl_->log.warn)
+                impl_->log.warn("Failed to initialize dialog memory reader");
+            // Continue anyway - reader will retry during polling
+        }
+    }
+
+    // If neither hook nor memory reader is available, fail
+    if (!hook_installed && !impl_->memory_reader)
+    {
+        if (impl_->log.error)
+            impl_->log.error("Failed to initialize dialog capture (hook and memory reader both unavailable)");
+        status_ = Status::Error;
+        return false;
     }
     // Do NOT change page protection at startup (keeps login stable on this build)
 
@@ -445,10 +486,37 @@ bool Engine::start_hook(StartPolicy policy)
             using namespace std::chrono_literals;
             while (!impl_->poll_stop.load())
             {
+                bool dialog_captured = false;
+
+                // Try hook-based capture first (if available)
                 if (impl_->hook && impl_->hook->PollDialogData())
                 {
                     std::string text = impl_->hook->GetLastDialogText();
                     std::string speaker = impl_->hook->GetLastNpcName();
+                    if (!text.empty())
+                    {
+                        DialogMessage msg;
+                        msg.seq = ++impl_->seq;
+                        msg.text = text;
+                        msg.speaker = speaker;
+                        msg.lang.clear();
+                        impl_->ring.try_push(std::move(msg));
+
+                        DialogStreamItem stream_item;
+                        stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+                        stream_item.type = DialogStreamType::Dialog;
+                        stream_item.text = std::move(text);
+                        stream_item.speaker = std::move(speaker);
+                        impl_->stream_ring.try_push(std::move(stream_item));
+                        dialog_captured = true;
+                    }
+                }
+
+                // Try memory reader fallback (if available and no hook data)
+                if (!dialog_captured && impl_->memory_reader && impl_->memory_reader->PollDialogData())
+                {
+                    std::string text = impl_->memory_reader->GetLastDialogText();
+                    std::string speaker = impl_->memory_reader->GetLastNpcName();
                     if (!text.empty())
                     {
                         DialogMessage msg;

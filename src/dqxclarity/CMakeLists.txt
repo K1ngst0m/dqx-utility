@@ -10,6 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Library sources (shared across platforms)
 set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/MemoryFactory.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/memory/DialogMemoryReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/Pattern.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/PatternScanner.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/PatternFinder.cpp
