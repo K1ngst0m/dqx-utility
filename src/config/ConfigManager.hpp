@@ -48,6 +48,9 @@ public:
     bool getCompatibilityMode() const { return compatibility_mode_; }
     void setCompatibilityMode(bool enabled) { compatibility_mode_ = enabled; }
 
+    int getHookWaitTimeoutMs() const { return hook_wait_timeout_ms_; }
+    void setHookWaitTimeoutMs(int timeout_ms) { hook_wait_timeout_ms_ = timeout_ms; }
+
     // Application mode
     AppMode getAppMode() const { return app_mode_; }
 
@@ -140,6 +143,7 @@ private:
     int logging_level_ = 4;   // plog severity: 0=none, 1=fatal, 2=error, 3=warning, 4=info, 5=debug, 6=verbose
     bool verbose_ = false;    // Verbose logging for dqxclarity
     bool compatibility_mode_ = false; // Auto mode (false) vs compatibility mode (true) for dialog capture
+    int hook_wait_timeout_ms_ = 200; // How long to wait for hook to upgrade memory reader captures (ms)
 
     bool default_dialog_enabled_ = true;
     bool default_quest_enabled_ = true;

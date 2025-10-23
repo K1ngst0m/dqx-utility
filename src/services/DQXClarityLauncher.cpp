@@ -192,6 +192,7 @@ DQXClarityLauncher::DQXClarityLauncher()
     {
         cfg.verbose = config_mgr->getVerbose();
         cfg.compatibility_mode = config_mgr->getCompatibilityMode();
+        cfg.hook_wait_timeout_ms = config_mgr->getHookWaitTimeoutMs();
     }
     pimpl_->engine_cfg = cfg;
     dqxclarity::Logger log{};

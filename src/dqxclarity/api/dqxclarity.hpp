@@ -33,6 +33,8 @@ struct Config
     bool enable_integrity_diagnostics = false;
     // Dialog capture mode: false = auto (hook + memory reader), true = compatibility (memory reader only)
     bool compatibility_mode = false;
+    // Hook priority wait time: how long to wait for hook to upgrade memory reader captures (ms)
+    int hook_wait_timeout_ms = 200;
 };
 
 struct Logger

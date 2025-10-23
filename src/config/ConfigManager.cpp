@@ -694,6 +694,7 @@ bool ConfigManager::saveAll()
     debug.insert("logging_level", logging_level_);
     debug.insert("verbose", verbose_);
     debug.insert("compatibility_mode", compatibility_mode_);
+    debug.insert("hook_wait_timeout_ms", hook_wait_timeout_ms_);
     app.insert("debug", std::move(debug));
     root.insert("app", std::move(app));
 
@@ -950,6 +951,8 @@ bool ConfigManager::loadAndApply()
                 setVerbose(*v);
             if (auto v = (*dbg)["compatibility_mode"].value<bool>())
                 setCompatibilityMode(*v);
+            if (auto v = (*dbg)["hook_wait_timeout_ms"].value<int>())
+                setHookWaitTimeoutMs(*v);
         }
 
         default_dialog_state_.reset();

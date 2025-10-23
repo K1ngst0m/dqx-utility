@@ -23,6 +23,7 @@
 #include <mutex>
 #include <vector>
 #include <map>
+#include <set>
 
 namespace dqxclarity
 {
@@ -622,43 +623,83 @@ bool Engine::start_hook(StartPolicy policy)
                     }
                 }
 
-                // Phase 2: Process pending queue 
+                // Phase 2: Hook-priority processing with immediate publish
                 {
                     std::lock_guard<std::mutex> lock(impl_->pending_mutex);
 
-                    // Find items ready for publication
-                    std::vector<PendingDialog> ready;
-                    auto it = impl_->pending_dialogs.begin();
-                    while (it != impl_->pending_dialogs.end())
+                    auto hook_wait_ms = std::chrono::milliseconds(impl_->cfg.hook_wait_timeout_ms);
+                    std::vector<PendingDialog> ready_to_publish;
+
+                    // Pass 1: Separate hooks and memory readers (avoids iterator invalidation)
+                    std::vector<PendingDialog> hooks;
+                    std::vector<PendingDialog> memory_readers;
+
+                    for (auto& dialog : impl_->pending_dialogs)
                     {
-                        auto age = now - it->capture_time;
-                        if (age >= 400ms)
+                        if (dialog.source == PendingDialog::Hook)
                         {
-                            ready.push_back(std::move(*it));
-                            it = impl_->pending_dialogs.erase(it);
+                            hooks.push_back(std::move(dialog));
                         }
                         else
                         {
-                            ++it;
+                            memory_readers.push_back(std::move(dialog));
                         }
                     }
+                    impl_->pending_dialogs.clear();
 
-                    // Deduplicate by text (prefer hook for NPC name)
-                    std::map<std::string, PendingDialog> unique;
-                    for (auto& dialog : ready)
+                    // Pass 2: Process hooks and mark memory reader duplicates
+                    std::set<size_t> memory_reader_indices_to_skip;
+
+                    for (auto& hook : hooks)
                     {
-                        auto map_it = unique.find(dialog.text);
-                        if (map_it == unique.end())
+                        // Check if memory reader already captured same text
+                        bool found_duplicate = false;
+                        for (size_t i = 0; i < memory_readers.size(); ++i)
                         {
-                            unique[dialog.text] = std::move(dialog);
+                            if (memory_readers[i].text == hook.text)
+                            {
+                                // Found memory reader duplicate - hook upgrades it
+                                if (impl_->cfg.verbose && impl_->log.info)
+                                {
+                                    auto upgrade_latency = now - memory_readers[i].capture_time;
+                                    auto latency_ms = std::chrono::duration_cast<std::chrono::milliseconds>(upgrade_latency).count();
+                                    impl_->log.info("Hook upgraded memory reader capture (+" +
+                                                   std::to_string(latency_ms) + "ms, has NPC name)");
+                                }
+                                memory_reader_indices_to_skip.insert(i);
+                                found_duplicate = true;
+                                break;
+                            }
+                        }
+
+                        // Publish hook immediately (higher priority, has NPC name)
+                        ready_to_publish.push_back(std::move(hook));
+                    }
+
+                    // Pass 3: Process memory reader timeouts (skip those upgraded by hooks)
+                    for (size_t i = 0; i < memory_readers.size(); ++i)
+                    {
+                        if (memory_reader_indices_to_skip.count(i) > 0)
+                        {
+                            continue; // Skip - was upgraded by hook
+                        }
+
+                        auto age = now - memory_readers[i].capture_time;
+                        if (age >= hook_wait_ms)
+                        {
+                            // Memory reader timeout - hook didn't capture, publish memory reader version
+                            if (impl_->cfg.verbose && impl_->log.info)
+                            {
+                                auto wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(age).count();
+                                impl_->log.info("Memory reader timeout (waited " +
+                                               std::to_string(wait_ms) + "ms, hook didn't capture)");
+                            }
+                            ready_to_publish.push_back(std::move(memory_readers[i]));
                         }
                         else
                         {
-                            // Duplicate found: prefer hook (has NPC name)
-                            if (dialog.source == PendingDialog::Hook)
-                            {
-                                unique[dialog.text] = std::move(dialog);
-                            }
+                            // Not timed out yet - put back in pending queue
+                            impl_->pending_dialogs.push_back(std::move(memory_readers[i]));
                         }
                     }
 
@@ -680,8 +721,8 @@ bool Engine::start_hook(StartPolicy policy)
                         }
                     }
 
-                    // Publish unique dialogs to ring buffer (with global cache check)
-                    for (auto& [text_key, dialog] : unique)
+                    // Publish dialogs to ring buffer (with global cache check)
+                    for (auto& dialog : ready_to_publish)
                     {
                         // Check global cache to prevent cross-batch duplicates
                         bool is_duplicate = false;
