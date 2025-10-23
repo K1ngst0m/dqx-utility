@@ -42,6 +42,12 @@ public:
     int getLoggingLevel() const { return logging_level_; }
     void setLoggingLevel(int level);
 
+    bool getVerbose() const { return verbose_; }
+    void setVerbose(bool enabled) { verbose_ = enabled; }
+
+    bool getCompatibilityMode() const { return compatibility_mode_; }
+    void setCompatibilityMode(bool enabled) { compatibility_mode_ = enabled; }
+
     // Application mode
     AppMode getAppMode() const { return app_mode_; }
 
@@ -132,6 +138,8 @@ private:
     // Debug configuration
     int profiling_level_ = 0; // 0=disabled, 1=timer, 2=tracy+timer (capped by build-time DQX_PROFILING_LEVEL)
     int logging_level_ = 4;   // plog severity: 0=none, 1=fatal, 2=error, 3=warning, 4=info, 5=debug, 6=verbose
+    bool verbose_ = false;    // Verbose logging for dqxclarity
+    bool compatibility_mode_ = false; // Auto mode (false) vs compatibility mode (true) for dialog capture
 
     bool default_dialog_enabled_ = true;
     bool default_quest_enabled_ = true;

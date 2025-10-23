@@ -7,6 +7,7 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <chrono>
 
 namespace dqxclarity
 {
@@ -94,6 +95,8 @@ private:
     // Captured dialog data
     std::string last_dialog_text_;
     std::string last_npc_name_;
+    std::chrono::steady_clock::time_point last_dialog_time_;
+    static constexpr std::chrono::milliseconds kStateTimeout{5000}; // Clear state after 5s of inactivity
 
     /**
      * @brief Find the dialog pattern in memory (fast path: cached region, slow path: full scan)

@@ -31,9 +31,8 @@ struct Config
     bool enable_post_login_heuristics = false; // optional walkthrough heuristic
     // Diagnostic switch: when true, emits detailed integrity scanning diagnostics.
     bool enable_integrity_diagnostics = false;
-    // Memory reader fallback: when true, enables alternative non-invasive memory reading
-    bool enable_memory_fallback = true; // enable memory reader as fallback if hooks fail
-    bool force_memory_mode = true; // skip hooking entirely, use only memory reader
+    // Dialog capture mode: false = auto (hook + memory reader), true = compatibility (memory reader only)
+    bool compatibility_mode = false;
 };
 
 struct Logger

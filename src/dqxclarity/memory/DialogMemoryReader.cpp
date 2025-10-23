@@ -75,17 +75,13 @@ bool DialogMemoryReader::PollDialogData()
 
     try
     {
+        auto now = std::chrono::steady_clock::now();
+
         // Step 1: Find the dialog pattern (fast path: cached region, slow path: full scan)
         uintptr_t pattern_addr = FindDialogPattern();
         if (pattern_addr == 0)
         {
             // No dialog active or pattern not found
-            if (!last_dialog_text_.empty())
-            {
-                // Dialog was cleared
-                last_dialog_text_.clear();
-                last_npc_name_.clear();
-            }
             return false;
         }
 
@@ -104,11 +100,6 @@ bool DialogMemoryReader::PollDialogData()
         // Step 3: Check if pointer is null (no active dialog)
         if (dialog_actual_addr == 0)
         {
-            if (!last_dialog_text_.empty())
-            {
-                last_dialog_text_.clear();
-                last_npc_name_.clear();
-            }
             return false;
         }
 
@@ -131,13 +122,12 @@ bool DialogMemoryReader::PollDialogData()
         // Step 6: Handle empty text (dialog was cleared)
         if (text.empty())
         {
-            last_dialog_text_.clear();
-            last_npc_name_.clear();
             return false;
         }
 
-        // Step 7: Update captured text
+        // Step 7: Update captured text and timestamp
         last_dialog_text_ = text;
+        last_dialog_time_ = now;
         // Note: NPC name extraction not available in this mode (no register context)
         last_npc_name_ = "No_NPC";
 

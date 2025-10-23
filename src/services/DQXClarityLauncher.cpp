@@ -3,6 +3,7 @@
 
 #include <plog/Log.h>
 
+#include "../config/ConfigManager.hpp"
 #include "../utils/ErrorReporter.hpp"
 #include "../utils/CrashHandler.hpp"
 #include "../utils/Profile.hpp"
@@ -185,9 +186,13 @@ void DQXClarityLauncher::CrashCleanupThunk()
 DQXClarityLauncher::DQXClarityLauncher()
     : pimpl_(std::make_unique<Impl>())
 {
-    dqxclarity::Config cfg{}; // defaults
-    // Enable post-login heuristics by default for the utility app
+    dqxclarity::Config cfg{};
     cfg.enable_post_login_heuristics = true;
+    if (auto* config_mgr = ConfigManager_Get())
+    {
+        cfg.verbose = config_mgr->getVerbose();
+        cfg.compatibility_mode = config_mgr->getCompatibilityMode();
+    }
     pimpl_->engine_cfg = cfg;
     dqxclarity::Logger log{};
     log.info = [](const std::string& m)

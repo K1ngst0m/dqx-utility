@@ -692,6 +692,8 @@ bool ConfigManager::saveAll()
     toml::table debug;
     debug.insert("profiling_level", profiling_level_);
     debug.insert("logging_level", logging_level_);
+    debug.insert("verbose", verbose_);
+    debug.insert("compatibility_mode", compatibility_mode_);
     app.insert("debug", std::move(debug));
     root.insert("app", std::move(app));
 
@@ -944,6 +946,10 @@ bool ConfigManager::loadAndApply()
                 setProfilingLevel(*v);
             if (auto v = (*dbg)["logging_level"].value<int>())
                 setLoggingLevel(*v);
+            if (auto v = (*dbg)["verbose"].value<bool>())
+                setVerbose(*v);
+            if (auto v = (*dbg)["compatibility_mode"].value<bool>())
+                setCompatibilityMode(*v);
         }
 
         default_dialog_state_.reset();
