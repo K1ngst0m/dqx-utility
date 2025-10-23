@@ -171,9 +171,8 @@ void GlobalSettingsPanel::render(bool& open)
 
         renderAppearanceSection();
 
-        renderWindowManagementSection();
-
 #ifdef DQXU_ENABLE_DEBUG_SECTIONS
+        renderWindowManagementSection();
         if (ImGui::CollapsingHeader(i18n::get("settings.sections.debug")))
         {
             renderDebugSection();
@@ -773,10 +772,13 @@ void GlobalSettingsPanel::renderAppearanceSection()
 
         if (auto* cm = ConfigManager_Get())
         {
-            bool always_on_top = cm->getWindowAlwaysOnTop();
-            if (ImGui::Checkbox(i18n::get("settings.always_on_top"), &always_on_top))
+            if (cm->getAppMode() == ConfigManager::AppMode::Normal)
             {
-                cm->setWindowAlwaysOnTop(always_on_top);
+                bool always_on_top = cm->getWindowAlwaysOnTop();
+                if (ImGui::Checkbox(i18n::get("settings.always_on_top"), &always_on_top))
+                {
+                    cm->setWindowAlwaysOnTop(always_on_top);
+                }
             }
         }
     }
