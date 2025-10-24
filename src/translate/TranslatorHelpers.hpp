@@ -152,5 +152,14 @@ inline std::size_t calculate_json_buffer_size(std::size_t text_length)
     return base_overhead + text_overhead;
 }
 
+inline std::string replace_string(std::string text, const std::string& replacement, const std::string placeholder = "{target_lang}") {
+    size_t pos = 0;
+    while ((pos = text.find(placeholder, pos)) != std::string::npos) {
+        text.replace(pos, placeholder.length(), replacement);
+        pos += replacement.length();
+    }
+    return text;
+}
+
 } // namespace helpers
 } // namespace translate

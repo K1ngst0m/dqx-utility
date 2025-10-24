@@ -303,19 +303,31 @@ bool ZhipuGLMTranslator::doRequest(const std::string& text, const std::string& t
         return false;
     std::string url = cfg_.base_url;
 
-    std::string target_name;
-    if (target_lang == "en-us")
-        target_name = "English";
-    else if (target_lang == "zh-cn")
-        target_name = "Simplified Chinese";
-    else if (target_lang == "zh-tw")
-        target_name = "Traditional Chinese";
+    // Use custom prompt from config, or fall back to default if empty
+    std::string sys;
+    if (!cfg_.prompt.empty())
+    {
+        sys = cfg_.prompt;
+    }
     else
-        target_name = target_lang;
+    {
+        sys = "Translate the following game dialog to {target_lang}. \
+              Keep the speaker's tone and game style. Do not add or remove content. \
+              Do not introduce any explanations or additional text.";
+    }
 
-    std::string sys =
-        "Translate the following game dialog to " + target_name +
-        ". Keep the speaker's tone and game style. Preserve any <...> tags exactly. Do not add or remove content.";
+    {
+        std::string target_name;
+        if (target_lang == "en-us")
+            target_name = "English";
+        else if (target_lang == "zh-cn")
+            target_name = "Simplified Chinese";
+        else if (target_lang == "zh-tw")
+            target_name = "Traditional Chinese";
+        else
+            target_name = target_lang;
+        sys = replace_string(sys, target_name, "{target_lang}");
+    }
     std::string user = text;
 
     // PHASE 2: Fix buffer reservation

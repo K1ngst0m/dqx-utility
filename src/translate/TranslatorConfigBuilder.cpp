@@ -30,6 +30,7 @@ BackendConfig BackendConfig::from(const ::TranslationConfig& cfg_ui)
     BackendConfig out;
     out.backend = static_cast<Backend>(cfg_ui.translation_backend);
     out.target_lang = to_string_lang(cfg_ui.target_lang_enum);
+    out.prompt = cfg_ui.custom_prompt.data();
     out.max_concurrent_requests =
         cfg_ui.max_concurrent_requests <= 0 ? 1 : static_cast<std::size_t>(cfg_ui.max_concurrent_requests);
     out.request_interval_seconds =

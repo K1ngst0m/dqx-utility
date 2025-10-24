@@ -3,6 +3,7 @@
 #include "../ui/WindowRegistry.hpp"
 #include "../ui/dialog/DialogWindow.hpp"
 #include "../ui/quest/QuestWindow.hpp"
+#include "../ui/Localization.hpp"
 #include "../state/DialogStateManager.hpp"
 #include "../utils/ErrorReporter.hpp"
 #include "../processing/Diagnostics.hpp"
@@ -115,6 +116,7 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
         break;
     }
     translation.insert("target_lang", target_lang);
+    translation.insert("custom_prompt", std::string(state.translation_config().custom_prompt.data()));
 
     toml::table openai;
     openai.insert("api_key", std::string(state.translation_config().openai_api_key.data()));
@@ -207,6 +209,9 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
             else if (*v == "zh-tw")
                 state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
         }
+        if (auto v = (*translation_tbl)["custom_prompt"].value<std::string>())
+            std::snprintf(state.translation_config().custom_prompt.data(), state.translation_config().custom_prompt.size(),
+                          "%s", v->c_str());
 
         if (auto* openai_tbl = (*translation_tbl)["openai"].as_table())
         {
@@ -334,6 +339,9 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
         else if (*v == "zh-tw")
             state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
     }
+    if (auto v = t["custom_prompt"].value<std::string>())
+        std::snprintf(state.translation_config().custom_prompt.data(), state.translation_config().custom_prompt.size(),
+                      "%s", v->c_str());
 
     if (auto v = t["openai_base_url"].value<std::string>())
         std::snprintf(state.translation_config().openai_base_url.data(),
@@ -652,6 +660,7 @@ bool ConfigManager::saveAll()
         break;
     }
     translation.insert("target_lang", global_target_lang);
+    translation.insert("custom_prompt", std::string(global_translation_config_.custom_prompt.data()));
 
     toml::table openai;
     openai.insert("api_key", std::string(global_translation_config_.openai_api_key.data()));
@@ -809,6 +818,12 @@ bool ConfigManager::loadAndApply()
                 setDefaultQuestEnabled(*v);
 
             global_translation_config_.applyDefaults();
+            if (global_translation_config_.custom_prompt[0] == '\0')
+            {
+                std::snprintf(global_translation_config_.custom_prompt.data(),
+                              global_translation_config_.custom_prompt.size(), "%s",
+                              i18n::get("dialog.settings.default_prompt"));
+            }
             if (auto* trans = (*g)["translation"].as_table())
             {
                 if (auto v = (*trans)["translate_enabled"].value<bool>())
@@ -831,6 +846,9 @@ bool ConfigManager::loadAndApply()
                     else if (*v == "zh-tw")
                         global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
                 }
+                if (auto v = (*trans)["custom_prompt"].value<std::string>())
+                    std::snprintf(global_translation_config_.custom_prompt.data(),
+                                  global_translation_config_.custom_prompt.size(), "%s", v->c_str());
                 if (auto* openai_tbl = (*trans)["openai"].as_table())
                 {
                     if (auto v = (*openai_tbl)["base_url"].value<std::string>())
@@ -893,6 +911,9 @@ bool ConfigManager::loadAndApply()
                     }
                 }
 
+                if (auto v = (*trans)["custom_prompt"].value<std::string>())
+                    std::snprintf(global_translation_config_.custom_prompt.data(),
+                                  global_translation_config_.custom_prompt.size(), "%s", v->c_str());
                 if (auto v = (*trans)["openai_base_url"].value<std::string>())
                     std::snprintf(global_translation_config_.openai_base_url.data(),
                                   global_translation_config_.openai_base_url.size(), "%s", v->c_str());
@@ -965,7 +986,13 @@ bool ConfigManager::loadAndApply()
                     continue;
                 auto tbl = *node.as_table();
                 DialogStateManager state;
-                state.applyDefaults(); // Start with defaults
+                state.applyDefaults();
+                if (state.translation_config().custom_prompt[0] == '\0')
+                {
+                    std::snprintf(state.translation_config().custom_prompt.data(),
+                                  state.translation_config().custom_prompt.size(), "%s",
+                                  i18n::get("dialog.settings.default_prompt"));
+                }
                 std::string name;
                 if (tomlToDialogState(tbl, state, name)) // Overlay config values
                 {
@@ -1066,6 +1093,12 @@ bool ConfigManager::loadAndApply()
         {
             QuestStateManager quest_state;
             quest_state.applyDefaults();
+            if (quest_state.translation_config().custom_prompt[0] == '\0')
+            {
+                std::snprintf(quest_state.translation_config().custom_prompt.data(),
+                              quest_state.translation_config().custom_prompt.size(), "%s",
+                              i18n::get("dialog.settings.default_prompt"));
+            }
             std::string quest_name;
             if (!tomlToDialogState(quest_tbl, quest_state, quest_name))
             {

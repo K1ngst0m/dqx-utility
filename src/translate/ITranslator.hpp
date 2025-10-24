@@ -29,6 +29,7 @@ struct BackendConfig
     std::string model;
     std::string api_key;
     std::string api_secret;
+    std::string prompt;
     std::size_t max_concurrent_requests = 3;
     double request_interval_seconds = 0.5;
     int max_retries = 3;

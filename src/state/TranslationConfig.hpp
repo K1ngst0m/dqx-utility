@@ -10,6 +10,7 @@ struct TranslationConfig
     static constexpr std::size_t URLSize = 256;
     static constexpr std::size_t ModelSize = 128;
     static constexpr std::size_t ApiKeySize = 256;
+    static constexpr std::size_t PromptSize = 1024;
 
     enum class TargetLang
     {
@@ -65,6 +66,9 @@ struct TranslationConfig
     std::array<char, ApiKeySize> youdao_app_secret{};
     YoudaoMode youdao_mode = YoudaoMode::Text;
 
+    // Custom system prompt for translation
+    std::array<char, PromptSize> custom_prompt{};
+
     void applyDefaults()
     {
         translate_enabled = false;
@@ -100,6 +104,8 @@ struct TranslationConfig
         youdao_app_key.fill('\0');
         youdao_app_secret.fill('\0');
         youdao_mode = YoudaoMode::Text;
+
+        custom_prompt.fill('\0');
     }
 
     void copyFrom(const TranslationConfig& other)
@@ -127,5 +133,6 @@ struct TranslationConfig
         youdao_app_key = other.youdao_app_key;
         youdao_app_secret = other.youdao_app_secret;
         youdao_mode = other.youdao_mode;
+        custom_prompt = other.custom_prompt;
     }
 };

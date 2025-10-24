@@ -151,6 +151,7 @@ void TranslationSettingsPanel::render(translate::ITranslator* translator, std::s
     renderStatusAndResults(translator, applyHint, applyHintTimer, testResult, testTimestamp);
 }
 
+
 bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
 {
     stream_filters_changed_ = false;
@@ -208,6 +209,28 @@ bool TranslationSettingsPanel::renderBackendSpecificConfig(TranslationConfig& co
     bool youdao_app_key_changed = false;
     bool youdao_app_secret_changed = false;
     bool youdao_mode_changed = false;
+    bool prompt_changed = false;
+
+    if (config.translation_backend == TranslationConfig::TranslationBackend::OpenAI ||
+        config.translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
+    {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(i18n::get("dialog.settings.system_prompt"));
+        ImGui::TextDisabled("%s", i18n::get("dialog.settings.system_prompt_hint"));
+
+        prompt_changed = ImGui::InputTextMultiline("##prompt", config.custom_prompt.data(), config.custom_prompt.size(),
+                                                    ImVec2(500.0f, 120.0f),
+                                                    ImGuiInputTextFlags_WordWrap | ImGuiInputTextFlags_AllowTabInput);
+
+        if (ImGui::Button(i18n::get("dialog.settings.reset_prompt")))
+        {
+            std::snprintf(config.custom_prompt.data(), config.custom_prompt.size(), "%s",
+                        i18n::get("dialog.settings.default_prompt"));
+            prompt_changed = true;
+        }
+
+        ImGui::Spacing();
+    }
 
     if (config.translation_backend == TranslationConfig::TranslationBackend::OpenAI)
     {
@@ -295,7 +318,7 @@ bool TranslationSettingsPanel::renderBackendSpecificConfig(TranslationConfig& co
 
     return base_url_changed || model_changed || openai_key_changed || google_key_changed || zhipu_key_changed ||
            qwen_key_changed || niutrans_key_changed || youdao_app_key_changed || youdao_app_secret_changed ||
-           youdao_mode_changed;
+           youdao_mode_changed || prompt_changed;
 }
 
 bool TranslationSettingsPanel::renderApplyAndTestButtons(translate::ITranslator* translator, TranslationConfig& config,
