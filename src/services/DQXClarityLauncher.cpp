@@ -24,7 +24,7 @@
 // Private implementation details
 struct DQXClarityLauncher::Impl
 {
-    dqxclarity::Engine engine;
+    std::unique_ptr<dqxclarity::Engine> engine;
     std::thread monitor;
     std::atomic<bool> stop_flag{ false };
     std::atomic<bool> shutdown_called{ false };
@@ -80,7 +80,7 @@ struct DQXClarityLauncher::Impl
     {
         std::lock_guard<std::mutex> lock(engine_mutex);
         clearLastErrorMessage();
-        bool ok = engine.start_hook(policy);
+        bool ok = engine->start_hook(policy);
         if (!ok && last_error_message.empty())
         {
             std::string policy_name =
@@ -110,13 +110,13 @@ struct DQXClarityLauncher::Impl
         try
         {
             std::lock_guard<std::mutex> lock(engine_mutex);
-            auto status = engine.status();
+            auto status = engine->status();
             if (status == dqxclarity::Status::Stopped)
             {
                 clearLastErrorMessage();
                 return true;
             }
-            ok = engine.stop_hook();
+            ok = engine->stop_hook();
             if (ok)
             {
                 std::lock_guard<std::mutex> qlock(quest_mutex);
@@ -186,6 +186,14 @@ void DQXClarityLauncher::CrashCleanupThunk()
 DQXClarityLauncher::DQXClarityLauncher()
     : pimpl_(std::make_unique<Impl>())
 {
+    pimpl_->engine = std::make_unique<dqxclarity::Engine>();
+    s_active_impl.store(pimpl_.get(), std::memory_order_release);
+    utils::CrashHandler::RegisterFatalFlag(&pimpl_->fatal_signal);
+    utils::CrashHandler::RegisterFatalCleanup(CrashCleanupThunk);
+}
+
+void DQXClarityLauncher::lateInitialize()
+{
     dqxclarity::Config cfg{};
     cfg.enable_post_login_heuristics = true;
     if (auto* config_mgr = ConfigManager_Get())
@@ -199,7 +207,6 @@ DQXClarityLauncher::DQXClarityLauncher()
     log.info = [](const std::string& m)
     {
 #if DQX_PROFILING_LEVEL >= 1
-        // Route dqxclarity profiling logs to logs/profiling.log
         if (m.find("[PROFILE]") != std::string::npos)
         {
             PLOG_DEBUG_(profiling::kProfilingLogInstance) << m;
@@ -222,11 +229,8 @@ DQXClarityLauncher::DQXClarityLauncher()
             pimpl_->setLastErrorMessage(m);
         }
     };
-    pimpl_->engine.initialize(pimpl_->engine_cfg, std::move(log));
+    pimpl_->engine->initialize(pimpl_->engine_cfg, std::move(log));
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
-    s_active_impl.store(pimpl_.get(), std::memory_order_release);
-    utils::CrashHandler::RegisterFatalFlag(&pimpl_->fatal_signal);
-    utils::CrashHandler::RegisterFatalCleanup(CrashCleanupThunk);
 
     // Start controller monitor thread
     pimpl_->monitor = std::thread(
@@ -243,7 +247,7 @@ DQXClarityLauncher::DQXClarityLauncher()
                     initialized = true;
                 }
                 const bool game_running = isDQXGameRunning();
-                auto st = pimpl_->engine.status();
+                auto st = pimpl_->engine->status();
                 if (st == dqxclarity::Status::Hooked)
                 {
                     pimpl_->clearLastErrorMessage();
@@ -381,7 +385,7 @@ DQXClarityLauncher::DQXClarityLauncher()
 
                 // Drain new messages from engine and append to backlog
                 std::vector<dqxclarity::DialogMessage> tmp;
-                if (pimpl_->engine.drain(tmp) && !tmp.empty())
+                if (pimpl_->engine->drain(tmp) && !tmp.empty())
                 {
                     std::lock_guard<std::mutex> lock(pimpl_->backlog_mutex);
                     for (auto& m : tmp)
@@ -397,7 +401,7 @@ DQXClarityLauncher::DQXClarityLauncher()
                 }
 
                 std::vector<dqxclarity::DialogStreamItem> stream_items;
-                if (pimpl_->engine.drainStream(stream_items) && !stream_items.empty())
+                if (pimpl_->engine->drainStream(stream_items) && !stream_items.empty())
                 {
                     std::lock_guard<std::mutex> lock(pimpl_->stream_mutex);
                     for (auto& item : stream_items)
@@ -414,7 +418,7 @@ DQXClarityLauncher::DQXClarityLauncher()
                 }
 
                 dqxclarity::QuestMessage quest_snapshot;
-                if (pimpl_->engine.latest_quest(quest_snapshot))
+                if (pimpl_->engine->latest_quest(quest_snapshot))
                 {
                     std::lock_guard<std::mutex> qlock(pimpl_->quest_mutex);
                     pimpl_->latest_quest = std::move(quest_snapshot);
@@ -449,7 +453,7 @@ DQXClarityLauncher::DQXClarityLauncher()
                 }
                 const bool fatal = pimpl_->fatal_signal.load(std::memory_order_acquire);
                 const bool stalled = stagnant_ticks >= 6;
-                auto st = pimpl_->engine.status();
+                auto st = pimpl_->engine->status();
                 if ((fatal || stalled) && (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting ||
                                            st == dqxclarity::Status::Stopping))
                 {
@@ -569,6 +573,95 @@ bool DQXClarityLauncher::stop()
     return ok;
 }
 
+bool DQXClarityLauncher::reinitialize()
+{
+    PLOG_INFO << "Reinitialize requested - reconfiguring with new compatibility mode";
+
+    // Stop engine hooks but keep monitor thread alive
+    if (!stop())
+    {
+        PLOG_ERROR << "Failed to stop hook during reinitialize";
+        return false;
+    }
+
+    // Clear all cached data from previous mode
+    {
+        std::lock_guard<std::mutex> lock(pimpl_->backlog_mutex);
+        pimpl_->backlog.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(pimpl_->stream_mutex);
+        pimpl_->stream_backlog.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(pimpl_->quest_mutex);
+        pimpl_->quest_valid = false;
+        pimpl_->latest_quest = dqxclarity::QuestMessage{};
+    }
+    PLOG_INFO << "Cleared cached dialogs from previous mode";
+
+    // Re-read config and re-initialize engine with new settings
+    dqxclarity::Config cfg{};
+    cfg.enable_post_login_heuristics = true;
+    if (auto* config_mgr = ConfigManager_Get())
+    {
+        cfg.verbose = config_mgr->getVerbose();
+        cfg.compatibility_mode = config_mgr->getCompatibilityMode();
+        cfg.hook_wait_timeout_ms = config_mgr->getHookWaitTimeoutMs();
+    }
+    pimpl_->engine_cfg = cfg;
+    pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
+
+    PLOG_INFO << "Compatibility mode setting: " << (cfg.compatibility_mode ? "true (memory reader only)" : "false (auto mode)");
+
+    // Re-initialize engine with new config (this updates impl_->cfg)
+    dqxclarity::Logger log{};
+    log.info = [](const std::string& m)
+    {
+#if DQX_PROFILING_LEVEL >= 1
+        if (m.find("[PROFILE]") != std::string::npos)
+        {
+            PLOG_DEBUG_(profiling::kProfilingLogInstance) << m;
+        }
+        else
+#endif
+        {
+            PLOG_INFO << m;
+        }
+    };
+    log.warn = [](const std::string& m)
+    {
+        PLOG_WARNING << m;
+    };
+    log.error = [this](const std::string& m)
+    {
+        PLOG_ERROR << m;
+        if (pimpl_)
+        {
+            pimpl_->setLastErrorMessage(m);
+        }
+    };
+
+    {
+        std::lock_guard<std::mutex> lock(pimpl_->engine_mutex);
+        if (!pimpl_->engine->initialize(pimpl_->engine_cfg, std::move(log)))
+        {
+            PLOG_ERROR << "Failed to re-initialize engine with new config";
+            return false;
+        }
+    }
+
+    // Restart engine if game is running
+    if (!isDQXGameRunning())
+    {
+        PLOG_INFO << "Reinitialize complete (game not running, will auto-start when detected)";
+        return true;
+    }
+
+    PLOG_INFO << "Game running, restarting with new compatibility mode...";
+    return launch();
+}
+
 void DQXClarityLauncher::shutdown()
 {
     if (!pimpl_)
@@ -609,7 +702,7 @@ void DQXClarityLauncher::shutdown()
 DQXClarityStatus DQXClarityLauncher::getStatus() const
 {
     using S = dqxclarity::Status;
-    switch (pimpl_->engine.status())
+    switch (pimpl_->engine->status())
     {
     case S::Stopped:
         return DQXClarityStatus::Stopped;
@@ -642,6 +735,6 @@ std::string DQXClarityLauncher::getStatusString() const
     }
 }
 
-dqxclarity::Status DQXClarityLauncher::getEngineStage() const { return pimpl_->engine.status(); }
+dqxclarity::Status DQXClarityLauncher::getEngineStage() const { return pimpl_->engine->status(); }
 
 std::string DQXClarityLauncher::getLastErrorMessage() const { return pimpl_->getLastErrorMessage(); }

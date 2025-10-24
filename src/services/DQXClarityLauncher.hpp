@@ -29,6 +29,10 @@ public:
     DQXClarityLauncher();
     ~DQXClarityLauncher();
 
+    void lateInitialize();
+
+    bool reinitialize();
+
     // Start hook
     bool launch();
 

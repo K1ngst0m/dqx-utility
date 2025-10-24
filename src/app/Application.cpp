@@ -192,6 +192,11 @@ void Application::initializeConfig()
                                             config_->lastError());
     }
 
+    if (auto* dqxc = DQXClarityService_Get())
+    {
+        dqxc->lateInitialize();
+    }
+
     i18n::init(config_->getUILanguageCode());
 
     last_window_topmost_ = config_->getWindowAlwaysOnTop();

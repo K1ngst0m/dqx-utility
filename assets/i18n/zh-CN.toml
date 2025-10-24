@@ -51,6 +51,14 @@ debug_title = "DQXClarity 调试"
 status_label = "状态："
 not_running_hint = "（DQXGame.exe 未运行）"
 wineserver_mismatch = "dqxclarity 与 DQXGame.exe 不在同一 wineserver 中。Hook 将无法正常工作。请尝试停止并重新启动。"
+compatibility_mode = "兼容模式"  
+compatibility_mode_tooltip = "更安全，但无法显示NPC名称。"  
+status_auto_mode = "自动模式"  
+status_compatibility_mode = "兼容模式"  
+status_error = "错误"  
+status_starting = "启动中"  
+status_stopping = "停止中"  
+
 
 [settings.status]
 game_label = "DQX 游戏："

@@ -408,6 +408,33 @@ void GlobalSettingsPanel::renderDQXClaritySection()
     ImGui::SameLine();
     ImGui::TextColored(status_color, "%s", status_str.c_str());
 
+    ImGui::Spacing();
+
+    // Compatibility mode checkbox
+    auto* config_mgr = ConfigManager_Get();
+    if (config_mgr)
+    {
+        bool compat_mode = config_mgr->getCompatibilityMode();
+        bool is_hooked = (status == DQXClarityStatus::Connected);
+
+        if (ImGui::Checkbox(i18n::get("settings.dqxc.compatibility_mode"), &compat_mode))
+        {
+            config_mgr->setCompatibilityMode(compat_mode);
+            ConfigManager_SaveAll();
+
+            // Reinitialize engine with new compatibility mode setting
+            if (dqxc_launcher_)
+            {
+                dqxc_launcher_->reinitialize();
+            }
+        }
+
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip("%s", i18n::get("settings.dqxc.compatibility_mode_tooltip"));
+        }
+    }
+
 #ifndef _WIN32
     // Show wineserver info on Linux
     if (status == DQXClarityStatus::Disconnected)
