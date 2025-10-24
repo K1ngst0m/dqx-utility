@@ -55,7 +55,7 @@ compatibility_mode = "Compatibility Mode"
 compatibility_mode_tooltip = "safer, no NPC names"
 status_auto_mode = "Auto Mode"
 status_compatibility_mode = "Compatibility Mode"
-status_error = "Error"
+status_error = "Stopped"
 status_starting = "Starting"
 status_stopping = "Stopping"
 

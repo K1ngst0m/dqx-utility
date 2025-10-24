@@ -4,6 +4,7 @@
 #include <plog/Log.h>
 
 #include "../config/ConfigManager.hpp"
+#include "../ui/Localization.hpp"
 #include "../utils/ErrorReporter.hpp"
 #include "../utils/CrashHandler.hpp"
 #include "../utils/Profile.hpp"
@@ -720,18 +721,24 @@ DQXClarityStatus DQXClarityLauncher::getStatus() const
 
 std::string DQXClarityLauncher::getStatusString() const
 {
-    switch (getStatus())
+    using S = dqxclarity::Status;
+    auto engine_status = pimpl_->engine->status();
+    bool compat_mode = pimpl_->engine_cfg.compatibility_mode;
+
+    switch (engine_status)
     {
-    case DQXClarityStatus::Stopped:
-        return "Stopped";
-    case DQXClarityStatus::Running:
-        return "Running";
-    case DQXClarityStatus::Connected:
-        return "OK";
-    case DQXClarityStatus::Disconnected:
-        return "Disconnected";
+    case S::Hooked:
+        return compat_mode ? i18n::get("settings.dqxc.status_compatibility_mode")
+                           : i18n::get("settings.dqxc.status_auto_mode");
+    case S::Starting:
+        return i18n::get("settings.dqxc.status_starting");
+    case S::Stopping:
+        return i18n::get("settings.dqxc.status_stopping");
+    case S::Error:
+        return i18n::get("settings.dqxc.status_error");
+    case S::Stopped:
     default:
-        return "Unknown";
+        return i18n::get("settings.dqxc.status_error");
     }
 }
 

@@ -55,7 +55,7 @@ compatibility_mode = "兼容模式"
 compatibility_mode_tooltip = "更安全，但无法显示NPC名称。"  
 status_auto_mode = "自动模式"  
 status_compatibility_mode = "兼容模式"  
-status_error = "错误"  
+status_error = "未启动"  
 status_starting = "启动中"  
 status_stopping = "停止中"  
 
