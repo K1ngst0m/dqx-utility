@@ -446,7 +446,12 @@ bool IntegrityDetour::BuildAndWriteTrampoline()
         m_log.info("Allocated integrity state at 0x" + std::to_string((unsigned long long)m_state_addr));
     // Initialize state to 0
     uint8_t zero = 0;
-    m_memory->WriteMemory(m_state_addr, &zero, 1);
+    if (!m_memory->WriteMemory(m_state_addr, &zero, 1))
+    {
+        if (m_log.error)
+            m_log.error("Failed to initialize integrity state");
+        return false;
+    }
 
     // Trampoline needs enough space to optionally restore several hook sites
     // Each restored byte uses 6 bytes (C6 05 <imm32> <imm8>), so allocate generously

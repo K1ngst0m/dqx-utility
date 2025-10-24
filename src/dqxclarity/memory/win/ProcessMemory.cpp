@@ -77,11 +77,12 @@ uintptr_t ProcessMemory::AllocateMemory(size_t size, bool executable)
     return reinterpret_cast<uintptr_t>(allocated);
 }
 
-bool ProcessMemory::FreeMemory(uintptr_t address, size_t size)
+bool ProcessMemory::FreeMemory(uintptr_t address, size_t /*size*/)
 {
     if (!m_is_attached)
         return false;
-    return VirtualFreeEx(m_process_handle, reinterpret_cast<LPVOID>(address), size, MEM_RELEASE) != 0;
+    // When using MEM_RELEASE, size must be 0 (releases entire region allocated by VirtualAllocEx)
+    return VirtualFreeEx(m_process_handle, reinterpret_cast<LPVOID>(address), 0, MEM_RELEASE) != 0;
 }
 
 bool ProcessMemory::SetMemoryProtection(uintptr_t address, size_t size, MemoryProtectionFlags protection)

@@ -276,6 +276,16 @@ static LONG WINAPI CrashHandlerFunction(EXCEPTION_POINTERS* ex)
     localtime_s(&tm_buf, &now);
     std::strftime(filename, sizeof(filename), "logs/crash_%Y%m%d_%H%M%S.dmp", &tm_buf);
 
+    // Ensure logs directory exists
+    try
+    {
+        std::filesystem::create_directories("logs");
+    }
+    catch (...)
+    {
+        // If directory creation fails, attempt to write anyway
+    }
+
     HANDLE file = CreateFileA(filename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (file != INVALID_HANDLE_VALUE)
