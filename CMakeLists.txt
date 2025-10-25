@@ -13,7 +13,7 @@ endif()
 option(BUILD_DQXCLARITY_CLI "Build DQXClarity C++ CLI executable" OFF)
 option(ENABLE_DEBUG_SECTION "Enable debugging sections in the UI" OFF)
 
-include(ProjectOptions)
+include(CompilerOptions)
 include(ClangFormat)
 add_subdirectory(src/dqxclarity)
 
