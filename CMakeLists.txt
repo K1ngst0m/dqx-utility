@@ -32,6 +32,7 @@ if(BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-if(WIN32)
+# Include packaging for Windows targets
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   include(Packaging)
 endif()

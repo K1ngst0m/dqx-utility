@@ -14,13 +14,14 @@ endif()
 include(${CPM_DOWNLOAD_LOCATION})
 
 # SDL3 - Graphics library
-if(WIN32 AND MSVC)
+# Use prebuilt DLLs for Windows targets
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   CPMAddPackage(
     NAME SDL3
     URL https://github.com/libsdl-org/SDL/releases/download/release-3.2.24/SDL3-devel-3.2.24-VC.zip
     DOWNLOAD_ONLY YES
   )
-  
+
   if(SDL3_ADDED)
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
       set(SDL3_ARCH "x64")
@@ -56,9 +57,10 @@ if(WIN32 AND MSVC)
       INTERFACE_INCLUDE_DIRECTORIES "${SDL3_SOURCE_DIR}/include"
     )
 
-    message(STATUS "Using prebuilt SDL3 for Windows MSVC from: ${SDL3_SOURCE_DIR}")
+    message(STATUS "Using prebuilt SDL3 for Windows from: ${SDL3_SOURCE_DIR}")
   endif()
 else()
+  # Build SDL3 from source for native Linux builds
   CPMAddPackage(
     NAME SDL3
     GITHUB_REPOSITORY libsdl-org/SDL
