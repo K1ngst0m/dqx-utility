@@ -81,6 +81,38 @@
       }
     },
     {
+      "name": "windows-mingw-debug",
+      "inherits": [
+        "base"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/llvm-mingw-local.cmake",
+        "BUILD_TESTS": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-mingw-release",
+      "inherits": [
+        "base"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/llvm-mingw-local.cmake",
+        "BUILD_TESTS": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
       "name": "llvm-mingw-cross-debug",
       "inherits": [
         "base"
@@ -133,6 +165,14 @@
       "configuration": "Debug"
     },
     {
+      "name": "windows-mingw-debug",
+      "configurePreset": "windows-mingw-debug"
+    },
+    {
+      "name": "windows-mingw-release",
+      "configurePreset": "windows-mingw-release"
+    },
+    {
       "name": "llvm-mingw-cross-debug",
       "configurePreset": "llvm-mingw-cross-debug"
     },
@@ -150,6 +190,18 @@
       ],
       "configurations": [
         "Release"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-mingw-portable",
+      "configurePreset": "windows-mingw-release",
+      "generators": [
+        "ZIP"
       ],
       "condition": {
         "type": "equals",
