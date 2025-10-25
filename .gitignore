@@ -2,6 +2,7 @@
 /compile_commands.json
 /out/
 /logs/
+/build-logs/
 **/__pycache__/**
 /.cache/
 /.cpm-cache/

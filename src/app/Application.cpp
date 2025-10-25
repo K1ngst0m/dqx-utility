@@ -41,6 +41,10 @@
 namespace
 {
 
+#if DQX_PROFILING_LEVEL == 1
+    profiling::detail::FrameStatsAccumulator frame_stats_{ 60 }; // Log every 60 frames (~1 second)
+#endif
+
 static void SDLCALL SDLLogBridge(void* userdata, int category, SDL_LogPriority priority, const char* message)
 {
     (void)userdata;
