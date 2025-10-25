@@ -239,6 +239,44 @@ void AppContext::setWindowBorderless(bool borderless)
 {
     if (!window_)
         return;
+
+#ifdef _WIN32
+    // On Windows, we need to use Win32 API to properly set WS_POPUP style
+    // for borderless mode. This ensures the window is treated as fullscreen-like
+    // by the Windows shell, which keeps the auto-hide taskbar hidden.
+    SDL_PropertiesID props = SDL_GetWindowProperties(window_);
+    void* hwnd_ptr = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+    if (hwnd_ptr)
+    {
+        HWND hwnd = reinterpret_cast<HWND>(hwnd_ptr);
+        LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+
+        if (borderless)
+        {
+            // Remove standard window frame styles and add WS_POPUP
+            style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+            style |= WS_POPUP;
+        }
+        else
+        {
+            // Restore standard window frame styles
+            style &= ~WS_POPUP;
+            style |= (WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+        }
+
+        SetWindowLongPtr(hwnd, GWL_STYLE, style);
+
+        // Keep SDL's internal state synchronized
+        SDL_SetWindowBordered(window_, !borderless);
+
+        // Force Windows to apply the style changes immediately
+        SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+        return;
+    }
+#endif
+
+    // Fallback for non-Windows platforms or if HWND is not available
     SDL_SetWindowBordered(window_, !borderless);
 }
 
