@@ -43,8 +43,8 @@ struct LabelDefinition
     LabelDefinition()
         : match_type(LabelMatchType::Literal)
         , action(LabelAction::Remove)
-        , case_sensitive(false)
         , processor(nullptr)
+        , case_sensitive(false)
     {
     }
 };

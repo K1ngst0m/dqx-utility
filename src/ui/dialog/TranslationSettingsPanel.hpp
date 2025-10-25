@@ -33,7 +33,7 @@ private:
                                 const std::string& testResult, const std::string& testTimestamp);
 
     DialogStateManager& state_;
-    TranslateSession& session_;
+    [[maybe_unused]] TranslateSession& session_;
     TranslationConfig* active_config_ = nullptr;
     TranslationConfig* global_config_ = nullptr;
     bool using_global_config_ = false;

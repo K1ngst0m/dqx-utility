@@ -415,7 +415,6 @@ void GlobalSettingsPanel::renderDQXClaritySection()
     if (config_mgr)
     {
         bool compat_mode = config_mgr->getCompatibilityMode();
-        bool is_hooked = (status == DQXClarityStatus::Connected);
 
         if (ImGui::Checkbox(i18n::get("settings.dqxc.compatibility_mode"), &compat_mode))
         {

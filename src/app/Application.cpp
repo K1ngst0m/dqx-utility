@@ -24,10 +24,6 @@
 #include <plog/Appenders/ConsoleAppender.h>
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Initializers/RollingFileInitializer.h>
-#include <filesystem>
-#include <fstream>
-#include <cstring>
-#include <string>
 #include <toml++/toml.h>
 
 #ifdef _WIN32
@@ -124,14 +120,35 @@ bool Application::initializeLogging()
         return false;
     }
 
-    utils::LogManager::RegisterLogger<0>({ .name = "main", .filepath = "logs/run.log", .add_console_appender = true });
+    utils::LogManager::RegisterLogger<0>({
+        .name = "main",
+        .filepath = "logs/run.log",
+        .append_override = std::nullopt,
+        .level_override = std::nullopt,
+        .max_file_size = 10 * 1024 * 1024,
+        .backup_count = 3,
+        .add_console_appender = true
+    });
 
-    utils::LogManager::RegisterLogger<1>({ .name = "diagnostics", .filepath = "logs/dialog.log" });
+    utils::LogManager::RegisterLogger<1>({
+        .name = "diagnostics",
+        .filepath = "logs/dialog.log",
+        .append_override = std::nullopt,
+        .level_override = std::nullopt,
+        .max_file_size = 10 * 1024 * 1024,
+        .backup_count = 3,
+        .add_console_appender = false
+    });
 
 #if DQX_PROFILING_LEVEL >= 1
     utils::LogManager::RegisterLogger<2>({
         .name = "profiling",
         .filepath = "logs/profiling.log",
+        .append_override = std::nullopt,
+        .level_override = std::nullopt,
+        .max_file_size = 10 * 1024 * 1024,
+        .backup_count = 3,
+        .add_console_appender = false
     });
 #endif
 

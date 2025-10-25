@@ -210,11 +210,6 @@ bool startsWith(const std::string& value, const std::string& prefix)
     return value.size() >= prefix.size() && value.compare(0, prefix.size(), prefix) == 0;
 }
 
-bool endsWith(const std::string& value, const std::string& suffix)
-{
-    return value.size() >= suffix.size() && value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
 void trimUtf8InPlace(std::string& text)
 {
     auto isAsciiSpace = [](unsigned char c)

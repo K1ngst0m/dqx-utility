@@ -21,7 +21,7 @@ DialogSettingsView::DialogSettingsView(DialogStateManager& state, FontManager& f
 
 void DialogSettingsView::render(translate::ITranslator* translator, std::string& applyHint, float& applyHintTimer,
                                 bool& testingConnection, std::string& testResult, std::string& testTimestamp,
-                                const std::string& settingsIdSuffix,
+                                [[maybe_unused]] const std::string& settingsIdSuffix,
                                 const std::function<void()>& initTranslatorIfEnabledFn,
                                 const std::function<translate::ITranslator*()>& currentTranslatorFn)
 {

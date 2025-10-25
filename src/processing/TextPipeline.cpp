@@ -20,7 +20,9 @@ namespace
 void logInput(const std::string& input)
 {
     if (Diagnostics::IsVerbose())
+    {
         PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] stage=input raw=" << Diagnostics::Preview(input);
+    }
 }
 
 void logStageResult(const text_processing::StageResult<std::string>& stage, const char* name,
@@ -60,7 +62,9 @@ void logLanguageDetection(const text_processing::StageResult<bool>& stage)
             << "[TextPipeline] stage=language_filter status=ok duration=" << stage.duration.count()
             << "us detected=" << (stage.result ? "jp" : "non-jp");
         if (!stage.result)
+        {
             PLOG_INFO_(Diagnostics::kLogInstance) << "[TextPipeline] filtered_out reason=non_japanese";
+        }
     }
     else
     {
@@ -75,15 +79,19 @@ void logLanguageDetection(const text_processing::StageResult<bool>& stage)
 std::string logFallback(const char* target, const std::string& fallback_value)
 {
     if (Diagnostics::IsVerbose())
+    {
         PLOG_WARNING_(Diagnostics::kLogInstance) << "[TextPipeline] fallback=" << target;
+    }
     return fallback_value;
 }
 
 void logCompletion(const std::string& output)
 {
     if (Diagnostics::IsVerbose())
+    {
         PLOG_INFO_(Diagnostics::kLogInstance)
             << "[TextPipeline] stage=complete output=" << Diagnostics::Preview(output);
+    }
 }
 
 } // anonymous namespace

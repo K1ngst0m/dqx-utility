@@ -24,7 +24,7 @@ public:
 
 private:
     AppContext& app_context_;
-    WindowRegistry& registry_;
+    [[maybe_unused]] WindowRegistry& registry_;
     MiniModeManager& mini_manager_;
     ConfigManager::AppMode current_mode_ = ConfigManager::AppMode::Normal;
 };

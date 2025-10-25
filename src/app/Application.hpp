@@ -69,6 +69,6 @@ private:
     Uint64 last_time_ = 0;
     bool last_window_topmost_ = false;
 
-    int argc_ = 0;
-    char** argv_ = nullptr;
+    [[maybe_unused]] int argc_ = 0;
+    [[maybe_unused]] char** argv_ = nullptr;
 };

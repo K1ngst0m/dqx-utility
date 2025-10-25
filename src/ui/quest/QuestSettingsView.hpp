@@ -29,8 +29,8 @@ private:
     void applyPendingResizeFlags(const AppearanceSettingsPanel::RenderResult& changes);
 
     QuestStateManager& state_;
-    FontManager& font_manager_;
-    TranslateSession& session_;
+    [[maybe_unused]] FontManager& font_manager_;
+    [[maybe_unused]] TranslateSession& session_;
     AppearanceSettingsPanel appearance_panel_;
     TranslationSettingsPanel translation_panel_;
 };

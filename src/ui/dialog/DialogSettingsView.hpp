@@ -29,8 +29,8 @@ private:
     void applyPendingResizeFlags(const AppearanceSettingsPanel::RenderResult& changes);
 
     DialogStateManager& state_;
-    FontManager& fontManager_;
-    TranslateSession& session_;
+    [[maybe_unused]] FontManager& fontManager_;
+    [[maybe_unused]] TranslateSession& session_;
     AppearanceSettingsPanel appearancePanel_;
     TranslationSettingsPanel translationPanel_;
     DebugSettingsPanel debugPanel_;

@@ -661,8 +661,6 @@ bool Engine::start_hook(StartPolicy policy)
 
                         for (auto& hook : hooks)
                         {
-                            // Check if memory reader already captured same text
-                            bool found_duplicate = false;
                             for (size_t i = 0; i < memory_readers.size(); ++i)
                             {
                                 if (memory_readers[i].text == hook.text)
@@ -678,7 +676,6 @@ bool Engine::start_hook(StartPolicy policy)
                                                         std::to_string(latency_ms) + "ms, has NPC name)");
                                     }
                                     memory_reader_indices_to_skip.insert(i);
-                                    found_duplicate = true;
                                     break;
                                 }
                             }

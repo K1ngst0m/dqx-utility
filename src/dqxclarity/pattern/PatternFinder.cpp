@@ -60,10 +60,9 @@ std::optional<uintptr_t> PatternFinder::FindWithFallback(const Pattern& pattern,
                                                             /*require_executable=*/false);
         }
 
-        size_t total_scan_bytes = 0;
+        [[maybe_unused]] size_t total_scan_bytes = 0;
         for (const auto& region : regions)
         {
-            // Restrict to the address window relative to the module base
             if (region.end <= base || region.start >= base + scan_size_bytes)
                 continue;
             uintptr_t start = (std::max)(region.start, base);

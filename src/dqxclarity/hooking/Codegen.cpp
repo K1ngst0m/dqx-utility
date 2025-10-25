@@ -27,7 +27,7 @@ constexpr uint8_t NOP = 0x90;
 // ModR/M bytes for [disp32] addressing (Mod=00, R/M=101)
 namespace ModRM
 {
-constexpr uint8_t EAX_DISP32 = 0x05; // [disp32] with EAX
+[[maybe_unused]] constexpr uint8_t EAX_DISP32 = 0x05; // [disp32] with EAX
 constexpr uint8_t EBX_DISP32 = 0x1D; // [disp32] with EBX
 constexpr uint8_t ECX_DISP32 = 0x0D; // [disp32] with ECX
 constexpr uint8_t EDX_DISP32 = 0x15; // [disp32] with EDX

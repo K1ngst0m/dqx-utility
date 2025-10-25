@@ -292,8 +292,8 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
 
 DialogWindow::DialogWindow(FontManager& font_manager, int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
-    , settings_view_(state_, font_manager_, session_)
     , cached_backend_(translate::Backend::OpenAI)
+    , settings_view_(state_, font_manager_, session_)
 {
 
     name_ = name;
@@ -1122,7 +1122,7 @@ void DialogWindow::renderDialogContextMenu()
                     auto mode = cm->getAppMode();
                     bool sel_normal = (mode == ConfigManager::AppMode::Normal);
                     bool sel_borderless = (mode == ConfigManager::AppMode::Borderless);
-                    bool sel_mini = (mode == ConfigManager::AppMode::Mini);
+                    // bool sel_mini = (mode == ConfigManager::AppMode::Mini);
                     if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal))
                         cm->setAppMode(ConfigManager::AppMode::Normal);
                     if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless))

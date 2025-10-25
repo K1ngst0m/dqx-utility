@@ -272,7 +272,7 @@ bool IntegrityDetour::FindIntegrityAddress(uintptr_t& out_addr)
             }
             m_log.info(oss.str());
             std::ostringstream oss2;
-            oss2 << "Integrity diag: full matches among anchors=" << full_matches;
+            oss2 << "Integrity diag: full matches among anchors=" << full_matches << " shown=" << shown;
             m_log.info(oss2.str());
         }
 

@@ -33,9 +33,8 @@ private:
     int previous_selected_index_ = -1;
     std::array<char, 128> rename_buffer_{};
 
-    // DQXClarity launcher
     std::unique_ptr<DQXClarityLauncher> dqxc_launcher_;
-    bool is_launching_ = false;
+    [[maybe_unused]] bool is_launching_ = false;
 
     // Debug log viewer state
     std::string cached_log_content_;

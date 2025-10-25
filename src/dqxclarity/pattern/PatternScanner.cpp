@@ -194,11 +194,9 @@ std::optional<uintptr_t> PatternScanner::ScanProcess(const Pattern& pattern, boo
     }
 
     std::vector<MemoryRegion> regions;
-    size_t total_regions = 0;
     {
         PROFILE_SCOPE_CUSTOM("ScanProcess.ParseRegions");
         regions = MemoryRegionParser::ParseMapsFiltered(m_memory->GetAttachedPid(), true, require_executable);
-        total_regions = regions.size();
     }
 
     for (const auto& region : regions)
@@ -223,12 +221,9 @@ std::optional<uintptr_t> PatternScanner::ScanModule(const Pattern& pattern, cons
     }
 
     std::vector<MemoryRegion> regions;
-    size_t total_regions = 0;
-    size_t matched_regions = 0;
     {
         PROFILE_SCOPE_CUSTOM("ScanModule.ParseMaps");
         regions = MemoryRegionParser::ParseMaps(m_memory->GetAttachedPid());
-        total_regions = regions.size();
     }
 
     return ScanModuleWithRegions(pattern, module_name, regions);
@@ -243,8 +238,8 @@ std::optional<uintptr_t> PatternScanner::ScanModuleWithRegions(const Pattern& pa
         return std::nullopt;
     }
 
-    size_t matched_regions = 0;
-    constexpr size_t MAX_REGION_SIZE = 10 * 1024 * 1024; // 10MB - skip huge regions
+    constexpr size_t MAX_REGION_SIZE = 10 * 1024 * 1024;
+    [[maybe_unused]] size_t matched_regions = 0;
 
     // Case-insensitive module name for matching
     std::string module_name_lower = ToLowerCase(module_name);
