@@ -471,9 +471,6 @@ void DialogWindow::render()
     refreshPlaceholderStatus();
     applyPending();
 
-    if (auto* cm = ConfigManager_Get())
-        cm->pollAndApply();
-
     bool using_global = usingGlobalTranslation();
     if (using_global)
     {
