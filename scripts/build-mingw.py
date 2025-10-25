@@ -139,10 +139,14 @@ class ContainerBuilder:
         if log_file and self.enable_logging:
             return self._run_with_logging(container_args, log_file)
         else:
-            return subprocess.run(container_args, cwd=self.project_root)
+            return subprocess.run(
+                container_args,
+                cwd=self.project_root,
+                check=False  # Don't raise exception, let caller handle errors
+            )
 
     def _run_with_logging(self, container_args, log_file):
-        """Run command with output to console, filter warnings/errors to log file using grep."""
+        """Run command with output to console, filter warnings/errors to log file."""
         log_path = self.log_dir / log_file
 
         log_info(f"Logging warnings/errors to: {log_path}")
@@ -158,8 +162,24 @@ class ContainerBuilder:
         with open(log_path, 'w', encoding='utf-8') as f:
             f.write(header)
 
-        # Build a shell pipeline: run command, tee to console, grep errors/warnings to log
-        # Using shell=True to allow piping
+        # Platform-specific logging implementation
+        if platform.system() == 'Windows':
+            returncode = self._run_with_logging_windows(container_args, log_path)
+        else:
+            returncode = self._run_with_logging_unix(container_args, log_path)
+
+        # Write footer
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(f"\n{'='*80}\n")
+            f.write(f"Exit code: {returncode}\n")
+
+        return subprocess.CompletedProcess(
+            args=container_args,
+            returncode=returncode
+        )
+
+    def _run_with_logging_unix(self, container_args, log_path):
+        """Unix/Linux logging using Bash pipeline with tee and process substitution."""
         cmd_str = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in container_args)
         grep_pattern = 'warning:\\|error:\\|Error:\\|ERROR:\\|fatal error:'
 
@@ -179,15 +199,47 @@ class ContainerBuilder:
             process.wait()
             raise
 
-        # Write footer
-        with open(log_path, 'a', encoding='utf-8') as f:
-            f.write(f"\n{'='*80}\n")
-            f.write(f"Exit code: {returncode}\n")
+        return returncode
 
-        return subprocess.CompletedProcess(
-            args=container_args,
-            returncode=returncode
+    def _run_with_logging_windows(self, container_args, log_path):
+        """Windows logging using Python-based output filtering."""
+        import re
+
+        # Compile regex pattern for warnings/errors
+        error_pattern = re.compile(
+            r'(warning:|error:|Error:|ERROR:|fatal error:)',
+            re.IGNORECASE
         )
+
+        process = subprocess.Popen(
+            container_args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            bufsize=1,  # Line buffered
+            cwd=self.project_root
+        )
+
+        try:
+            with open(log_path, 'a', encoding='utf-8') as log_f:
+                for line in process.stdout:
+                    # Print to console in real-time
+                    print(line, end='', flush=True)
+
+                    # Filter and write warnings/errors to log file
+                    if error_pattern.search(line):
+                        log_f.write(line)
+                        log_f.flush()
+
+            returncode = process.wait()
+        except KeyboardInterrupt:
+            process.terminate()
+            process.wait()
+            raise
+
+        return returncode
 
     def configure(self):
         """Configure build with CMake."""
