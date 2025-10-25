@@ -302,7 +302,7 @@ EXAMPLES:
     ./scripts/build-mingw.py
 
     # Build debug version
-    ./scripts/build-mingw.py -p linux-mingw-debug
+    ./scripts/build-mingw.py -p llvm-mingw-cross-debug
 
     # Configure only
     ./scripts/build-mingw.py configure
@@ -323,8 +323,8 @@ EXAMPLES:
 
     parser.add_argument(
         '-p', '--preset',
-        default=os.environ.get('PRESET', 'linux-mingw-release'),
-        help='CMake preset to use (default: linux-mingw-release)'
+        default=os.environ.get('PRESET', 'llvm-mingw-cross-release'),
+        help='CMake preset to use (default: llvm-mingw-cross-release)'
     )
     parser.add_argument(
         '-j', '--jobs',

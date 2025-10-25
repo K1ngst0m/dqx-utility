@@ -4,6 +4,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-Wno-deprecated-literal-operator" HAS_NO_DEPRECATED_LITERAL_OPERATOR)
+check_cxx_compiler_flag("-Wno-unknown-warning-option" HAS_NO_UNKNOWN_WARNING_OPTION)
+
+if(HAS_NO_UNKNOWN_WARNING_OPTION)
+  add_compile_options(-Wno-unknown-warning-option)
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wno-deprecated-literal-operator)
+endif()
 
 add_library(project_options INTERFACE)
 add_library(project_warnings INTERFACE)
@@ -43,8 +52,10 @@ function(configure_target_properties target)
       RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/MinSizeRel/app"
     )
 
-    if(WIN32)
+    if(WIN32 AND MSVC)
       target_link_options(${target} PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
+    elseif(WIN32 AND NOT MSVC)
+      target_link_options(${target} PRIVATE -mwindows)
     endif()
   endif()
 endfunction()

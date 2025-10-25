@@ -77,7 +77,7 @@
       }
     },
     {
-      "name": "linux-mingw-debug",
+      "name": "llvm-mingw-cross-debug",
       "inherits": [
         "base"
       ],
@@ -93,7 +93,7 @@
       }
     },
     {
-      "name": "linux-mingw-release",
+      "name": "llvm-mingw-cross-release",
       "inherits": [
         "base"
       ],
@@ -129,12 +129,12 @@
       "configuration": "Debug"
     },
     {
-      "name": "linux-mingw-debug",
-      "configurePreset": "linux-mingw-debug"
+      "name": "llvm-mingw-cross-debug",
+      "configurePreset": "llvm-mingw-cross-debug"
     },
     {
-      "name": "linux-mingw-release",
-      "configurePreset": "linux-mingw-release"
+      "name": "llvm-mingw-cross-release",
+      "configurePreset": "llvm-mingw-cross-release"
     }
   ],
   "packagePresets": [
@@ -154,8 +154,8 @@
       }
     },
     {
-      "name": "linux-mingw-portable",
-      "configurePreset": "linux-mingw-release",
+      "name": "llvm-mingw-cross-portable",
+      "configurePreset": "llvm-mingw-cross-release",
       "generators": [
         "ZIP"
       ],
