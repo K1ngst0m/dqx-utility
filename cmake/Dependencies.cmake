@@ -146,6 +146,48 @@ CPMAddPackage(
     "CPPTRACE_STATIC_LIB ON"
 )
 
+# libmem - Cross-platform process memory library (MSVC prebuilt binary)
+if(MSVC)
+  CPMAddPackage(
+    NAME libmem
+    URL https://github.com/rdbo/libmem/releases/download/5.1.0/libmem-5.1.0-x86_64-windows-msvc-static-md.tar.gz
+    DOWNLOAD_ONLY YES
+  )
+
+  if(libmem_ADDED)
+    # Create imported static library target
+    add_library(libmem STATIC IMPORTED GLOBAL)
+    add_library(libmem::libmem ALIAS libmem)
+
+    # Set include directories and define LM_EXPORT to prevent dllimport decoration
+    set_target_properties(libmem PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${libmem_SOURCE_DIR}/include"
+      INTERFACE_COMPILE_DEFINITIONS "LM_EXPORT"
+      INTERFACE_LINK_LIBRARIES "ntdll"
+    )
+
+    # Set library locations for multi-config generators (Visual Studio)
+    set_target_properties(libmem PROPERTIES
+      IMPORTED_LOCATION_DEBUG "${libmem_SOURCE_DIR}/lib/debug/libmem.lib"
+      IMPORTED_LOCATION_RELEASE "${libmem_SOURCE_DIR}/lib/release/libmem.lib"
+      IMPORTED_LOCATION_RELWITHDEBINFO "${libmem_SOURCE_DIR}/lib/release/libmem.lib"
+      IMPORTED_LOCATION_MINSIZEREL "${libmem_SOURCE_DIR}/lib/release/libmem.lib"
+    )
+
+    # Also set the default configuration
+    set_target_properties(libmem PROPERTIES
+      IMPORTED_CONFIGURATIONS "RELEASE;DEBUG;RELWITHDEBINFO;MINSIZEREL"
+    )
+
+    message(STATUS "Using libmem prebuilt static library from: ${libmem_SOURCE_DIR}")
+    message(STATUS "  Debug lib: ${libmem_SOURCE_DIR}/lib/debug/libmem.lib")
+    message(STATUS "  Release lib: ${libmem_SOURCE_DIR}/lib/release/libmem.lib")
+  endif()
+else()
+  message(WARNING "libmem prebuilt binary only supports MSVC. MinGW/Linux builds will fail.")
+  set(libmem_ADDED FALSE)
+endif()
+
 # Tracy - Real-time profiler (only for PROFILING_LEVEL >= 2)
 if(PROFILING_LEVEL GREATER_EQUAL 2)
   CPMAddPackage(
@@ -198,6 +240,10 @@ endif()
 
 if(NOT nlohmann_json_ADDED)
   message(FATAL_ERROR "Required dependency nlohmann_json was not acquired.")
+endif()
+
+if(NOT libmem_ADDED)
+  message(FATAL_ERROR "Required dependency libmem was not acquired.")
 endif()
 
 if(PROFILING_LEVEL GREATER_EQUAL 2)

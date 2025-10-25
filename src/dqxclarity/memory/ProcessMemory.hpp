@@ -1,16 +1,19 @@
 #pragma once
 
-#include "../IProcessMemory.hpp"
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
+#include "IProcessMemory.hpp"
+#include <libmem/libmem.h>
 #include <string>
 #include <vector>
 
 namespace dqxclarity
 {
 
+/**
+ * @brief Unified cross-platform process memory implementation using libmem
+ *
+ * This class provides a single implementation that works on both Windows and Linux
+ * by using the libmem library for all process memory operations.
+ */
 class ProcessMemory : public IProcessMemory
 {
 public:
@@ -36,11 +39,14 @@ public:
     void FlushInstructionCache(uintptr_t address, size_t size) override;
 
 private:
-    HANDLE m_process_handle;
-    DWORD m_process_id;
+    lm_process_t m_process;
+    pid_t m_process_id;
     bool m_is_attached;
 
-    DWORD ConvertProtectionFlags(MemoryProtectionFlags flags);
+    /**
+     * @brief Convert IProcessMemory protection flags to libmem protection flags
+     */
+    lm_prot_t ConvertProtectionFlags(MemoryProtectionFlags flags);
 };
 
 } // namespace dqxclarity

@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 3.20)
 # dqxclarity subproject: static library + optional CLI tool
 project(DQXClarity LANGUAGES CXX)
 
+# libmem currently only supports MSVC on Windows
+if(WIN32 AND NOT MSVC)
+  message(FATAL_ERROR "DQXClarity Windows builds currently require MSVC (MinGW support pending due to libmem dependency)")
+endif()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -10,6 +15,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Library sources (shared across platforms)
 set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/MemoryFactory.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/memory/ProcessMemory.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/DialogMemoryReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/Pattern.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/PatternScanner.cpp
@@ -32,17 +38,14 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/console/ConsoleFactory.cpp
 )
 
-# Platform-specific library sources
 if(WIN32)
   list(APPEND DQXCLARITY_LIB_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/memory/win/ProcessMemory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/pattern/win/MemoryRegion.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/process/win/ProcessFinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/console/win/Console.cpp
   )
 else()
   list(APPEND DQXCLARITY_LIB_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/memory/linux/ProcessMemory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/pattern/linux/MemoryRegion.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/process/linux/ProcessFinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/console/linux/Console.cpp
@@ -77,9 +80,8 @@ if(PROFILING_LEVEL GREATER_EQUAL 2)
   target_link_libraries(dqxclarity PUBLIC Tracy::TracyClient)
 endif()
 
-if(WIN32)
-  target_link_libraries(dqxclarity PUBLIC psapi)
-endif()
+# Link libmem for cross-platform process memory operations
+target_link_libraries(dqxclarity PUBLIC libmem)
 
 # Optional CLI tool built on the library (for development)
 if(BUILD_DQXCLARITY_CLI)
