@@ -798,13 +798,10 @@ void GlobalSettingsPanel::renderAppearanceSection()
 
         if (auto* cm = ConfigManager_Get())
         {
-            if (cm->getAppMode() == ConfigManager::AppMode::Normal)
+            bool always_on_top = cm->getWindowAlwaysOnTop();
+            if (ImGui::Checkbox(i18n::get("settings.always_on_top"), &always_on_top))
             {
-                bool always_on_top = cm->getWindowAlwaysOnTop();
-                if (ImGui::Checkbox(i18n::get("settings.always_on_top"), &always_on_top))
-                {
-                    cm->setWindowAlwaysOnTop(always_on_top);
-                }
+                cm->setWindowAlwaysOnTop(always_on_top);
             }
         }
     }
