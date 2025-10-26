@@ -3,8 +3,10 @@
 
 #include <plog/Log.h>
 #include <nlohmann/json.hpp>
+#include <array>
 #include <fstream>
 #include <filesystem>
+#include <vector>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -106,6 +108,61 @@ std::size_t GlossaryManager::getEntryCount(const std::string& target_lang) const
 }
 
 bool GlossaryManager::isInitialized() const { return initialized_; }
+
+std::string GlossaryManager::buildGlossarySnippet(const std::string& text, const std::string& target_lang,
+                                                  std::size_t max_entries) const
+{
+    if (!initialized_ || text.empty() || max_entries == 0)
+    {
+        return {};
+    }
+
+    std::string glossary_lang = mapToGlossaryLanguage(target_lang);
+    auto lang_it = glossaries_.find(glossary_lang);
+    if (lang_it == glossaries_.end())
+    {
+        return {};
+    }
+
+    std::array<bool, 256> present{};
+    for (unsigned char c : text)
+    {
+        present[c] = true;
+    }
+
+    std::vector<std::pair<std::string, std::string>> matches;
+    matches.reserve(max_entries);
+    const auto& glossary_map = lang_it->second;
+    for (const auto& entry : glossary_map)
+    {
+        const std::string& source = entry.first;
+        if (source.empty())
+            continue;
+        if (!present[static_cast<unsigned char>(source[0])])
+            continue;
+        if (text.find(source) == std::string::npos)
+            continue;
+        matches.emplace_back(entry);
+        if (matches.size() >= max_entries)
+            break;
+    }
+
+    if (matches.empty())
+        return {};
+
+    std::string snippet;
+    snippet.reserve(matches.size() * 24);
+    for (const auto& pair : matches)
+    {
+        snippet.append(pair.first);
+        snippet.append(" → ");
+        snippet.append(pair.second);
+        snippet.push_back('\n');
+    }
+    if (!snippet.empty())
+        snippet.pop_back();
+    return snippet;
+}
 
 bool GlossaryManager::loadGlossaryFile(const std::string& file_path, const std::string& language_code)
 {

@@ -218,7 +218,7 @@ bool TranslationSettingsPanel::renderBackendSpecificConfig(TranslationConfig& co
         ImGui::TextDisabled("%s", i18n::get("dialog.settings.system_prompt_hint"));
 
         prompt_changed = ImGui::InputTextMultiline("##prompt", config.custom_prompt.data(), config.custom_prompt.size(),
-                                                   ImVec2(500.0f, 120.0f),
+                                                   ImVec2(500.0f, 200.0f),
                                                    ImGuiInputTextFlags_WordWrap | ImGuiInputTextFlags_AllowTabInput);
 
         if (ImGui::Button(i18n::get("dialog.settings.reset_prompt")))

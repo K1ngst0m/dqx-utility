@@ -132,6 +132,18 @@ std::string strip_waiting_suffix(std::string text)
     return text;
 }
 
+bool isLLMBackend(TranslationConfig::TranslationBackend backend)
+{
+    switch (backend)
+    {
+    case TranslationConfig::TranslationBackend::OpenAI:
+    case TranslationConfig::TranslationBackend::ZhipuGLM:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string& reason)
 {
     using translate::Backend;
@@ -389,10 +401,11 @@ void DialogWindow::applyPending()
         }
 
         std::string target_lang_code = toTargetCode(config.target_lang_enum);
+        bool use_glossary_replacement = config.glossary_enabled && !isLLMBackend(config.translation_backend);
         std::string processed_text =
             (m.type == dqxclarity::DialogStreamType::CornerText) ?
                 text_to_process :
-                text_pipeline_->process(text_to_process, target_lang_code, config.glossary_enabled);
+                text_pipeline_->process(text_to_process, target_lang_code, use_glossary_replacement);
 
         if (processed_text.empty())
         {
@@ -828,7 +841,9 @@ void DialogWindow::renderDialog()
                         std::string text_to_retry = it->second;
                         std::string target_lang_code = toTargetCode(config.target_lang_enum);
                         std::string processed_text =
-                            text_pipeline_->process(text_to_retry, target_lang_code, config.glossary_enabled);
+                            text_pipeline_->process(text_to_retry, target_lang_code,
+                                                    config.glossary_enabled &&
+                                                        !isLLMBackend(config.translation_backend));
                         auto submit = session_.submit(processed_text, config.translation_backend,
                                                       config.target_lang_enum, translator_.get());
 

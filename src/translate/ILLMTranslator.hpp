@@ -3,6 +3,7 @@
 #include "ITranslator.hpp"
 
 #include "TranslatorHelpers.hpp"
+#include "../processing/GlossaryManager.hpp"
 #include "../utils/ErrorReporter.hpp"
 #include "../utils/HttpCommon.hpp"
 
@@ -113,6 +114,8 @@ protected:
     static void replaceAll(std::string& target, const std::string& placeholder, const std::string& value);
     RequestResult performRequest(const Job& job);
     void workerLoop();
+    std::string buildGlossarySnippet(const Job& job, const std::string& target_lang) const;
+    static processing::GlossaryManager& sharedGlossaryManager();
 
     struct FlightGuard
     {

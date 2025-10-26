@@ -199,7 +199,7 @@ void ILLMTranslator::workerLoop()
 
         if (success)
         {
-            PLOG_INFO << providerName() << " translation [" << job.src << " -> " << job.dst << "]: '" << job.text
+            PLOG_DEBUG << providerName() << " translation [" << job.src << " -> " << job.dst << "]: '" << job.text
                       << "' -> '" << request_result.completed.text << "'";
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(request_result.completed));
@@ -285,11 +285,25 @@ ILLMTranslator::Prompt ILLMTranslator::buildPrompt(const Job& job) const
         ctx.target_lang = "zh-cn";
     ctx.replacements.emplace_back("{target_lang}", languageDisplayName(ctx.target_lang));
     ctx.replacements.emplace_back("{source_lang}", languageDisplayName(ctx.source_lang));
+    std::string glossary_block = buildGlossarySnippet(job, ctx.target_lang);
+    if (glossary_block.empty())
+        glossary_block = "(empty)";
+    ctx.replacements.emplace_back("{glossary}", glossary_block);
+    ctx.replacements.emplace_back("{source_text}", job.text);
     augmentPromptContext(job, ctx);
 
-    const std::string default_template =
-        "Translate the following game dialog to {target_lang}. Keep the speaker's tone and game style. "
-        "Do not add or remove content. Do not introduce any explanations or additional text.";
+    const std::string default_template = std::string(R"(You are a professional translator familiar with the Dragon Quest series.
+Translate the following Dragon Quest X dialogue into {target_lang}.
+Preserve official DQX terminology and tone; when no official wording exists, lean on standard series phrasing.
+Adhere to the glossary below when available:
+{glossary}
+
+Guidelines:
+- Stay faithful to the source; add nothing and omit nothing.
+- Retain the speaker's voice, era flavor, and the series' stylistic quirks.
+- Output translation only—no explanations.
+Source text:
+{source_text})");
     std::string system_prompt = cfg_.prompt.empty() ? default_template : cfg_.prompt;
     for (const auto& repl : ctx.replacements)
         replaceAll(system_prompt, repl.first, repl.second);
@@ -303,13 +317,18 @@ ILLMTranslator::Prompt ILLMTranslator::buildPrompt(const Job& job) const
 
 std::string ILLMTranslator::languageDisplayName(const std::string& lang)
 {
-    if (lang == "en" || lang == "en-us" || lang == "en_US")
+    std::string lower;
+    lower.reserve(lang.size());
+    for (char c : lang)
+        lower.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+
+    if (lower == "en" || lower == "en-us" || lower == "en_us")
         return "English";
-    if (lang == "zh-cn" || lang == "zh-hans")
+    if (lower == "zh-cn" || lower == "zh-hans")
         return "Simplified Chinese";
-    if (lang == "zh-tw" || lang == "zh-hant")
+    if (lower == "zh-tw" || lower == "zh-hant")
         return "Traditional Chinese";
-    if (lang == "ja" || lang == "ja-jp")
+    if (lower == "ja" || lower == "ja-jp")
         return "Japanese";
     return lang.empty() ? "target language" : lang;
 }
@@ -324,6 +343,23 @@ void ILLMTranslator::replaceAll(std::string& target, const std::string& placehol
         target.replace(pos, placeholder.length(), value);
         pos += value.length();
     }
+}
+
+std::string ILLMTranslator::buildGlossarySnippet(const Job& job, const std::string& target_lang) const
+{
+    if (!cfg_.glossary_enabled)
+        return {};
+    const std::string effective_lang = target_lang.empty() ? cfg_.target_lang : target_lang;
+    auto& manager = sharedGlossaryManager();
+    return manager.buildGlossarySnippet(job.text, effective_lang.empty() ? "zh-cn" : effective_lang, 10);
+}
+
+processing::GlossaryManager& ILLMTranslator::sharedGlossaryManager()
+{
+    static processing::GlossaryManager manager;
+    static std::once_flag once;
+    std::call_once(once, []() { manager.initialize(); });
+    return manager;
 }
 
 ILLMTranslator::RequestResult ILLMTranslator::performRequest(const Job& job)
@@ -345,6 +381,7 @@ ILLMTranslator::RequestResult ILLMTranslator::performRequest(const Job& job)
     nlohmann::json body_json = nlohmann::json::object();
     buildRequestBody(job, prompt, body_json);
     std::string body = body_json.dump();
+    PLOG_DEBUG << "final post body: " << body;
 
     std::vector<Header> headers;
     buildHeaders(job, headers);

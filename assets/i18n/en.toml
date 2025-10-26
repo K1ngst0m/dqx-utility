@@ -128,8 +128,22 @@ model = "Model"
 api_key = "API Key"
 api_key_optional = "API Key (Optional)"
 system_prompt = "System Prompt"
-system_prompt_hint = "Customize the instruction given to the translation model. Leave empty for default. \nUse {target_lang} to represent the target language."
-default_prompt = "Translate the following game dialog to the {target_lang}. Keep the speaker's tone and game style. Do not add or remove content. Only the translated content should appear."
+system_prompt_hint = """Customize the instruction given to the translation model. Leave empty for default.
+{target_lang} → Target language label.
+{glossary} → Glossary snippet (term → translation list).
+{source_text} → Original text content."""
+default_prompt = """You are a professional translator familiar with the Dragon Quest series.
+Translate the following Dragon Quest X dialogue into {target_lang}.
+Preserve official DQX terminology and tone; when no official wording exists, lean on standard series phrasing.
+Adhere to the glossary below when available:
+{glossary}
+
+Guidelines:
+- Stay faithful to the source; add nothing and omit nothing.
+- Retain the speaker's voice, era flavor, and the series' stylistic quirks.
+- Output translation only—no explanations.
+Source text:
+{source_text}"""
 reset_prompt = "Reset"
 google_note = "Leave empty to use free tier. Paid API requires Google Cloud credentials."
 apply_hint = "Settings applied"

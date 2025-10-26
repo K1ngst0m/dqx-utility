@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include <optional>
+#include <cstddef>
 
 namespace processing
 {
@@ -21,6 +22,9 @@ public:
     std::size_t getEntryCount(const std::string& target_lang) const;
 
     bool isInitialized() const;
+
+    std::string buildGlossarySnippet(const std::string& text, const std::string& target_lang,
+                                     std::size_t max_entries = 10) const;
 
 private:
     bool loadGlossaryFile(const std::string& file_path, const std::string& language_code);

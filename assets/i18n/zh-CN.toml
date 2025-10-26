@@ -129,8 +129,22 @@ model = "模型"
 api_key = "API 密钥"
 api_key_optional = "API 密钥（可选）"
 system_prompt = "系统提示词"
-system_prompt_hint = "自定义给翻译模型的指令。留空使用默认提示词。\n目标语言使用 {target_lang} 来表示"
-default_prompt = "将以下游戏对话翻译为{target_lang}。保持说话者的语气和游戏风格。不要添加或删除内容。只能出现翻译内容。"
+system_prompt_hint = """自定义给翻译模型的提示。留空时使用默认值。
+{target_lang} → 目标语言标签
+{glossary} → 术语表摘录（术语 → 译文）
+{source_text} → 原文内容"""
+default_prompt = """你是一位熟悉《勇者斗恶龙》系列的专业游戏翻译员。
+请将以下《勇者斗恶龙X》游戏对白翻译为{target_lang}。
+优先保持DQX的官方术语和语气，如无明确DQX用法时，可参考系列通用译名。
+遵守以下术语表（若有）：
+{glossary}
+
+要求：
+- 忠实原文，不增删。
+- 保留角色语气、时代感与系列语言风格。
+- 仅输出翻译文本。
+原文：
+{source_text}"""
 reset_prompt = "重置"
 google_note = "留空以使用免费额度。付费 API 需要 Google Cloud 凭据。"
 apply_hint = "设置已应用"

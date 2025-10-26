@@ -33,6 +33,7 @@ struct BackendConfig
     std::size_t max_concurrent_requests = 3;
     double request_interval_seconds = 0.5;
     int max_retries = 3;
+    bool glossary_enabled = true;
 
     static BackendConfig from(const ::TranslationConfig& cfg_ui);
 };
