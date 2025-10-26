@@ -41,13 +41,11 @@ set(DQXCLARITY_LIB_SOURCES
 if(WIN32)
   list(APPEND DQXCLARITY_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/pattern/win/MemoryRegion.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/process/win/ProcessFinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/console/win/Console.cpp
   )
 else()
   list(APPEND DQXCLARITY_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/pattern/linux/MemoryRegion.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/process/linux/ProcessFinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/console/linux/Console.cpp
   )
 endif()
