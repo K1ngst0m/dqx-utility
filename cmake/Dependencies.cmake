@@ -150,7 +150,7 @@ CPMAddPackage(
 if(MSVC)
   CPMAddPackage(
     NAME libmem
-    URL https://github.com/rdbo/libmem/releases/download/5.1.0/libmem-5.1.0-x86_64-windows-msvc-static-md.tar.gz
+    URL https://github.com/rdbo/libmem/releases/download/5.2.0-pre1/libmem-5.2.0-pre1-x86_64-windows-msvc-static-md.tar.gz
     DOWNLOAD_ONLY YES
   )
 

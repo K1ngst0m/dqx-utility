@@ -20,6 +20,9 @@ add_library(project_warnings INTERFACE)
 target_compile_features(project_options INTERFACE cxx_std_20)
 
 if(MSVC)
+  # Ensure every translation unit (including third-party CPM packages like Catch2)
+  # uses /FS so simultaneous cl.exe instances do not contend for the same PDB.
+  add_compile_options("$<$<CONFIG:Debug>:/FS>")
   target_compile_options(project_warnings INTERFACE /W4 /permissive-)
 else()
   target_compile_options(project_warnings INTERFACE -Wall -Wextra -Wpedantic)

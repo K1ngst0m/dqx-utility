@@ -10,7 +10,7 @@ using pid_t = DWORD;
 #else
 #include <sys/types.h>
 #endif
-#include <cstdint>
+
 
 namespace dqxclarity
 {
@@ -42,12 +42,7 @@ class MemoryRegionParser
 {
 public:
     static std::vector<MemoryRegion> ParseMaps(pid_t pid);
-
     static std::vector<MemoryRegion> ParseMapsFiltered(pid_t pid, bool require_readable, bool require_executable);
-
-private:
-    static MemoryRegion ParseLine(const std::string& line);
-    static int ParseProtection(const std::string& perm);
 };
 
 } // namespace dqxclarity
