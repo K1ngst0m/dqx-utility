@@ -613,7 +613,8 @@ bool DQXClarityLauncher::reinitialize()
     pimpl_->engine_cfg = cfg;
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
 
-    PLOG_INFO << "Compatibility mode setting: " << (cfg.compatibility_mode ? "true (memory reader only)" : "false (auto mode)");
+    PLOG_INFO << "Compatibility mode setting: "
+              << (cfg.compatibility_mode ? "true (memory reader only)" : "false (auto mode)");
 
     // Re-initialize engine with new config (this updates impl_->cfg)
     dqxclarity::Logger log{};
@@ -728,8 +729,8 @@ std::string DQXClarityLauncher::getStatusString() const
     switch (engine_status)
     {
     case S::Hooked:
-        return compat_mode ? i18n::get("settings.dqxc.status_compatibility_mode")
-                           : i18n::get("settings.dqxc.status_auto_mode");
+        return compat_mode ? i18n::get("settings.dqxc.status_compatibility_mode") :
+                             i18n::get("settings.dqxc.status_auto_mode");
     case S::Starting:
         return i18n::get("settings.dqxc.status_starting");
     case S::Stopping:

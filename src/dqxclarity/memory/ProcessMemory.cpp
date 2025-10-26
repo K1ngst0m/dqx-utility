@@ -6,25 +6,27 @@ namespace dqxclarity
 {
 namespace
 {
-    template<typename E>
-    constexpr auto to_underlying(E e) noexcept {
-        return static_cast<std::underlying_type_t<E>>(e);
-    }
-
-    libmem::Prot convert_protection_flags(MemoryProtectionFlags flags) {
-        auto int_flags = static_cast<int>(flags);
-        uint32_t result_flags = 0;
-
-        if (int_flags & static_cast<int>(MemoryProtectionFlags::Read))
-            result_flags |= to_underlying(libmem::Prot::R);
-        if (int_flags & static_cast<int>(MemoryProtectionFlags::Write))
-            result_flags |= to_underlying(libmem::Prot::W);
-        if (int_flags & static_cast<int>(MemoryProtectionFlags::Execute))
-            result_flags |= to_underlying(libmem::Prot::X);
-
-        return static_cast<libmem::Prot>(result_flags);
-    }
+template <typename E>
+constexpr auto to_underlying(E e) noexcept
+{
+    return static_cast<std::underlying_type_t<E>>(e);
 }
+
+libmem::Prot convert_protection_flags(MemoryProtectionFlags flags)
+{
+    auto int_flags = static_cast<int>(flags);
+    uint32_t result_flags = 0;
+
+    if (int_flags & static_cast<int>(MemoryProtectionFlags::Read))
+        result_flags |= to_underlying(libmem::Prot::R);
+    if (int_flags & static_cast<int>(MemoryProtectionFlags::Write))
+        result_flags |= to_underlying(libmem::Prot::W);
+    if (int_flags & static_cast<int>(MemoryProtectionFlags::Execute))
+        result_flags |= to_underlying(libmem::Prot::X);
+
+    return static_cast<libmem::Prot>(result_flags);
+}
+} // namespace
 
 ProcessMemory::ProcessMemory()
     : m_process{}
@@ -32,10 +34,7 @@ ProcessMemory::ProcessMemory()
 {
 }
 
-ProcessMemory::~ProcessMemory()
-{
-    DetachProcess();
-}
+ProcessMemory::~ProcessMemory() { DetachProcess(); }
 
 bool ProcessMemory::AttachProcess(pid_t pid)
 {
@@ -82,15 +81,9 @@ void ProcessMemory::DetachProcess()
     }
 }
 
-bool ProcessMemory::IsProcessAttached() const
-{
-    return m_process.has_value();
-}
+bool ProcessMemory::IsProcessAttached() const { return m_process.has_value(); }
 
-pid_t ProcessMemory::GetAttachedPid() const
-{
-    return m_process.has_value() ? m_process_id : static_cast<pid_t>(-1);
-}
+pid_t ProcessMemory::GetAttachedPid() const { return m_process.has_value() ? m_process_id : static_cast<pid_t>(-1); }
 
 uintptr_t ProcessMemory::AllocateMemory(size_t size, bool executable)
 {
@@ -202,6 +195,5 @@ void ProcessMemory::FlushInstructionCache(uintptr_t address, size_t size)
     (void)address;
     (void)size;
 }
-
 
 } // namespace dqxclarity
