@@ -1,20 +1,13 @@
 #pragma once
 
 #include "IProcessMemory.hpp"
-#include <libmem/libmem.hpp>
-#include <optional>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace dqxclarity
 {
 
-/**
- * @brief Unified cross-platform process memory implementation using libmem
- * 
- * This class provides a single implementation that works on both Windows and Linux
- * by using the libmem library for all process memory operations.
- */
 class ProcessMemory : public IProcessMemory
 {
 public:
@@ -40,7 +33,8 @@ public:
     void FlushInstructionCache(uintptr_t address, size_t size) override;
 
 private:
-    std::optional<libmem::Process> m_process;
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
     pid_t m_process_id;
 };
 

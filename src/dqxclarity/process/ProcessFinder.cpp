@@ -1,4 +1,5 @@
 #include "ProcessFinder.hpp"
+#include <libmem/libmem.hpp>
 #include <algorithm>
 #include <cctype>
 
@@ -30,7 +31,7 @@ std::vector<ProcessInfo> ProcessFinder::FindAll()
     for (const auto& proc : *processes)
     {
         ProcessInfo info;
-        info.pid = proc.pid;
+        info.pid = static_cast<pid_t>(proc.pid);
         info.name = proc.name;
         info.exe_path = proc.path;
 
@@ -47,7 +48,7 @@ std::vector<ProcessInfo> ProcessFinder::FindAll()
     return result;
 }
 
-std::vector<libmem::Pid> ProcessFinder::FindByName(const std::string& name, bool case_sensitive)
+std::vector<pid_t> ProcessFinder::FindByName(const std::string& name, bool case_sensitive)
 {
     auto processes = libmem::EnumProcesses();
     if (!processes)
@@ -55,7 +56,7 @@ std::vector<libmem::Pid> ProcessFinder::FindByName(const std::string& name, bool
         return {};
     }
 
-    std::vector<libmem::Pid> matching_pids;
+    std::vector<pid_t> matching_pids;
     std::string search_name = case_sensitive ? name : ToLower(name);
 
     for (const auto& proc : *processes)
@@ -64,7 +65,7 @@ std::vector<libmem::Pid> ProcessFinder::FindByName(const std::string& name, bool
 
         if (proc_name == search_name)
         {
-            matching_pids.push_back(proc.pid);
+            matching_pids.push_back(static_cast<pid_t>(proc.pid));
             continue;
         }
 
@@ -83,7 +84,7 @@ std::vector<libmem::Pid> ProcessFinder::FindByName(const std::string& name, bool
 
                 if (compare_exe == search_name)
                 {
-                    matching_pids.push_back(proc.pid);
+                    matching_pids.push_back(static_cast<pid_t>(proc.pid));
                 }
             }
         }
@@ -92,7 +93,7 @@ std::vector<libmem::Pid> ProcessFinder::FindByName(const std::string& name, bool
     return matching_pids;
 }
 
-std::vector<libmem::Pid> ProcessFinder::FindByExePath(const std::string& path)
+std::vector<pid_t> ProcessFinder::FindByExePath(const std::string& path)
 {
     auto processes = libmem::EnumProcesses();
     if (!processes)
@@ -100,29 +101,29 @@ std::vector<libmem::Pid> ProcessFinder::FindByExePath(const std::string& path)
         return {};
     }
 
-    std::vector<libmem::Pid> matching_pids;
+    std::vector<pid_t> matching_pids;
 
     for (const auto& proc : *processes)
     {
         if (proc.path == path)
         {
-            matching_pids.push_back(proc.pid);
+            matching_pids.push_back(static_cast<pid_t>(proc.pid));
         }
     }
 
     return matching_pids;
 }
 
-std::optional<ProcessInfo> ProcessFinder::GetProcessInfo(libmem::Pid pid)
+std::optional<ProcessInfo> ProcessFinder::GetProcessInfo(pid_t pid)
 {
-    auto process = libmem::GetProcess(pid);
+    auto process = libmem::GetProcess(static_cast<libmem::Pid>(pid));
     if (!process)
     {
         return std::nullopt;
     }
 
     ProcessInfo info;
-    info.pid = process->pid;
+    info.pid = static_cast<pid_t>(process->pid);
     info.name = process->name;
     info.exe_path = process->path;
 
@@ -136,12 +137,12 @@ std::optional<ProcessInfo> ProcessFinder::GetProcessInfo(libmem::Pid pid)
     return info;
 }
 
-bool ProcessFinder::IsWineProcess(libmem::Pid pid)
+bool ProcessFinder::IsWineProcess(pid_t pid)
 {
 #ifdef _WIN32
     return false;
 #else
-    auto process = libmem::GetProcess(pid);
+    auto process = libmem::GetProcess(static_cast<libmem::Pid>(pid));
     if (!process)
     {
         return false;
