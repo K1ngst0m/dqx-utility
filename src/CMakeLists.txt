@@ -56,6 +56,8 @@ target_sources(dqxu_core
 target_sources(dqxu_core
   PRIVATE
     translate/ITranslator.hpp
+    translate/ILLMTranslator.cpp
+    translate/ILLMTranslator.hpp
     translate/GoogleTranslator.cpp
     translate/GoogleTranslator.hpp
     translate/NiutransTranslator.cpp
