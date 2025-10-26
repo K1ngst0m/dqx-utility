@@ -20,11 +20,12 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/Pattern.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/PatternScanner.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/PatternFinder.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/pattern/ProcessMemoryScanner.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/pattern/polling/PollingRunner.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/pattern/polling/PatternPollingTask.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/MemoryRegion.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/signatures/Signatures.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/process/ProcessFinder.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/process/NoticeWaiter.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/process/PostLoginDetector.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/Codegen.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/DialogHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/CornerTextHook.cpp
@@ -104,3 +105,5 @@ if(BUILD_DQXCLARITY_CLI)
     RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/MinSizeRel/app"
   )
 endif()
+
+

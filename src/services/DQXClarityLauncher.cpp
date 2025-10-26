@@ -13,14 +13,85 @@
 #include "dqxclarity/api/dialog_message.hpp"
 #include "dqxclarity/api/dialog_stream.hpp"
 #include "dqxclarity/api/quest_message.hpp"
-#include "dqxclarity/process/NoticeWaiter.hpp"
-#include "dqxclarity/process/PostLoginDetector.hpp"
+#include "DQXClarityService.hpp"
+#include "dqxclarity/process/ProcessFinder.hpp"
+#include "dqxclarity/memory/MemoryFactory.hpp"
+#include "dqxclarity/memory/IProcessMemory.hpp"
+#include "dqxclarity/pattern/IMemoryScanner.hpp"
+#include "dqxclarity/pattern/polling/PollingRunner.hpp"
+#include "dqxclarity/pattern/polling/PatternPollingTask.hpp"
+#include "dqxclarity/signatures/Signatures.hpp"
 
 #include <atomic>
 #include <chrono>
 #include <thread>
 #include <mutex>
 #include <exception>
+#include <optional>
+
+namespace
+{
+
+bool run_pattern_waiter(const char* name, const dqxclarity::Pattern& pattern, bool require_executable,
+                      std::chrono::milliseconds poll_interval, std::chrono::milliseconds timeout,
+                      std::atomic<bool>& cancel)
+{
+    auto pids = dqxclarity::ProcessFinder::FindByName("DQXGame.exe", false);
+    if (pids.empty())
+    {
+        return false;
+    }
+
+    auto memory_unique = dqxclarity::MemoryFactory::CreatePlatformMemory();
+    std::shared_ptr<dqxclarity::IProcessMemory> memory(std::move(memory_unique));
+    if (!memory || !memory->AttachProcess(pids[0]))
+    {
+        return false;
+    }
+
+    auto scanner = std::make_shared<dqxclarity::ProcessMemoryScanner>(memory);
+    dqxclarity::PollingRunner runner(scanner);
+    bool matched = false;
+
+    std::optional<std::chrono::milliseconds> timeout_opt;
+    if (timeout.count() > 0)
+    {
+        timeout_opt = timeout;
+    }
+
+    dqxclarity::PatternPollingTask task(name, pattern, require_executable, poll_interval, timeout_opt,
+                                        dqxclarity::TerminationMode::FirstMatch,
+                                        [&](uintptr_t)
+                                        {
+                                            matched = true;
+                                        });
+
+    auto result = runner.Run(task, cancel);
+    memory->DetachProcess();
+    return matched && result.status == dqxclarity::PollingResult::Status::Matched;
+}
+
+bool wait_for_notice_screen(std::atomic<bool>& cancel, std::chrono::milliseconds poll_interval,
+                         std::chrono::milliseconds timeout)
+{
+    return run_pattern_waiter("NoticeWaiter", dqxclarity::Signatures::GetNoticeString(), /*require_executable=*/false,
+                             poll_interval, timeout, cancel);
+}
+
+bool detect_post_login(std::atomic<bool>& cancel, std::chrono::milliseconds poll_interval,
+                     std::chrono::milliseconds timeout)
+{
+    return run_pattern_waiter("PostLoginDetector", dqxclarity::Signatures::GetWalkthroughPattern(), /*require_executable=*/false,
+                             poll_interval, timeout, cancel);
+}
+
+} // namespace
+
+namespace dqxclarity
+{
+
+
+} // namespace dqxclarity
 
 // Private implementation details
 struct DQXClarityLauncher::Impl
@@ -293,7 +364,7 @@ void DQXClarityLauncher::lateInitialize()
                                 [this]
                                 {
                                     // Wait for notice with configured timeout (0 = infinite)
-                                    bool ok = dqxclarity::WaitForNoticeScreen(
+                                    bool ok = wait_for_notice_screen(
                                         pimpl_->cancel_notice, std::chrono::milliseconds(250),
                                         std::chrono::milliseconds(pimpl_->notice_wait_timeout_ms));
                                     if (ok)
@@ -309,7 +380,7 @@ void DQXClarityLauncher::lateInitialize()
                                 pimpl_->post_login_worker = std::thread(
                                     [this]
                                     {
-                                        bool ok = dqxclarity::DetectPostLogin(pimpl_->cancel_post_login,
+                                        bool ok = detect_post_login(pimpl_->cancel_post_login,
                                                                               std::chrono::milliseconds(250),
                                                                               std::chrono::milliseconds(0));
                                         if (ok)
@@ -746,3 +817,6 @@ std::string DQXClarityLauncher::getStatusString() const
 dqxclarity::Status DQXClarityLauncher::getEngineStage() const { return pimpl_->engine->status(); }
 
 std::string DQXClarityLauncher::getLastErrorMessage() const { return pimpl_->getLastErrorMessage(); }
+
+
+

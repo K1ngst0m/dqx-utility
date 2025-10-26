@@ -54,8 +54,6 @@ bool DialogMemoryReader::Initialize()
     }
     else
     {
-        if (verbose_)
-            std::cout << "DialogMemoryReader: Pattern not found during init (will retry during polling)\n";
         if (logger_.warn)
             logger_.warn("DialogMemoryReader: Pattern not found during init");
         // Still mark as initialized - we'll try to find it during polling
