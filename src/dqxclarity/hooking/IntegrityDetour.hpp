@@ -18,8 +18,6 @@ public:
     explicit IntegrityDetour(std::shared_ptr<IProcessMemory> memory);
     ~IntegrityDetour();
 
-    void SetVerbose(bool v) { m_verbose = v; }
-
     // Install the integrity trampoline and patch the integrity function.
     // Returns true on success.
     bool Install();
@@ -84,7 +82,6 @@ private:
     };
 
     std::shared_ptr<IProcessMemory> m_memory;
-    bool m_verbose = false;
     bool m_installed = false;
     bool m_diag = false; // detailed diagnostics switch
     dqxclarity::Logger m_log{};

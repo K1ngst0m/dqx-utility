@@ -211,31 +211,10 @@ void RotateLogsIfNeeded()
     }
 }
 
-bool ShouldAppendNetworkLog()
-{
-    static bool append_mode = true;
-    static std::once_flag check_once;
-    std::call_once(check_once,
-                   []
-                   {
-                       std::ifstream marker(".dqx_append_logs");
-                       if (marker.is_open())
-                       {
-                           std::string value;
-                           if (std::getline(marker, value) && value == "false")
-                           {
-                               append_mode = false;
-                           }
-                       }
-                   });
-    return append_mode;
-}
-
 void WriteNetworkLog(const NetworkTextHook::Capture& data)
 {
     static std::once_flag once;
     static std::mutex log_mutex;
-    static bool first_write = true;
 
     std::call_once(once,
                    []
@@ -251,14 +230,7 @@ void WriteNetworkLog(const NetworkTextHook::Capture& data)
 
     std::lock_guard<std::mutex> lock(log_mutex);
 
-    auto mode = std::ios::app;
-    if (first_write)
-    {
-        mode = ShouldAppendNetworkLog() ? std::ios::app : std::ios::trunc;
-        first_write = false;
-    }
-
-    std::ofstream stream("logs/network.log", mode);
+    std::ofstream stream("logs/network.log", std::ios::trunc);
     if (!stream.is_open())
     {
         return;

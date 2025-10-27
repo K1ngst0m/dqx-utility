@@ -52,9 +52,12 @@ bool IntegrityDetour::FindIntegrityAddress(uintptr_t& out_addr)
             m_log.info(oss.str());
         }
     }
-    if (m_verbose && !m_diag)
+    if (!m_diag)
     {
-        std::cout << "Integrity scan: pattern size=" << pat.Size() << "\n";
+        std::ostringstream oss;
+        oss << "Integrity scan: pattern size=" << pat.Size() << "\n";
+        if (m_log.debug)
+            m_log.debug(oss.str());
     }
 
     uintptr_t base = m_memory->GetModuleBaseAddress("DQXGame.exe");
@@ -422,15 +425,18 @@ static dqxclarity::Pattern MakeAnchor(const dqxclarity::Pattern& pat, size_t n)
 
 void IntegrityDetour::LogBytes(const char* label, uintptr_t addr, size_t count)
 {
-    if (!m_verbose)
+    if (!m_log.debug)
         return;
     std::vector<uint8_t> buf(count);
     if (m_memory->ReadMemory(addr, buf.data(), buf.size()))
     {
-        std::cout << label << " @0x" << std::hex << addr << std::dec << ": ";
+        std::ostringstream oss;
+        oss << label << " @0x" << std::hex << addr << std::dec << ": ";
         for (auto b : buf)
-            std::printf("%02X ", b);
-        std::cout << "\n";
+        {
+            oss << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(b) << ' ';
+        }
+        oss << "\n";
     }
 }
 
@@ -540,10 +546,8 @@ bool IntegrityDetour::BuildAndWriteTrampoline()
             ctx << ", return=0x" << std::hex << ret_target << std::dec;
         else
             ctx << ", tailcall";
-        if (m_log.info)
-            m_log.info(ctx.str());
-        if (m_verbose)
-            std::cout << ctx.str() << "\n";
+        if (m_log.debug)
+            m_log.debug(ctx.str());
         LogBytes("Trampoline[0..64]", m_trampoline_addr, (std::min<size_t>)(code.size(), (size_t)64));
         if (ret_target)
             LogBytes("ReturnSite[0..16]", ret_target, 16);
@@ -567,10 +571,8 @@ bool IntegrityDetour::PatchIntegrityFunction()
         std::ostringstream oss;
         oss << "Integrity patch: site=0x" << std::hex << m_integrity_addr << " -> tramp=0x" << m_trampoline_addr
             << ", rel=0x" << rel << std::dec;
-        if (m_log.info)
-            m_log.info(oss.str());
-        if (m_verbose)
-            std::cout << oss.str() << "\n";
+        if (m_log.debug)
+            m_log.debug(oss.str());
     }
 
     // Set RWX for patch region, write, restore RX
@@ -594,8 +596,6 @@ bool IntegrityDetour::Install()
 
     if (!FindIntegrityAddress(m_integrity_addr))
     {
-        if (m_verbose)
-            std::cout << "Integrity pattern not found\n";
         if (m_log.error)
             m_log.error("Integrity pattern not found");
         return false;
@@ -611,14 +611,12 @@ bool IntegrityDetour::Install()
         if (base)
             oss << " (offset +0x" << std::hex << (m_integrity_addr - base) << ")" << std::dec;
         oss << " ; HookSite=head ; ReapplyDelayMs=2500";
-        if (m_log.info)
-            m_log.info(oss.str());
-        if (m_verbose)
-            std::cout << oss.str() << "\n";
+        if (m_log.debug)
+            m_log.debug(oss.str());
     }
 
     // Pre-patch diagnostics: dump surrounding bytes (selected site)
-    if (m_diag || m_verbose)
+    if (m_diag)
     {
         uint8_t pre[64] = { 0 };
         if (m_memory->ReadMemory(m_integrity_addr, pre, sizeof(pre)))
@@ -626,10 +624,8 @@ bool IntegrityDetour::Install()
             std::ostringstream ctx;
             ctx << "Integrity pre-patch @0x" << std::hex << m_integrity_addr << std::dec << "\n"
                 << HexDump(pre, sizeof(pre));
-            if (m_log.info)
-                m_log.info(ctx.str());
-            if (m_verbose)
-                std::cout << ctx.str() << "\n";
+            if (m_log.debug)
+                m_log.debug(ctx.str());
         }
     }
 
@@ -651,7 +647,7 @@ bool IntegrityDetour::Install()
     if (!m_memory->ReadMemory(m_integrity_addr, m_original_bytes.data(), stolen_len))
         return false;
 
-    if (m_diag || m_verbose)
+    if (m_diag)
     {
         std::ostringstream oss;
         oss << "Integrity stolen_len=" << stolen_len;
@@ -669,23 +665,25 @@ bool IntegrityDetour::Install()
         {
             oss << " [pc-relative branch present]";
         }
-        if (m_log.info)
-            m_log.info(oss.str());
-        if (m_verbose)
-            std::cout << oss.str() << "\n";
+        if (m_log.debug)
+            m_log.debug(oss.str());
     }
 
-    if (m_verbose)
     {
-        std::cout << "Integrity patch site at 0x" << std::hex << m_integrity_addr << std::dec << "\n";
-        std::cout << "Original[0..16]: ";
+        std::ostringstream oss;
+        oss << "Integrity patch site at 0x" << std::hex << m_integrity_addr << std::dec << "\n";
+        oss << "Original[0..16]: ";
         for (auto b : m_original_bytes)
-            std::printf("%02X ", b);
-        std::cout << "\n";
+        {
+            oss << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(b) << ' ';
+        }
+        oss << "\n";
+        if (m_log.debug)
+            m_log.debug(oss.str());
     }
-    if (m_log.info)
+    if (m_log.debug)
     {
-        m_log.info("Integrity found at 0x" + std::to_string((unsigned long long)m_integrity_addr));
+        m_log.debug("Integrity found at 0x" + std::to_string((unsigned long long)m_integrity_addr));
     }
 
     // Verify no changes just before patch
@@ -728,9 +726,8 @@ void IntegrityDetour::Remove()
                     m_log.error("Failed to restore original bytes at integrity address during cleanup");
             }
             m_memory->FlushInstructionCache(m_integrity_addr, m_original_bytes.size());
-            if (m_verbose)
-                LogBytes("Integrity restored", m_integrity_addr,
-                         (std::max<size_t>)(m_original_bytes.size(), (size_t)8));
+            LogBytes("Integrity restored", m_integrity_addr,
+                        (std::max<size_t>)(m_original_bytes.size(), (size_t)8));
         }
         if (m_trampoline_addr)
         {

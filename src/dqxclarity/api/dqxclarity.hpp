@@ -40,6 +40,7 @@ struct Config
 struct Logger
 {
     std::function<void(const std::string&)> info;
+    std::function<void(const std::string&)> debug;
     std::function<void(const std::string&)> warn;
     std::function<void(const std::string&)> error;
 };

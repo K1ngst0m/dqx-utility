@@ -289,6 +289,10 @@ void DQXClarityLauncher::lateInitialize()
             PLOG_INFO << m;
         }
     };
+    log.debug = [](const std::string& m)
+    {
+        PLOG_DEBUG << m;
+    };
     log.warn = [](const std::string& m)
     {
         PLOG_WARNING << m;

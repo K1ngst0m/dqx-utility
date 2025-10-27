@@ -321,7 +321,6 @@ bool Engine::start_hook(StartPolicy policy)
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallIntegrityDetour");
         impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
-        impl_->integrity->SetVerbose(impl_->cfg.verbose);
         impl_->integrity->SetLogger(impl_->log);
         impl_->integrity->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
         impl_->integrity->SetCachedRegions(cached_regions);
