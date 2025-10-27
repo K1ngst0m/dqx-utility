@@ -648,8 +648,6 @@ bool ConfigManager::saveAll()
     global.insert("app_mode", static_cast<int>(app_mode_));
     global.insert("window_always_on_top", window_always_on_top_);
     global.insert("ui_language", ui_language_);
-    global.insert("dialog_fade_enabled", dialog_fade_enabled_);
-    global.insert("dialog_fade_timeout", dialog_fade_timeout_);
     global.insert("default_dialog_enabled", default_dialog_enabled_);
     global.insert("default_quest_enabled", default_quest_enabled_);
 
@@ -821,10 +819,6 @@ bool ConfigManager::loadAndApply()
                 window_always_on_top_ = *v;
             if (auto v = (*g)["ui_language"].value<std::string>())
                 ui_language_ = *v;
-            if (auto v = (*g)["dialog_fade_enabled"].value<bool>())
-                dialog_fade_enabled_ = *v;
-            if (auto v = (*g)["dialog_fade_timeout"].value<double>())
-                dialog_fade_timeout_ = static_cast<float>(*v);
             if (auto v = (*g)["default_dialog_enabled"].value<bool>())
                 setDefaultDialogEnabled(*v);
             if (auto v = (*g)["default_quest_enabled"].value<bool>())

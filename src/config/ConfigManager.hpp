@@ -79,15 +79,6 @@ public:
     void setDefaultQuestEnabled(bool enabled);
     void reconcileDefaultWindowStates();
 
-    // Dialog auto-fade settings
-    bool getDialogFadeEnabled() const { return dialog_fade_enabled_; }
-
-    void setDialogFadeEnabled(bool enabled) { dialog_fade_enabled_ = enabled; }
-
-    float getDialogFadeTimeout() const { return dialog_fade_timeout_; }
-
-    void setDialogFadeTimeout(float timeout) { dialog_fade_timeout_ = timeout; }
-
     // Assign registry pointer (used for save/apply)
     void setRegistry(WindowRegistry* reg);
 
@@ -157,10 +148,6 @@ private:
     std::optional<DialogStateManager> default_dialog_state_;
     std::optional<QuestStateManager> default_quest_state_;
     bool suppress_default_window_updates_ = false;
-
-    // Dialog fade settings
-    bool dialog_fade_enabled_ = false;
-    float dialog_fade_timeout_ = 20.0f; // seconds
 
     struct ImGuiStyleBackup
     {
