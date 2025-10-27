@@ -236,7 +236,7 @@ use_glossary = "Use glossary (pre-translation cache)"
 
 [dialog.placeholder]
 waiting = "Initializing dialog system..."
-ready = "Dialog system ready."
+ready = "Dialog system ready. For new user. \nRight-click the window to open settings for API configuration setup."
 failed = "Dialog system failed to initialize. Check hook status and logs."
 
 [dialog.corner]
