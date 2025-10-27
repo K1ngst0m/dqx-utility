@@ -134,6 +134,7 @@ private:
     PendingQueue<PendingMsg> pending_;
     std::uint64_t last_applied_seq_ = 0;
     ActivityMonitor activity_monitor_;
+    bool scroll_to_bottom_requested_ = false;
 
     std::unique_ptr<translate::ITranslator> translator_;
     std::uint64_t last_job_id_ = 0;

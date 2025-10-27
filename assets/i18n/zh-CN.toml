@@ -277,6 +277,7 @@ retry = "重试"
 [dialog.context_menu]
 increase_font = "增大字体"
 decrease_font = "减小字体"
+scroll_bottom = "滚动到底部"
 
 [quest]
 

@@ -882,6 +882,11 @@ void DialogWindow::renderDialog()
             ImGui::SetWindowFontScale(1.0f);
             ImGui::PopFont();
         }
+        if (scroll_to_bottom_requested_)
+        {
+            ImGui::SetScrollY(ImGui::GetScrollMaxY());
+            scroll_to_bottom_requested_ = false;
+        }
 
         animator_.update(
             state_.ui_state(), io.DeltaTime, activity_monitor_.isActive(), activity_monitor_.hoverActive());
@@ -1115,6 +1120,11 @@ void DialogWindow::renderDialogContextMenu()
         if (ImGui::MenuItem(i18n::get("dialog.context_menu.decrease_font"), nullptr, false, can_decrease))
         {
             state_.ui_state().font_size = std::max(state_.ui_state().font_size - 2.0f, min_font);
+        }
+
+        if (ImGui::MenuItem(ui::LocalizedOrFallback("dialog.context_menu.scroll_bottom", "Scroll to Bottom").c_str()))
+        {
+            scroll_to_bottom_requested_ = true;
         }
 
         ImGui::Separator();

@@ -278,6 +278,7 @@ retry = "Retry"
 [dialog.context_menu]
 increase_font = "Increase Font Size"
 decrease_font = "Decrease Font Size"
+scroll_bottom = "Scroll to Bottom"
 
 [quest]
 
