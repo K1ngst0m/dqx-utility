@@ -562,7 +562,7 @@ void QuestWindow::applyQuestUpdate()
     state_.original.repeat_rewards = msg.repeat_rewards;
 
     resetTranslationState();
-    appended_since_last_frame_ = true;
+    activity_monitor_.markActive();
 
     const TranslationConfig& config = activeTranslationConfig();
     if (config.translate_enabled && !state_.quest.description.empty())
@@ -586,7 +586,7 @@ void QuestWindow::resetTranslationState()
 
 void QuestWindow::render()
 {
-    appended_since_last_frame_ = false;
+    activity_monitor_.beginFrame();
 
     applyQuestUpdate();
     processTranslatorEvents();
@@ -638,6 +638,7 @@ void QuestWindow::render()
     state_.ui_state().border_thickness = std::clamp(state_.ui_state().border_thickness, 0.5f, 6.0f);
 
     bool fade_enabled = state_.ui_state().fade_enabled;
+    bool hover_active = false;
 
     if (fade_enabled && state_.ui_state().current_alpha_multiplier <= 0.01f)
     {
@@ -652,6 +653,7 @@ void QuestWindow::render()
                 {
                     state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
                     state_.ui_state().current_alpha_multiplier = 1.0f;
+                    hover_active = true;
                 }
             }
         }
@@ -719,6 +721,11 @@ void QuestWindow::render()
             ImVec2 window_max(win_pos.x + win_size.x, win_pos.y + win_size.y);
             is_hovered = ImGui::IsMouseHoveringRect(win_pos, window_max, false);
         }
+        if (!hover_active && is_hovered)
+        {
+            hover_active = true;
+        }
+        activity_monitor_.setHover(hover_active);
 
         ui::RenderVignette(win_pos, win_size, state_.ui_state().vignette_thickness, state_.ui_state().rounding,
                            state_.ui_state().current_alpha_multiplier);
@@ -745,7 +752,8 @@ void QuestWindow::render()
         }
 
         // Unified animator update (fade + optional scroll)
-        animator_.update(state_.ui_state(), io.DeltaTime, appended_since_last_frame_, is_hovered);
+        animator_.update(
+            state_.ui_state(), io.DeltaTime, activity_monitor_.isActive(), activity_monitor_.hoverActive());
 
         state_.ui_state().window_pos = win_pos;
         state_.ui_state().window_size = win_size;
@@ -1284,7 +1292,7 @@ void QuestWindow::submitTranslationRequest()
     {
         state_.translation_failed = true;
         state_.translation_error = ui::LocalizedOrFallback("quest.translation.not_ready", "Translator not ready.");
-        appended_since_last_frame_ = true;
+        activity_monitor_.markActive();
         refreshTranslationFlags();
         return;
     }
@@ -1367,7 +1375,7 @@ void QuestWindow::applyCachedTranslation(QuestField field, const std::string& te
         state_.translated.repeat_rewards = text;
         break;
     }
-    appended_since_last_frame_ = true;
+    activity_monitor_.markActive();
 }
 
 void QuestWindow::handleTranslationFailure(QuestField field, const std::string& message)
@@ -1382,7 +1390,7 @@ void QuestWindow::handleTranslationFailure(QuestField field, const std::string& 
     {
         state_.translation_error = message;
     }
-    appended_since_last_frame_ = true;
+    activity_monitor_.markActive();
 }
 
 void QuestWindow::refreshTranslationFlags()

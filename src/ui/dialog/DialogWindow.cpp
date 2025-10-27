@@ -219,6 +219,7 @@ void DialogWindow::setPlaceholderText(const std::string& text, PlaceholderState 
     placeholder_active_ = true;
     placeholder_state_ = state;
     placeholder_base_text_ = text;
+    activity_monitor_.markActive();
     if (state == PlaceholderState::Waiting)
     {
         animator_.reset();
@@ -291,6 +292,7 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
         placeholder_active_ = false;
         placeholder_state_ = PlaceholderState::Ready;
         placeholder_base_text_.clear();
+        activity_monitor_.markActive();
         return 0;
     }
 
@@ -299,6 +301,7 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
     safe_copy_utf8(state_.content_state().segments.back().data(), state_.content_state().segments.back().size(),
                    collapsed_text);
     state_.content_state().speakers.push_back(speaker);
+    activity_monitor_.markActive();
     return static_cast<int>(state_.content_state().segments.size()) - 1;
 }
 
@@ -391,7 +394,6 @@ void DialogWindow::applyPending()
         }
     }
 
-    appended_since_last_frame_ = true;
     for (auto& m : local)
     {
         std::string text_to_process = m.text;
@@ -480,7 +482,7 @@ void DialogWindow::applyPending()
 
 void DialogWindow::render()
 {
-    appended_since_last_frame_ = false;
+    activity_monitor_.beginFrame();
     refreshPlaceholderStatus();
     applyPending();
 
@@ -513,7 +515,6 @@ void DialogWindow::render()
         std::vector<translate::Completed> done;
         if (translator_->drain(done))
         {
-            appended_since_last_frame_ = true;
             std::vector<TranslateSession::CompletedEvent> events;
             session_.onCompleted(done, events);
             for (auto& ev : events)
@@ -533,6 +534,7 @@ void DialogWindow::render()
                             failed_segments_.insert(idx);
                             failed_original_text_[idx] = ev.original_text;
                             failed_error_messages_[idx] = ev.error_message;
+                            activity_monitor_.markActive();
                         }
                         else
                         {
@@ -542,6 +544,7 @@ void DialogWindow::render()
                             failed_segments_.erase(idx);
                             failed_original_text_.erase(idx);
                             failed_error_messages_.erase(idx);
+                            activity_monitor_.markActive();
                         }
                     }
                     pending_segment_by_job_.erase(it);
@@ -560,12 +563,14 @@ void DialogWindow::render()
                         failed_segments_.insert(new_idx);
                         failed_original_text_[new_idx] = ev.original_text;
                         failed_error_messages_[new_idx] = ev.error_message;
+                        activity_monitor_.markActive();
                     }
                     else
                     {
                         std::string collapsed_text = processing::collapse_newlines(ev.text);
                         safe_copy_utf8(state_.content_state().segments.back().data(),
                                        state_.content_state().segments.back().size(), collapsed_text);
+                        activity_monitor_.markActive();
                     }
                 }
             }
@@ -609,6 +614,8 @@ void DialogWindow::renderDialog()
     // Auto-fade logic (per-window setting)
     bool fade_enabled = state_.ui_state().fade_enabled;
 
+    bool hover_reactivated = false;
+
     if (fade_enabled && state_.ui_state().current_alpha_multiplier <= 0.01f)
     {
         if (ImGui::IsMousePosValid(&io.MousePos))
@@ -622,6 +629,7 @@ void DialogWindow::renderDialog()
                 {
                     state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
                     state_.ui_state().current_alpha_multiplier = 1.0f;
+                    hover_reactivated = true;
                 }
             }
         }
@@ -689,6 +697,11 @@ void DialogWindow::renderDialog()
             ImVec2 window_max(window_pos.x + window_size.x, window_pos.y + window_size.y);
             is_hovered = ImGui::IsMouseHoveringRect(window_pos, window_max, false);
         }
+        if (!hover_reactivated && is_hovered)
+        {
+            hover_reactivated = true;
+        }
+        activity_monitor_.setHover(hover_reactivated);
 
         renderVignette(window_pos, window_size, state_.ui_state().vignette_thickness, state_.ui_state().rounding,
                        state_.ui_state().current_alpha_multiplier);
@@ -870,8 +883,8 @@ void DialogWindow::renderDialog()
             ImGui::PopFont();
         }
 
-        // Unified animator update
-        animator_.update(state_.ui_state(), io.DeltaTime, appended_since_last_frame_, is_hovered);
+        animator_.update(
+            state_.ui_state(), io.DeltaTime, activity_monitor_.isActive(), activity_monitor_.hoverActive());
 
         const bool was_pending_resize = state_.ui_state().pending_resize;
 

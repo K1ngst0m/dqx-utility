@@ -111,10 +111,29 @@ private:
     bool should_be_removed_ = false;
     bool is_default_instance_ = false;
 
+    struct ActivityMonitor
+    {
+        void beginFrame()
+        {
+            active_ = false;
+            hover_ = false;
+        }
+
+        void markActive() { active_ = true; }
+        void setHover(bool hovered) { hover_ = hovered; }
+
+        bool isActive() const { return active_; }
+        bool hoverActive() const { return hover_; }
+
+    private:
+        bool active_ = false;
+        bool hover_ = false;
+    };
+
     // In-process messaging: pending messages and last seen seq
     PendingQueue<PendingMsg> pending_;
     std::uint64_t last_applied_seq_ = 0;
-    bool appended_since_last_frame_ = false;
+    ActivityMonitor activity_monitor_;
 
     std::unique_ptr<translate::ITranslator> translator_;
     std::uint64_t last_job_id_ = 0;

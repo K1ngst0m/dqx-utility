@@ -113,7 +113,25 @@ private:
     float apply_hint_timer_ = 0.0f;
     std::uint64_t last_applied_seq_ = 0;
     bool should_be_removed_ = false;
-    bool appended_since_last_frame_ = false;
+    struct ActivityMonitor
+    {
+        void beginFrame()
+        {
+            active_ = false;
+            hover_ = false;
+        }
+
+        void markActive() { active_ = true; }
+        void setHover(bool hovered) { hover_ = hovered; }
+        bool isActive() const { return active_; }
+        bool hoverActive() const { return hover_; }
+
+    private:
+        bool active_ = false;
+        bool hover_ = false;
+    };
+
+    ActivityMonitor activity_monitor_;
     std::uint64_t observed_global_translation_version_ = 0;
     bool last_used_global_translation_ = false;
     ui::WindowAnimator animator_;
