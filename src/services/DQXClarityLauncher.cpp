@@ -576,6 +576,7 @@ void DQXClarityLauncher::lateInitialize()
                     pimpl_->quest_valid = true;
                 }
 
+#if 0
                 dqxclarity::PlayerInfo player_snapshot;
                 if (pimpl_->engine->latest_player(player_snapshot))
                 {
@@ -590,6 +591,7 @@ void DQXClarityLauncher::lateInitialize()
                     pimpl_->latest_player = std::move(player_snapshot);
                     pimpl_->player_valid = true;
                 }
+#endif
 
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
