@@ -91,6 +91,11 @@ void Signatures::InitializeSignatures()
         s_signatures["notice_string"] = Pattern::FromString(
             "E5 8B 95 E7 94 BB E9 85 8D E4 BF A1 E3 81 AE E9 9A 9B E3 81 AF E3 82 B5 E3 83 BC E3 83 90 E3 83 BC");
         s_signatures["walkthrough"] = Pattern::FromString("04 02 ?? ?? 10 00 00 00 80 ?? ?? ?? 00 00 00 00 ??");
+        s_signatures["player_name_trigger"] = Pattern::FromString("55 8B EC 56 8B F1 57 8B 46 58 85 C0");
+        s_signatures["player_name_pattern"] = Pattern::FromString(
+            "A8 15 ?? ?? 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ?? ?? ?? ?? 00 ?? ?? ?? 00 00 00 00 00 00 00 00 00 00 00 70 87 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ??");
+        s_signatures["sibling_name_pattern"] = Pattern::FromString(
+            "?? ?? 00 ?? 00 00 00 ?? ?? 00 02 ?? 00 ?? 00 ?? 00 00 00 00 00 ?? 00 ?? ?? 00 00 ?? ?? ?? 00 ?? 00 ?? ?? ?? 00 ?? 00 ?? ?? 00 00 00 00 ?? ?? 00 00 00 00 ??");
     }
 
     s_initialized = true;
@@ -146,6 +151,24 @@ const Pattern& Signatures::GetWalkthroughPattern()
 {
     InitializeSignatures();
     return s_signatures["walkthrough"];
+}
+
+const Pattern& Signatures::GetPlayerNameTrigger()
+{
+    InitializeSignatures();
+    return s_signatures["player_name_trigger"];
+}
+
+const Pattern& Signatures::GetPlayerNamePattern()
+{
+    InitializeSignatures();
+    return s_signatures["player_name_pattern"];
+}
+
+const Pattern& Signatures::GetSiblingNamePattern()
+{
+    InitializeSignatures();
+    return s_signatures["sibling_name_pattern"];
 }
 
 const Pattern* Signatures::GetSignature(const std::string& name)

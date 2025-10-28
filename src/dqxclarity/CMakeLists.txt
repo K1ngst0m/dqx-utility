@@ -30,6 +30,7 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/DialogHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/CornerTextHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/NetworkTextHook.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hooking/PlayerHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/QuestHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityDetour.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityMonitor.cpp

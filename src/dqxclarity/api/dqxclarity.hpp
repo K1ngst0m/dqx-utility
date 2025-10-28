@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "player_info.hpp"
+
 namespace dqxclarity
 {
 
@@ -69,6 +71,8 @@ public:
     bool drainStream(std::vector<struct DialogStreamItem>& out);
 
     bool latest_quest(struct QuestMessage& out) const;
+    bool latest_player(struct PlayerInfo& out) const;
+    void update_player_info(PlayerInfo info);
 
 private:
     struct Impl;

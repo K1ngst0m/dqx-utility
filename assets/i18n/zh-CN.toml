@@ -58,6 +58,19 @@ status_compatibility_mode = "兼容模式"
 status_error = "未启动"  
 status_starting = "启动中"  
 status_stopping = "停止中"  
+player_header = "玩家信息"
+player_name_label = "玩家名称"
+sibling_name_label = "兄弟姐妹名称"
+relationship_label = "与玩家关系"
+player_name_unknown = "未知"
+player_not_captured = "未捕获玩家信息"
+
+[settings.dqxc.relationship_values]
+older_brother = "哥哥"
+younger_brother = "弟弟"
+older_sister = "姐姐"
+younger_sister = "妹妹"
+unknown = "未知"
 
 
 [settings.status]

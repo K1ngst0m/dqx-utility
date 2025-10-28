@@ -12,6 +12,7 @@
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "dqxclarity/api/dialog_message.hpp"
 #include "dqxclarity/api/dialog_stream.hpp"
+#include "dqxclarity/api/player_info.hpp"
 #include "dqxclarity/api/quest_message.hpp"
 #include "DQXClarityService.hpp"
 #include "dqxclarity/process/ProcessFinder.hpp"
@@ -85,6 +86,70 @@ bool detect_post_login(std::atomic<bool>& cancel, std::chrono::milliseconds poll
                              poll_interval, timeout, cancel);
 }
 
+bool scan_player_names(dqxclarity::PlayerInfo& out)
+{
+    using namespace dqxclarity;
+    PLOG_DEBUG << "[PlayerScan] begin polling";
+
+    auto pids = ProcessFinder::FindByName("DQXGame.exe", false);
+    if (pids.empty())
+    {
+        PLOG_DEBUG << "[PlayerScan] DQXGame.exe not found";
+        return false;
+    }
+
+    auto memory_unique = MemoryFactory::CreatePlatformMemory();
+    std::shared_ptr<IProcessMemory> memory(std::move(memory_unique));
+    if (!memory || !memory->AttachProcess(pids[0]))
+    {
+        PLOG_DEBUG << "[PlayerScan] failed to attach to process";
+        return false;
+    }
+
+    auto scanner = std::make_shared<ProcessMemoryScanner>(memory);
+    PollingRunner runner(scanner);
+    std::atomic<bool> cancel{ false };
+    PlayerInfo captured;
+    bool captured_valid = false;
+
+    auto callback = [&](uintptr_t address)
+    {
+        std::string player_name;
+        std::string sibling_name;
+        if (!memory->ReadString(address - 21, player_name, 128))
+            return;
+        if (!memory->ReadString(address + 51, sibling_name, 128))
+            return;
+        if (!player_name.empty() && static_cast<unsigned char>(player_name.front()) < 0x20)
+            player_name.erase(player_name.begin());
+        if (!sibling_name.empty() && static_cast<unsigned char>(sibling_name.front()) < 0x20)
+            sibling_name.erase(sibling_name.begin());
+        if (player_name.empty() || sibling_name.empty())
+            return;
+        captured.player_name = std::move(player_name);
+        captured.sibling_name = std::move(sibling_name);
+        captured.relationship = PlayerRelationship::Unknown;
+        captured_valid = true;
+    };
+
+    PatternPollingTask task("PlayerNamePatternScan", Signatures::GetSiblingNamePattern(), false,
+                               std::chrono::milliseconds(250), std::chrono::milliseconds(2000),
+                               TerminationMode::FirstMatch, callback);
+
+    auto result = runner.Run(task, cancel);
+    memory->DetachProcess();
+
+    if (captured_valid && result.status == PollingResult::Status::Matched)
+    {
+        PLOG_INFO << "[PlayerScan] captured player=\"" << captured.player_name << "\" sibling=\""
+                  << captured.sibling_name << "\"";
+        out = std::move(captured);
+        return true;
+    }
+    PLOG_DEBUG << "[PlayerScan] no match (status=" << static_cast<int>(result.status) << ")";
+    return false;
+}
+
 } // namespace
 
 namespace dqxclarity
@@ -142,6 +207,10 @@ struct DQXClarityLauncher::Impl
     dqxclarity::QuestMessage latest_quest;
     bool quest_valid = false;
 
+    mutable std::mutex player_mutex;
+    dqxclarity::PlayerInfo latest_player;
+    bool player_valid = false;
+
     // Config mirrors
     dqxclarity::Config engine_cfg{};
     bool enable_post_login_heuristics = false;
@@ -193,6 +262,12 @@ struct DQXClarityLauncher::Impl
             {
                 std::lock_guard<std::mutex> qlock(quest_mutex);
                 quest_valid = false;
+            }
+            if (ok)
+            {
+                std::lock_guard<std::mutex> plock(player_mutex);
+                player_valid = false;
+                latest_player = dqxclarity::PlayerInfo{};
             }
             if (ok)
             {
@@ -501,6 +576,21 @@ void DQXClarityLauncher::lateInitialize()
                     pimpl_->quest_valid = true;
                 }
 
+                dqxclarity::PlayerInfo player_snapshot;
+                if (pimpl_->engine->latest_player(player_snapshot))
+                {
+                    std::lock_guard<std::mutex> plock(pimpl_->player_mutex);
+                    pimpl_->latest_player = std::move(player_snapshot);
+                    pimpl_->player_valid = true;
+                }
+                else if (scan_player_names(player_snapshot))
+                {
+                    pimpl_->engine->update_player_info(player_snapshot);
+                    std::lock_guard<std::mutex> plock(pimpl_->player_mutex);
+                    pimpl_->latest_player = std::move(player_snapshot);
+                    pimpl_->player_valid = true;
+                }
+
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
         });
@@ -590,6 +680,17 @@ bool DQXClarityLauncher::getLatestQuest(dqxclarity::QuestMessage& out) const
         return false;
     }
     out = pimpl_->latest_quest;
+    return true;
+}
+
+bool DQXClarityLauncher::getLatestPlayer(dqxclarity::PlayerInfo& out) const
+{
+    std::lock_guard<std::mutex> lock(pimpl_->player_mutex);
+    if (!pimpl_->player_valid)
+    {
+        return false;
+    }
+    out = pimpl_->latest_player;
     return true;
 }
 

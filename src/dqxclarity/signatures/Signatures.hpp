@@ -17,6 +17,9 @@ public:
     static const Pattern& GetCornerText();
     static const Pattern& GetNoticeString();
     static const Pattern& GetWalkthroughPattern();
+    static const Pattern& GetPlayerNameTrigger();
+    static const Pattern& GetPlayerNamePattern();
+    static const Pattern& GetSiblingNamePattern();
 
     static const Pattern* GetSignature(const std::string& name);
 

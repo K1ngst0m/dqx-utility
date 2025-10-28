@@ -10,6 +10,7 @@ namespace dqxclarity
 struct DialogMessage;
 struct DialogStreamItem;
 struct QuestMessage;
+struct PlayerInfo;
 enum class Status;
 struct Config;
 } // namespace dqxclarity
@@ -59,6 +60,7 @@ public:
     bool copyDialogStreamSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogStreamItem>& out) const;
 
     bool getLatestQuest(dqxclarity::QuestMessage& out) const;
+    bool getLatestPlayer(dqxclarity::PlayerInfo& out) const;
 
     // Expose engine stage to guard UI actions
     dqxclarity::Status getEngineStage() const;

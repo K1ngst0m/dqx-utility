@@ -58,6 +58,19 @@ status_compatibility_mode = "Compatibility Mode"
 status_error = "Stopped"
 status_starting = "Starting"
 status_stopping = "Stopping"
+player_header = "Player Information"
+player_name_label = "Player"
+sibling_name_label = "Sibling"
+relationship_label = "Relationship"
+player_name_unknown = "(empty)"
+player_not_captured = "Not captured yet"
+
+[settings.dqxc.relationship_values]
+older_brother = "Older brother"
+younger_brother = "Younger brother"
+older_sister = "Older sister"
+younger_sister = "Younger sister"
+unknown = "Unknown"
 
 [settings.status]
 game_label = "DQX Game:"

@@ -1,4 +1,4 @@
-# Signatures for DQXClarity pattern scanner
+﻿# Signatures for DQXClarity pattern scanner
 # Keys map to patterns consumed by Pattern::FromString.
 # Wildcards may be specified as "??" or single "." tokens separated by spaces.
 
@@ -11,6 +11,9 @@ network_text_trigger = "8B CA 8D 71 ?? 8A 01 41 84 C0 75 F9 EB 20"
 quest_text       = "8D 8E 78 04 00 00 E8 ?? ?? ?? ?? 5F"
 corner_text      = "8B D0 8D 5A 01 66 90 8A 0A 42 84 C9 75 F9 2B D3 0F"
 corner_text_trigger = "8B D0 8D 5A 01 66 90 8A 0A 42 84 C9 75 F9 2B D3 0F"
+player_name_trigger = "55 8B EC 56 8B F1 57 8B 46 58 85 C0"
+player_name_pattern = "A8 15 ?? ?? 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ?? ?? ?? ?? 00 ?? ?? ?? 00 00 00 00 00 00 00 00 00 00 00 70 87 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ??"
+sibling_name_pattern = "?? ?? 00 ?? 00 00 00 ?? ?? 00 02 ?? 00 ?? 00 ?? 00 00 00 00 00 ?? 00 ?? ?? 00 00 ?? ?? ?? 00 ?? 00 ?? ?? ?? 00 ?? 00 ?? ?? 00 00 00 00 ?? ?? 00 00 00 00 ??"
 
 # UTF-8 bytes for "動画配信の際はサーバー"
 notice_string    = "E5 8B 95 E7 94 BB E9 85 8D E4 BF A1 E3 81 AE E9 9A 9B E3 81 AF E3 82 B5 E3 83 BC E3 83 90 E3 83 BC"

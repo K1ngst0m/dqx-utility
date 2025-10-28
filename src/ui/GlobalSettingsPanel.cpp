@@ -10,6 +10,7 @@
 #include "UITheme.hpp"
 #include "DQXClarityService.hpp"
 #include "dqxclarity/api/dqxclarity.hpp"
+#include "dqxclarity/api/player_info.hpp"
 #include "ui/Localization.hpp"
 #include "ui/DockState.hpp"
 #include "UIHelper.hpp"
@@ -49,6 +50,24 @@ const char* windowTypeLabel(UIWindowType type)
         }
     }
     return "";
+}
+
+const char* relationshipLabelKey(dqxclarity::PlayerRelationship rel)
+{
+    using dqxclarity::PlayerRelationship;
+    switch (rel)
+    {
+    case PlayerRelationship::OlderBrother:
+        return "settings.dqxc.relationship_values.older_brother";
+    case PlayerRelationship::YoungerBrother:
+        return "settings.dqxc.relationship_values.younger_brother";
+    case PlayerRelationship::OlderSister:
+        return "settings.dqxc.relationship_values.older_sister";
+    case PlayerRelationship::YoungerSister:
+        return "settings.dqxc.relationship_values.younger_sister";
+    default:
+        return "settings.dqxc.relationship_values.unknown";
+    }
 }
 
 const char* severityBadge(utils::ErrorSeverity severity)
@@ -433,6 +452,30 @@ void GlobalSettingsPanel::renderDQXClaritySection()
             ImGui::SetTooltip("%s", i18n::get("settings.dqxc.compatibility_mode_tooltip"));
         }
     }
+
+    dqxclarity::PlayerInfo player_info;
+    bool has_player = dqxc_launcher_->getLatestPlayer(player_info);
+
+    ImGui::Spacing();
+    ImGui::TextUnformatted(i18n::get("settings.dqxc.player_header"));
+    ImGui::Indent();
+    if (has_player)
+    {
+        const char* rel_key = relationshipLabelKey(player_info.relationship);
+        const char* rel_text = i18n::get(rel_key);
+        ImGui::Text("%s: %s", i18n::get("settings.dqxc.player_name_label"),
+                    player_info.player_name.empty() ? i18n::get("settings.dqxc.player_name_unknown") :
+                                                      player_info.player_name.c_str());
+        ImGui::Text("%s: %s", i18n::get("settings.dqxc.sibling_name_label"),
+                    player_info.sibling_name.empty() ? i18n::get("settings.dqxc.player_name_unknown") :
+                                                       player_info.sibling_name.c_str());
+        ImGui::Text("%s: %s", i18n::get("settings.dqxc.relationship_label"), rel_text);
+    }
+    else
+    {
+        ImGui::TextColored(UITheme::disabledColor(), "%s", i18n::get("settings.dqxc.player_not_captured"));
+    }
+    ImGui::Unindent();
 
 #ifndef _WIN32
     // Show wineserver info on Linux

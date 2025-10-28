@@ -7,6 +7,7 @@
 #include "../hooking/DialogHook.hpp"
 #include "../hooking/CornerTextHook.hpp"
 #include "../hooking/NetworkTextHook.hpp"
+#include "../hooking/PlayerHook.hpp"
 #include "../hooking/QuestHook.hpp"
 #include "../hooking/IntegrityDetour.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
@@ -51,6 +52,7 @@ struct Engine::Impl
     std::unique_ptr<QuestHook> quest_hook;
     std::unique_ptr<NetworkTextHook> network_hook;
     std::unique_ptr<CornerTextHook> corner_hook;
+    std::unique_ptr<PlayerHook> player_hook;
     std::unique_ptr<class IntegrityDetour> integrity;
 
     SpscRing<DialogMessage, 1024> ring;
@@ -65,6 +67,11 @@ struct Engine::Impl
     mutable std::mutex quest_mutex;
     QuestMessage quest_snapshot;
     bool quest_valid = false;
+
+    std::atomic<std::uint64_t> player_seq{ 0 };
+    mutable std::mutex player_mutex;
+    PlayerInfo player_snapshot;
+    bool player_valid = false;
 
     // Two-phase commit: pending queue for deduplication
     std::vector<PendingDialog> pending_dialogs;
@@ -132,6 +139,12 @@ bool Engine::start_hook(StartPolicy policy)
         std::lock_guard<std::mutex> lock(impl_->quest_mutex);
         impl_->quest_valid = false;
         impl_->quest_snapshot = QuestMessage{};
+    }
+    impl_->player_seq.store(0, std::memory_order_relaxed);
+    {
+        std::lock_guard<std::mutex> lock(impl_->player_mutex);
+        impl_->player_valid = false;
+        impl_->player_snapshot = PlayerInfo{};
     }
 
     // Find DQXGame.exe
@@ -288,6 +301,22 @@ bool Engine::start_hook(StartPolicy policy)
         }
     }
 
+    {
+        PROFILE_SCOPE_CUSTOM("Engine.InstallPlayerHook");
+        impl_->player_hook = std::make_unique<dqxclarity::PlayerHook>(impl_->memory);
+        impl_->player_hook->SetVerbose(impl_->cfg.verbose);
+        impl_->player_hook->SetLogger(impl_->log);
+        impl_->player_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
+        impl_->player_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
+        impl_->player_hook->SetCachedRegions(cached_regions);
+        if (impl_->player_hook && !impl_->player_hook->InstallHook(/*enable_patch=*/false))
+        {
+            if (impl_->log.warn)
+                impl_->log.warn("Failed to prepare player hook; continuing without player capture");
+            impl_->player_hook.reset();
+        }
+    }
+
     // temporarily disabled due to unused
 #if 0
   impl_->network_hook = std::make_unique<dqxclarity::NetworkTextHook>(impl_->memory);
@@ -334,6 +363,11 @@ bool Engine::start_hook(StartPolicy policy)
             impl_->integrity->AddRestoreTarget(impl_->quest_hook->GetHookAddress(),
                                                impl_->quest_hook->GetOriginalBytes());
         }
+        if (impl_->player_hook && impl_->player_hook->GetHookAddress() != 0)
+        {
+            impl_->integrity->AddRestoreTarget(impl_->player_hook->GetHookAddress(),
+                                               impl_->player_hook->GetOriginalBytes());
+        }
         if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0)
         {
             impl_->integrity->AddRestoreTarget(impl_->network_hook->GetHookAddress(),
@@ -353,6 +387,11 @@ bool Engine::start_hook(StartPolicy policy)
             {
                 impl_->quest_hook->RemoveHook();
                 impl_->quest_hook.reset();
+            }
+            if (impl_->player_hook)
+            {
+                impl_->player_hook->RemoveHook();
+                impl_->player_hook.reset();
             }
             if (impl_->network_hook)
             {
@@ -379,6 +418,8 @@ bool Engine::start_hook(StartPolicy policy)
             (void)impl_->hook->EnablePatch();
         if (impl_->quest_hook)
             (void)impl_->quest_hook->EnablePatch();
+        if (impl_->player_hook)
+            (void)impl_->player_hook->EnablePatch();
         if (impl_->network_hook)
             (void)impl_->network_hook->EnablePatch();
         if (impl_->corner_hook)
@@ -414,6 +455,19 @@ bool Engine::start_hook(StartPolicy policy)
                         if (impl_->log.warn)
                             impl_->log.warn("Post-enable verify: quest hook not present; reapplying once");
                         (void)impl_->quest_hook->ReapplyPatch();
+                    }
+                }
+                if (impl_->player_hook)
+                {
+                    if (!impl_->player_hook->IsPatched())
+                    {
+                        if (impl_->log.warn)
+                            impl_->log.warn("Post-enable verify: player hook not present; reapplying once");
+                        (void)impl_->player_hook->ReapplyPatch();
+                    }
+                    else if (impl_->cfg.verbose && impl_->log.info)
+                    {
+                        impl_->log.info("Post-enable verify: player hook present");
                     }
                 }
                 if (impl_->network_hook)
@@ -475,6 +529,12 @@ bool Engine::start_hook(StartPolicy policy)
                         if (impl_->log.info)
                             impl_->log.info("Quest hook enabled after first integrity run");
                     }
+                    if (impl_->player_hook)
+                    {
+                        (void)impl_->player_hook->EnablePatch();
+                        if (impl_->log.info)
+                            impl_->log.info("Player hook enabled after first integrity run");
+                    }
                     if (impl_->network_hook)
                     {
                         (void)impl_->network_hook->EnablePatch();
@@ -502,6 +562,12 @@ bool Engine::start_hook(StartPolicy policy)
                         if (impl_->log.info)
                             impl_->log.info("Quest hook re-applied after integrity");
                     }
+                    if (impl_->player_hook)
+                    {
+                        (void)impl_->player_hook->ReapplyPatch();
+                        if (impl_->log.info)
+                            impl_->log.info("Player hook re-applied after integrity");
+                    }
                     if (impl_->network_hook)
                     {
                         (void)impl_->network_hook->ReapplyPatch();
@@ -526,6 +592,11 @@ bool Engine::start_hook(StartPolicy policy)
             impl_->monitor->AddRestoreTarget(impl_->quest_hook->GetHookAddress(),
                                              impl_->quest_hook->GetOriginalBytes());
         }
+        if (impl_->player_hook && impl_->player_hook->GetHookAddress() != 0)
+        {
+            impl_->monitor->AddRestoreTarget(impl_->player_hook->GetHookAddress(),
+                                             impl_->player_hook->GetOriginalBytes());
+        }
         if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0)
         {
             impl_->monitor->AddRestoreTarget(impl_->network_hook->GetHookAddress(),
@@ -541,6 +612,7 @@ bool Engine::start_hook(StartPolicy policy)
 
     if (impl_->log.info)
         impl_->log.info("Hook installed");
+
 
     // Start poller thread to capture dialog events and publish to ring buffer
     impl_->poll_stop.store(false);
@@ -809,6 +881,13 @@ bool Engine::start_hook(StartPolicy policy)
                             impl_->quest_valid = true;
                         }
                     }
+                    // Player hook polling (captures player data)
+                    auto player_hook_ptr = impl_->player_hook.get();
+                    if (player_hook_ptr && player_hook_ptr->PollPlayerData())
+                    {
+                        PlayerInfo info = player_hook_ptr->GetLastPlayer();
+                        update_player_info(std::move(info));
+                    }
                     // Network hook polling (safe pointer capture to avoid TOCTOU race)
                     auto network_hook_ptr = impl_->network_hook.get();
                     if (network_hook_ptr)
@@ -871,6 +950,10 @@ bool Engine::stop_hook()
             std::lock_guard<std::mutex> lock(impl_->quest_mutex);
             impl_->quest_valid = false;
         }
+        {
+            std::lock_guard<std::mutex> lock(impl_->player_mutex);
+            impl_->player_valid = false;
+        }
 
         if (impl_->monitor)
         {
@@ -881,6 +964,11 @@ bool Engine::stop_hook()
         {
             impl_->quest_hook->RemoveHook();
             impl_->quest_hook.reset();
+        }
+        if (impl_->player_hook)
+        {
+            impl_->player_hook->RemoveHook();
+            impl_->player_hook.reset();
         }
         if (impl_->network_hook)
         {
@@ -941,6 +1029,40 @@ bool Engine::latest_quest(QuestMessage& out) const
     }
     out = impl_->quest_snapshot;
     return true;
+}
+
+bool Engine::latest_player(PlayerInfo& out) const
+{
+    std::lock_guard<std::mutex> lock(impl_->player_mutex);
+    if (!impl_->player_valid)
+    {
+        return false;
+    }
+    out = impl_->player_snapshot;
+    return true;
+}
+
+void Engine::update_player_info(PlayerInfo info)
+{
+    std::string log_player;
+    std::string log_sibling;
+    if (impl_->cfg.verbose && impl_->log.info)
+    {
+        log_player = info.player_name;
+        log_sibling = info.sibling_name;
+    }
+
+    info.seq = impl_->player_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+    {
+        std::lock_guard<std::mutex> lock(impl_->player_mutex);
+        impl_->player_snapshot = std::move(info);
+        impl_->player_valid = true;
+    }
+
+    if (impl_->cfg.verbose && impl_->log.info)
+    {
+        impl_->log.info("Player info updated: player=\"" + log_player + "\" sibling=\"" + log_sibling + "\"");
+    }
 }
 
 } // namespace dqxclarity
