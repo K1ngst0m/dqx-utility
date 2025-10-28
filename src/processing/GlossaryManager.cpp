@@ -32,7 +32,8 @@ void GlossaryManager::initialize()
     };
 
     std::vector<GlossaryFile> files = {
-        { "zh-Hans.json", "zh-Hans" }, // Shared for zh-CN and zh-TW
+        { "zh-Hans.json", "zh-Hans" },
+        { "zh-Hant.json", "zh-Hant" },
         { "en-US.json",   "en-US"   }
     };
 
@@ -219,9 +220,14 @@ bool GlossaryManager::loadGlossaryFile(const std::string& file_path, const std::
 std::string GlossaryManager::mapToGlossaryLanguage(const std::string& target_lang) const
 {
     // Both zh-CN (Simplified) and zh-TW (Traditional) use the same zh-Hans glossary
-    if (target_lang == "zh-CN" || target_lang == "zh-TW" || target_lang == "zh-cn" || target_lang == "zh-tw")
+    if (target_lang == "zh-CN" || target_lang == "zh-cn")
     {
         return "zh-Hans";
+    }
+
+    if (target_lang == "zh-TW" || target_lang == "zh-tw")
+    {
+        return "zh-Hant";
     }
 
     // English uses en-US
