@@ -11,6 +11,11 @@ class GlobalSettingsPanel;
 class ErrorDialog;
 class SingleInstanceGuard;
 
+namespace updater
+{
+class UpdaterService;
+}
+
 namespace ui
 {
 class UIEventHandler;
@@ -62,6 +67,7 @@ private:
     std::unique_ptr<ui::UIEventHandler> event_handler_;
     std::unique_ptr<ui::MiniModeManager> mini_manager_;
     std::unique_ptr<ui::AppModeManager> mode_manager_;
+    std::unique_ptr<updater::UpdaterService> updater_service_;
 
     bool show_settings_ = false;
     bool quit_requested_ = false;

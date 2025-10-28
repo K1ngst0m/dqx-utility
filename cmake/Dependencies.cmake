@@ -128,6 +128,22 @@ CPMAddPackage(
     "JSON_Install OFF"
 )
 
+# miniz - ZIP extraction library for updater
+CPMAddPackage(
+  NAME miniz
+  GITHUB_REPOSITORY richgel999/miniz
+  GIT_TAG 3.0.2
+  DOWNLOAD_ONLY YES
+)
+
+# picosha2 - SHA-256 hash library for updater
+CPMAddPackage(
+  NAME picosha2
+  GITHUB_REPOSITORY okdshin/PicoSHA2
+  GIT_TAG b699e6c900be6e00152db5a3d123c1db42ea13d0
+  DOWNLOAD_ONLY YES
+)
+
 # cpptrace - C++ stack trace library
 CPMAddPackage(
   NAME cpptrace

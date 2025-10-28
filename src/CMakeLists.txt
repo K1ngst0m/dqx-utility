@@ -141,6 +141,27 @@ target_sources(dqxu_core
     state/QuestStateManager.hpp
 )
 
+target_sources(dqxu_core
+  PRIVATE
+    updater/UpdateTypes.hpp
+    updater/Version.cpp
+    updater/Version.hpp
+    updater/UpdaterService.cpp
+    updater/UpdaterService.hpp
+    updater/GitHubReleaseChecker.cpp
+    updater/GitHubReleaseChecker.hpp
+    updater/ManifestParser.cpp
+    updater/ManifestParser.hpp
+    updater/PackageDownloader.cpp
+    updater/PackageDownloader.hpp
+    updater/ConfigMerger.cpp
+    updater/ConfigMerger.hpp
+    updater/BackupManager.cpp
+    updater/BackupManager.hpp
+    updater/UpdateApplier.cpp
+    updater/UpdateApplier.hpp
+)
+
 target_include_directories(dqxu_core
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -150,6 +171,7 @@ target_include_directories(dqxu_core
   PUBLIC
     ${tomlplusplus_SOURCE_DIR}/include
     ${plog_SOURCE_DIR}/include
+    ${picosha2_SOURCE_DIR}
 )
 
 target_link_libraries(dqxu_core

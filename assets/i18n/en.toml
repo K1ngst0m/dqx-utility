@@ -18,6 +18,7 @@ not_found = "[Log file not found: {path}]"
 status = "Status"
 window_management = "Window Management"
 appearance = "Appearance"
+updates = "Updates"
 debug = "Debug"
 
 [settings.app_mode]
@@ -80,6 +81,23 @@ not_running = "Not Running"
 japanese = "JP"
 non_japanese = "Non-JP"
 unknown = "Unknown"
+
+[settings.updates]
+check_button = "Check for Updates"
+checking = "Checking for updates..."
+up_to_date = "You're up to date! Running version {version}"
+update_available = "Update available: v{version}"
+update_size = "Size: {size} MB"
+download_button = "Download Update"
+downloading = "Downloading... {percent}%"
+cancel_button = "Cancel"
+downloaded = "Update downloaded successfully"
+apply_button = "Apply Update"
+apply_hint = "(application will restart)"
+applying = "Applying update..."
+failed = "Update failed: {error}"
+retry_button = "Retry Check"
+completed = "Update completed successfully"
 
 [settings.table]
 name = "Name"

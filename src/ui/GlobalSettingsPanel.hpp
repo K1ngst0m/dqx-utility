@@ -19,6 +19,7 @@ private:
     void renderStatusSection();
     void renderWindowManagementSection();
     void renderAppearanceSection();
+    void renderUpdateSection();
     void renderTypeSelector();
     void renderInstanceSelector();
     void renderDQXClaritySection();
@@ -39,4 +40,8 @@ private:
     // Debug log viewer state
     std::string cached_log_content_;
     float last_log_refresh_time_ = 0.0f;
+
+    // Update check result state
+    std::string update_check_hint_;
+    float update_check_hint_timer_ = 0.0f;
 };

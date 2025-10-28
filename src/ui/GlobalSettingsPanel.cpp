@@ -15,7 +15,9 @@
 #include "ui/DockState.hpp"
 #include "UIHelper.hpp"
 #include "utils/ErrorReporter.hpp"
+#include "updater/UpdaterService.hpp"
 
+#include <plog/Log.h>
 #include <algorithm>
 #include <imgui.h>
 #include <cstdio>
@@ -189,6 +191,8 @@ void GlobalSettingsPanel::render(bool& open)
         renderStatusSection();
 
         renderAppearanceSection();
+
+        renderUpdateSection();
 
 #ifdef DQXU_ENABLE_DEBUG_SECTIONS
         renderWindowManagementSection();
@@ -787,6 +791,138 @@ void GlobalSettingsPanel::renderWindowManagementSection()
         ImGui::Spacing();
 
         renderInstanceSelector();
+    }
+}
+
+void GlobalSettingsPanel::renderUpdateSection()
+{
+    auto* updaterService = UpdaterService_Get();
+    if (!updaterService)
+    {
+        return;
+    }
+
+    if (!updaterService->isInitialized())
+    {
+        return;
+    }
+
+    if (ImGui::CollapsingHeader(i18n::get("settings.sections.updates"), ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        auto state = updaterService->getState();
+
+        if (update_check_hint_timer_ > 0.0f)
+        {
+            update_check_hint_timer_ -= ImGui::GetIO().DeltaTime;
+            if (update_check_hint_timer_ <= 0.0f)
+            {
+                update_check_hint_timer_ = 0.0f;
+                update_check_hint_.clear();
+            }
+        }
+
+        if (state == updater::UpdateState::Idle)
+        {
+            if (ImGui::Button(i18n::get("settings.updates.check_button")))
+            {
+                update_check_hint_.clear();
+                update_check_hint_timer_ = 0.0f;
+
+                updaterService->checkForUpdatesAsync([this, updaterService](bool updateAvailable) {
+                    if (updateAvailable)
+                    {
+                        auto updateInfo = updaterService->getUpdateInfo();
+                        update_check_hint_ = i18n::format("settings.updates.update_available",
+                                                          {{ "version", updateInfo.version }});
+                    }
+                    else
+                    {
+                        std::string currentVersion = "0.1.0";
+                        update_check_hint_ = i18n::format("settings.updates.up_to_date",
+                                                          {{ "version", currentVersion }});
+                    }
+                    update_check_hint_timer_ = 5.0f;
+                });
+            }
+
+            if (!update_check_hint_.empty() && update_check_hint_timer_ > 0.0f)
+            {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", update_check_hint_.c_str());
+            }
+        }
+        else if (state == updater::UpdateState::Checking)
+        {
+            ImGui::TextDisabled("%s", i18n::get("settings.updates.checking"));
+        }
+        else if (state == updater::UpdateState::Available)
+        {
+            auto updateInfo = updaterService->getUpdateInfo();
+            std::string available_text = i18n::format("settings.updates.update_available",
+                                                      {{ "version", updateInfo.version }});
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%s", available_text.c_str());
+
+            char size_buf[32];
+            std::snprintf(size_buf, sizeof(size_buf), "%.2f", updateInfo.packageSize / (1024.0f * 1024.0f));
+            std::string size_text = i18n::format("settings.updates.update_size",
+                                                 {{ "size", std::string(size_buf) }});
+            ImGui::TextDisabled("%s", size_text.c_str());
+
+            if (ImGui::Button(i18n::get("settings.updates.download_button")))
+            {
+                updaterService->startDownload([](const updater::DownloadProgress& progress) {});
+            }
+        }
+        else if (state == updater::UpdateState::Downloading)
+        {
+            auto progress = updaterService->getDownloadProgress();
+            char percent_buf[16];
+            std::snprintf(percent_buf, sizeof(percent_buf), "%d", static_cast<int>(progress.percentage));
+            std::string downloading_text = i18n::format("settings.updates.downloading",
+                                                        {{ "percent", std::string(percent_buf) }});
+            ImGui::Text("%s", downloading_text.c_str());
+            ImGui::ProgressBar(progress.percentage / 100.0f);
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", progress.speed.c_str());
+
+            if (ImGui::Button(i18n::get("settings.updates.cancel_button")))
+            {
+                updaterService->cancelDownload();
+            }
+        }
+        else if (state == updater::UpdateState::Downloaded)
+        {
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%s", i18n::get("settings.updates.downloaded"));
+
+            if (ImGui::Button(i18n::get("settings.updates.apply_button")))
+            {
+                updaterService->applyUpdate([](bool success, const std::string& message) {
+                    PLOG_INFO << "Update result: " << message;
+                });
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", i18n::get("settings.updates.apply_hint"));
+        }
+        else if (state == updater::UpdateState::Applying)
+        {
+            ImGui::TextDisabled("%s", i18n::get("settings.updates.applying"));
+        }
+        else if (state == updater::UpdateState::Failed)
+        {
+            auto error = updaterService->getLastError();
+            std::string failed_text = i18n::format("settings.updates.failed",
+                                                   {{ "error", error.message }});
+            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "%s", failed_text.c_str());
+
+            if (ImGui::Button(i18n::get("settings.updates.retry_button")))
+            {
+                updaterService->checkForUpdatesAsync(nullptr);
+            }
+        }
+        else if (state == updater::UpdateState::Completed)
+        {
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%s", i18n::get("settings.updates.completed"));
+        }
     }
 }
 

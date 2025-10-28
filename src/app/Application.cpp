@@ -18,6 +18,8 @@
 #include "utils/Profile.hpp"
 #include "platform/SingleInstanceGuard.hpp"
 #include "utils/NativeMessageBox.hpp"
+#include "updater/UpdaterService.hpp"
+#include "updater/Version.hpp"
 
 #include <plog/Log.h>
 #include <plog/Init.h>
@@ -194,6 +196,10 @@ void Application::setupManagers()
 
     settings_panel_ = std::make_unique<GlobalSettingsPanel>(*registry_);
     error_dialog_ = std::make_unique<ErrorDialog>();
+
+    updater_service_ = std::make_unique<updater::UpdaterService>();
+    UpdaterService_Set(updater_service_.get());
+    updater_service_->initialize("K1ngst0m", "dqx-utility", updater::Version("0.1.0"));
 }
 
 void Application::initializeConfig()
@@ -225,6 +231,16 @@ void Application::initializeConfig()
     config_->setAppMode(ConfigManager::AppMode::Normal);
     mode_manager_->ApplyModeSettings(ConfigManager::AppMode::Normal);
     mode_manager_->SetCurrentMode(ConfigManager::AppMode::Normal);
+
+    if (updater_service_)
+    {
+        updater_service_->checkForUpdatesAsync([](bool updateAvailable) {
+            if (updateAvailable)
+            {
+                PLOG_INFO << "Update available in background check";
+            }
+        });
+    }
 }
 
 int Application::run()
@@ -303,11 +319,25 @@ void Application::handleQuitRequests()
         DQXClarityService_Set(nullptr);
     }
 
+    if (updater_service_)
+    {
+        updater_service_->shutdown();
+        UpdaterService_Set(nullptr);
+    }
+
     saveConfig();
     running_ = false;
 }
 
-void Application::cleanup() { saveConfig(); }
+void Application::cleanup()
+{
+    if (updater_service_)
+    {
+        updater_service_->shutdown();
+        UpdaterService_Set(nullptr);
+    }
+    saveConfig();
+}
 
 bool Application::checkSingleInstance()
 {
