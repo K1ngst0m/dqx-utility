@@ -770,7 +770,7 @@ bool Engine::start_hook(StartPolicy policy)
                                 if (impl_->cfg.verbose && impl_->log.info)
                                 {
                                     auto wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(age).count();
-                                    impl_->log.info("Memory reader timeout (waited " + std::to_string(wait_ms) +
+                                    impl_->log.debug("Memory reader timeout (waited " + std::to_string(wait_ms) +
                                                     "ms, hook didn't capture)");
                                 }
                                 ready_to_publish.push_back(std::move(memory_readers[i]));
