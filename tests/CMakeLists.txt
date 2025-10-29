@@ -6,6 +6,7 @@ add_executable(dqxu_tests
   dqxclarity/test_memory.cpp
   dqxclarity/test_pattern_scanner.cpp
   dqxclarity/test_process_finder.cpp
+  dqxclarity/test_hook_registry.cpp
 )
 
 # Set output directory to {preset}/{Config}/tests/

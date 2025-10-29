@@ -22,6 +22,7 @@
 #include "dqxclarity/pattern/polling/PollingRunner.hpp"
 #include "dqxclarity/pattern/polling/PatternPollingTask.hpp"
 #include "dqxclarity/signatures/Signatures.hpp"
+#include "dqxclarity/hooking/HookRegistry.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -380,6 +381,10 @@ void DQXClarityLauncher::lateInitialize()
             pimpl_->setLastErrorMessage(m);
         }
     };
+
+    dqxclarity::persistence::HookRegistry::SetLogger(log);
+    dqxclarity::persistence::HookRegistry::CheckAndCleanup();
+
     pimpl_->engine->initialize(pimpl_->engine_cfg, std::move(log));
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
 
@@ -387,112 +392,135 @@ void DQXClarityLauncher::lateInitialize()
     pimpl_->monitor = std::thread(
         [this]
         {
-            using namespace std::chrono;
-            bool initialized = false;
-            while (!pimpl_->stop_flag.load())
+            try
             {
-                pimpl_->heartbeat_seq.fetch_add(1, std::memory_order_relaxed);
-                if (!initialized)
+                using namespace std::chrono;
+                bool initialized = false;
+                while (!pimpl_->stop_flag.load())
                 {
-                    pimpl_->process_running_at_start = isDQXGameRunning();
-                    initialized = true;
-                }
-                const bool game_running = isDQXGameRunning();
-                auto st = pimpl_->engine->status();
-                if (st == dqxclarity::Status::Hooked)
-                {
-                    pimpl_->clearLastErrorMessage();
-                    pimpl_->process_warning_reported.store(false, std::memory_order_relaxed);
-                }
-                if (game_running)
-                {
-                    if (st == dqxclarity::Status::Stopped || st == dqxclarity::Status::Error)
+                    try
                     {
-                        // If process was already running when tool started, enable immediately once.
-                        if (pimpl_->process_running_at_start && !pimpl_->attempted_auto_start)
+                        pimpl_->heartbeat_seq.fetch_add(1, std::memory_order_relaxed);
+                        PLOG_DEBUG << "Launcher monitor heartbeat " << pimpl_->heartbeat_seq.load();
+                        if (!initialized)
                         {
-                            if (pimpl_->policy_skip_when_process_running)
-                            {
-                                PLOG_INFO << "Process already running at tool start; enabling immediately";
-                                (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
-                            }
-                            else
-                            {
-                                // no immediate start; ensure wait workers below will be created
-                            }
-                            pimpl_->attempted_auto_start = true;
-                            // Stop any lingering workers
-                            if (pimpl_->notice_worker.joinable())
-                            {
-                                pimpl_->cancel_notice.store(true);
-                                pimpl_->notice_worker.join();
-                            }
-                            if (pimpl_->post_login_worker.joinable())
-                            {
-                                pimpl_->cancel_post_login.store(true);
-                                pimpl_->post_login_worker.join();
-                            }
+                            pimpl_->process_running_at_start = isDQXGameRunning();
+                            initialized = true;
                         }
-                        else if (!pimpl_->notice_worker.joinable())
+                        const bool game_running = isDQXGameRunning();
+                        auto st = pimpl_->engine->status();
+                        if (st == dqxclarity::Status::Hooked)
                         {
-                            PLOG_INFO
-                                << "DQXGame.exe detected; waiting for \"Important notice\" and post-login heuristic";
-                            pimpl_->cancel_notice.store(false);
-                            pimpl_->notice_found.store(false);
-                            pimpl_->notice_worker = std::thread(
-                                [this]
+                            pimpl_->clearLastErrorMessage();
+                            pimpl_->process_warning_reported.store(false, std::memory_order_relaxed);
+                        }
+                        if (game_running)
+                        {
+                            if (st == dqxclarity::Status::Stopped || st == dqxclarity::Status::Error)
+                            {
+                                // If process was already running when tool started, enable immediately once.
+                                if (pimpl_->process_running_at_start && !pimpl_->attempted_auto_start)
                                 {
-                                    // Wait for notice with configured timeout (0 = infinite)
-                                    bool ok = wait_for_notice_screen(
-                                        pimpl_->cancel_notice, std::chrono::milliseconds(250),
-                                        std::chrono::milliseconds(pimpl_->notice_wait_timeout_ms));
-                                    if (ok)
+                                    if (pimpl_->policy_skip_when_process_running)
                                     {
-                                        pimpl_->notice_found.store(true);
+                                        PLOG_INFO << "Process already running at tool start; enabling immediately";
+                                        (void)pimpl_->startHookLocked(
+                                            dqxclarity::Engine::StartPolicy::EnableImmediately);
                                     }
-                                });
-                            // Run post-login detector in parallel when enabled
-                            if (pimpl_->enable_post_login_heuristics && !pimpl_->post_login_worker.joinable())
-                            {
-                                pimpl_->cancel_post_login.store(false);
-                                pimpl_->post_login_found.store(false);
-                                pimpl_->post_login_worker = std::thread(
-                                    [this]
+                                    else
                                     {
-                                        bool ok = detect_post_login(pimpl_->cancel_post_login,
-                                                                              std::chrono::milliseconds(250),
-                                                                              std::chrono::milliseconds(0));
-                                        if (ok)
+                                        // no immediate start; ensure wait workers below will be created
+                                    }
+                                    pimpl_->attempted_auto_start = true;
+                                    // Stop any lingering workers
+                                    if (pimpl_->notice_worker.joinable())
+                                    {
+                                        pimpl_->cancel_notice.store(true);
+                                        pimpl_->notice_worker.join();
+                                    }
+                                    if (pimpl_->post_login_worker.joinable())
+                                    {
+                                        pimpl_->cancel_post_login.store(true);
+                                        pimpl_->post_login_worker.join();
+                                    }
+                                }
+                                else if (!pimpl_->notice_worker.joinable())
+                                {
+                                    PLOG_INFO << "DQXGame.exe detected; waiting for \"Important notice\" and "
+                                                 "post-login heuristic";
+                                    pimpl_->cancel_notice.store(false);
+                                    pimpl_->notice_found.store(false);
+                                    pimpl_->notice_worker = std::thread(
+                                        [this]
                                         {
-                                            pimpl_->post_login_found.store(true);
-                                        }
-                                    });
-                            }
-                        }
+                                            // Wait for notice with configured timeout (0 = infinite)
+                                            bool ok = wait_for_notice_screen(
+                                                pimpl_->cancel_notice, std::chrono::milliseconds(250),
+                                                std::chrono::milliseconds(pimpl_->notice_wait_timeout_ms));
+                                            if (ok)
+                                            {
+                                                pimpl_->notice_found.store(true);
+                                            }
+                                        });
+                                    // Run post-login detector in parallel when enabled
+                                    if (pimpl_->enable_post_login_heuristics && !pimpl_->post_login_worker.joinable())
+                                    {
+                                        pimpl_->cancel_post_login.store(false);
+                                        pimpl_->post_login_found.store(false);
+                                        pimpl_->post_login_worker = std::thread(
+                                            [this]
+                                            {
+                                                bool ok = detect_post_login(pimpl_->cancel_post_login,
+                                                                            std::chrono::milliseconds(250),
+                                                                            std::chrono::milliseconds(0));
+                                                if (ok)
+                                                {
+                                                    pimpl_->post_login_found.store(true);
+                                                }
+                                            });
+                                    }
+                                }
 
-                        // If either signal is observed, start accordingly
-                        if (pimpl_->notice_found.load())
-                        {
-                            PLOG_INFO << "Important notice found; starting hook (defer until integrity)...";
-                            (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::DeferUntilIntegrity);
-                            pimpl_->notice_found.store(false);
-                            // Cancel heuristic worker
-                            if (pimpl_->post_login_worker.joinable())
-                            {
-                                pimpl_->cancel_post_login.store(true);
-                                pimpl_->post_login_worker.join();
-                            }
-                            if (pimpl_->notice_worker.joinable())
-                            {
-                                pimpl_->notice_worker.join();
+                                // If either signal is observed, start accordingly
+                                if (pimpl_->notice_found.load())
+                                {
+                                    PLOG_INFO << "Important notice found; starting hook (defer until integrity)...";
+                                    (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::DeferUntilIntegrity);
+                                    pimpl_->notice_found.store(false);
+                                    // Cancel heuristic worker
+                                    if (pimpl_->post_login_worker.joinable())
+                                    {
+                                        pimpl_->cancel_post_login.store(true);
+                                        pimpl_->post_login_worker.join();
+                                    }
+                                    if (pimpl_->notice_worker.joinable())
+                                    {
+                                        pimpl_->notice_worker.join();
+                                    }
+                                }
+                                else if (pimpl_->post_login_found.load())
+                                {
+                                    PLOG_INFO << "Post-login heuristic matched; enabling immediately...";
+                                    (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
+                                    pimpl_->post_login_found.store(false);
+                                    // Cancel notice worker
+                                    if (pimpl_->notice_worker.joinable())
+                                    {
+                                        pimpl_->cancel_notice.store(true);
+                                        pimpl_->notice_worker.join();
+                                    }
+                                    if (pimpl_->post_login_worker.joinable())
+                                    {
+                                        pimpl_->post_login_worker.join();
+                                    }
+                                }
                             }
                         }
-                        else if (pimpl_->post_login_found.load())
+                        else
                         {
-                            PLOG_INFO << "Post-login heuristic matched; enabling immediately...";
-                            (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
-                            pimpl_->post_login_found.store(false);
-                            // Cancel notice worker
+                            // Process not running: reset state and cancel any pending workers
+                            pimpl_->process_running_at_start = false;
+                            pimpl_->attempted_auto_start = false;
                             if (pimpl_->notice_worker.joinable())
                             {
                                 pimpl_->cancel_notice.store(true);
@@ -500,81 +528,64 @@ void DQXClarityLauncher::lateInitialize()
                             }
                             if (pimpl_->post_login_worker.joinable())
                             {
+                                pimpl_->cancel_post_login.store(true);
                                 pimpl_->post_login_worker.join();
                             }
+                            if (pimpl_->waiting_delay)
+                                pimpl_->waiting_delay = false;
+                            if (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting ||
+                                st == dqxclarity::Status::Stopping)
+                            {
+                                PLOG_INFO << "DQXGame.exe not running; ensuring hook is stopped";
+                                (void)pimpl_->stopHookLocked();
+                            }
+                            if (st != dqxclarity::Status::Error)
+                            {
+                                pimpl_->clearLastErrorMessage();
+                            }
                         }
-                    }
-                }
-                else
-                {
-                    // Process not running: reset state and cancel any pending workers
-                    pimpl_->process_running_at_start = false;
-                    pimpl_->attempted_auto_start = false;
-                    if (pimpl_->notice_worker.joinable())
-                    {
-                        pimpl_->cancel_notice.store(true);
-                        pimpl_->notice_worker.join();
-                    }
-                    if (pimpl_->post_login_worker.joinable())
-                    {
-                        pimpl_->cancel_post_login.store(true);
-                        pimpl_->post_login_worker.join();
-                    }
-                    if (pimpl_->waiting_delay)
-                        pimpl_->waiting_delay = false;
-                    if (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting ||
-                        st == dqxclarity::Status::Stopping)
-                    {
-                        PLOG_INFO << "DQXGame.exe not running; ensuring hook is stopped";
-                        (void)pimpl_->stopHookLocked();
-                    }
-                    if (st != dqxclarity::Status::Error)
-                    {
-                        pimpl_->clearLastErrorMessage();
-                    }
-                }
 
-                // Drain new messages from engine and append to backlog
-                std::vector<dqxclarity::DialogMessage> tmp;
-                if (pimpl_->engine->drain(tmp) && !tmp.empty())
-                {
-                    std::lock_guard<std::mutex> lock(pimpl_->backlog_mutex);
-                    for (auto& m : tmp)
-                    {
-                        pimpl_->backlog.push_back(std::move(m));
-                        if (pimpl_->backlog.size() > pimpl_->kMaxBacklog)
+                        // Drain new messages from engine and append to backlog
+                        std::vector<dqxclarity::DialogMessage> tmp;
+                        if (pimpl_->engine->drain(tmp) && !tmp.empty())
                         {
-                            pimpl_->backlog.erase(pimpl_->backlog.begin(),
-                                                  pimpl_->backlog.begin() +
-                                                      (pimpl_->backlog.size() - pimpl_->kMaxBacklog));
+                            std::lock_guard<std::mutex> lock(pimpl_->backlog_mutex);
+                            for (auto& m : tmp)
+                            {
+                                pimpl_->backlog.push_back(std::move(m));
+                                if (pimpl_->backlog.size() > pimpl_->kMaxBacklog)
+                                {
+                                    pimpl_->backlog.erase(pimpl_->backlog.begin(),
+                                                          pimpl_->backlog.begin() +
+                                                              (pimpl_->backlog.size() - pimpl_->kMaxBacklog));
+                                }
+                            }
                         }
-                    }
-                }
 
-                std::vector<dqxclarity::DialogStreamItem> stream_items;
-                if (pimpl_->engine->drainStream(stream_items) && !stream_items.empty())
-                {
-                    std::lock_guard<std::mutex> lock(pimpl_->stream_mutex);
-                    for (auto& item : stream_items)
-                    {
-                        pimpl_->stream_backlog.push_back(std::move(item));
-                        if (pimpl_->stream_backlog.size() > pimpl_->kMaxStreamBacklog)
+                        std::vector<dqxclarity::DialogStreamItem> stream_items;
+                        if (pimpl_->engine->drainStream(stream_items) && !stream_items.empty())
                         {
-                            pimpl_->stream_backlog.erase(
-                                pimpl_->stream_backlog.begin(),
-                                pimpl_->stream_backlog.begin() +
-                                    (pimpl_->stream_backlog.size() - pimpl_->kMaxStreamBacklog));
+                            std::lock_guard<std::mutex> lock(pimpl_->stream_mutex);
+                            for (auto& item : stream_items)
+                            {
+                                pimpl_->stream_backlog.push_back(std::move(item));
+                                if (pimpl_->stream_backlog.size() > pimpl_->kMaxStreamBacklog)
+                                {
+                                    pimpl_->stream_backlog.erase(
+                                        pimpl_->stream_backlog.begin(),
+                                        pimpl_->stream_backlog.begin() +
+                                            (pimpl_->stream_backlog.size() - pimpl_->kMaxStreamBacklog));
+                                }
+                            }
                         }
-                    }
-                }
 
-                dqxclarity::QuestMessage quest_snapshot;
-                if (pimpl_->engine->latest_quest(quest_snapshot))
-                {
-                    std::lock_guard<std::mutex> qlock(pimpl_->quest_mutex);
-                    pimpl_->latest_quest = std::move(quest_snapshot);
-                    pimpl_->quest_valid = true;
-                }
+                        dqxclarity::QuestMessage quest_snapshot;
+                        if (pimpl_->engine->latest_quest(quest_snapshot))
+                        {
+                            std::lock_guard<std::mutex> qlock(pimpl_->quest_mutex);
+                            pimpl_->latest_quest = std::move(quest_snapshot);
+                            pimpl_->quest_valid = true;
+                        }
 
 #if 0
                 dqxclarity::PlayerInfo player_snapshot;
@@ -593,7 +604,32 @@ void DQXClarityLauncher::lateInitialize()
                 }
 #endif
 
-                std::this_thread::sleep_for(std::chrono::seconds(1));
+                        std::this_thread::sleep_for(std::chrono::seconds(1));
+                    }
+                    catch (const std::exception& e)
+                    {
+                        PLOG_ERROR << "[Monitor] Iteration exception: " << e.what();
+                        // Continue running monitor thread despite iteration error
+                        std::this_thread::sleep_for(std::chrono::seconds(1));
+                    }
+                    catch (...)
+                    {
+                        PLOG_ERROR << "[Monitor] Unknown iteration exception";
+                        std::this_thread::sleep_for(std::chrono::seconds(1));
+                    }
+                }
+            }
+            catch (const std::exception& e)
+            {
+                PLOG_FATAL << "[Monitor] Thread crashed: " << e.what();
+                pimpl_->fatal_signal.store(true, std::memory_order_release);
+                (void)pimpl_->stopHookLocked();
+            }
+            catch (...)
+            {
+                PLOG_FATAL << "[Monitor] Thread crashed with unknown exception";
+                pimpl_->fatal_signal.store(true, std::memory_order_release);
+                (void)pimpl_->stopHookLocked();
             }
         });
 
@@ -607,7 +643,7 @@ void DQXClarityLauncher::lateInitialize()
             {
                 if (pimpl_->stop_flag.load(std::memory_order_acquire))
                     break;
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Reduced from 500ms
                 const auto seq = pimpl_->heartbeat_seq.load(std::memory_order_relaxed);
                 if (seq == last_seq)
                 {
@@ -619,14 +655,21 @@ void DQXClarityLauncher::lateInitialize()
                     stagnant_ticks = 0;
                     last_seq = seq;
                 }
+                PLOG_DEBUG << "Launcher watchdog heartbeat check: seq=" << seq
+                           << " stagnant_ticks=" << stagnant_ticks;
                 const bool fatal = pimpl_->fatal_signal.load(std::memory_order_acquire);
-                const bool stalled = stagnant_ticks >= 6;
+                const bool stalled = stagnant_ticks >= 6; // Reduced from 6
+
                 auto st = pimpl_->engine->status();
                 if ((fatal || stalled) && (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting ||
                                            st == dqxclarity::Status::Stopping))
                 {
                     PLOG_FATAL << "Watchdog detected " << (fatal ? "fatal signal" : "heartbeat stall")
                                << "; stopping hook";
+                    if (stalled)
+                    {
+                        PLOG_ERROR << "Watchdog detected heartbeat stall (ticks=" << stagnant_ticks << ")";
+                    }
                     (void)pimpl_->stopHookLocked();
                     if (fatal)
                         break;

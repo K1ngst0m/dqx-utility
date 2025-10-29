@@ -35,6 +35,7 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityDetour.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityMonitor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/MemoryPatch.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hooking/HookRegistry.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/api/dqxclarity.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/api/quest_message.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/api/dialog_stream.hpp
