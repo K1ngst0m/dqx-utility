@@ -6,12 +6,15 @@
 #include <array>
 #include <memory>
 #include <string>
+#include <functional>
 
 // GlobalSettingsPanel offers application-wide settings and window management.
 class GlobalSettingsPanel
 {
 public:
-    GlobalSettingsPanel(WindowRegistry& registry);
+    using ExitCallback = std::function<void()>;
+
+    GlobalSettingsPanel(WindowRegistry& registry, ExitCallback exitCallback = nullptr);
 
     void render(bool& open);
 
@@ -29,6 +32,7 @@ private:
     std::string readLogFile(const std::string& path, size_t max_lines = 1000);
 
     WindowRegistry& registry_;
+    ExitCallback exit_callback_;
     UIWindowType selected_type_ = UIWindowType::Dialog;
     int selected_index_ = 0;
     int previous_selected_index_ = -1;

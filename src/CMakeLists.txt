@@ -1,12 +1,21 @@
 include(PlatformWindows)
 
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/Version.hpp.in
+  ${CMAKE_CURRENT_BINARY_DIR}/app/Version.hpp
+  @ONLY
+)
+
 add_library(dqxu_core STATIC)
 
 target_sources(dqxu_core
   PRIVATE
     app/Application.cpp
     app/Application.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/app/Version.hpp
 )
+
+target_include_directories(dqxu_core PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 target_sources(dqxu_core
   PRIVATE

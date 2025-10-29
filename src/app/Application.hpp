@@ -30,6 +30,7 @@ public:
     ~Application();
 
     int run();
+    void requestExit();
 
 private:
     bool initialize();

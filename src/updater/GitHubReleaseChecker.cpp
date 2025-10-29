@@ -34,22 +34,27 @@ struct GitHubReleaseChecker::Impl
         }
     }
 
-    std::string getApiUrl() const { return "https://api.github.com/repos/" + owner + "/" + repo + "/releases/latest"; }
+    std::string getApiUrl() const
+    {
+        // Use jsDelivr CDN to fetch version.json from main branch (no rate limits)
+        // Note: @latest only works for npm packages, must use branch name for git repos
+        return "https://cdn.jsdelivr.net/gh/" + owner + "/" + repo + "@main/version.json";
+    }
 
     bool parseReleaseJson(const json& releaseJson, const Version& currentVersion, UpdateInfo& outInfo,
                           std::string& outError)
     {
         try
         {
-            // Extract version from tag_name
-            if (!releaseJson.contains("tag_name"))
+            // Extract version from "version" field (simplified format)
+            if (!releaseJson.contains("version"))
             {
-                outError = "Release JSON missing tag_name";
+                outError = "version.json missing 'version' field";
                 return false;
             }
 
-            std::string tagName = releaseJson["tag_name"];
-            Version releaseVersion(tagName);
+            std::string versionStr = releaseJson["version"];
+            Version releaseVersion(versionStr);
 
             // Check if this is a newer version
             if (releaseVersion <= currentVersion)
@@ -61,35 +66,30 @@ struct GitHubReleaseChecker::Impl
 
             // Fill UpdateInfo
             outInfo.version = releaseVersion.toString();
-            outInfo.changelogUrl = releaseJson.value("html_url", "");
+            outInfo.changelogUrl = releaseJson.value("changelog_url", "");
             outInfo.releasedDate = releaseJson.value("published_at", "");
 
-            // Find the package asset (look for .zip file matching pattern)
-            if (releaseJson.contains("assets") && releaseJson["assets"].is_array())
+            // Get download URL
+            if (!releaseJson.contains("download_url"))
             {
-                for (const auto& asset : releaseJson["assets"])
-                {
-                    std::string assetName = asset.value("name", "");
-
-                    // Look for: dqx-utility-zh-CN-*.zip or similar
-                    if (assetName.find(".zip") != std::string::npos &&
-                        assetName.find("dqx-utility") != std::string::npos)
-                    {
-                        outInfo.downloadUrl = asset.value("browser_download_url", "");
-                        outInfo.packageSize = asset.value("size", 0);
-                        break;
-                    }
-                }
-            }
-
-            if (outInfo.downloadUrl.empty())
-            {
-                outError = "No suitable package found in release assets";
+                outError = "version.json missing 'download_url' field";
                 return false;
             }
 
+            outInfo.downloadUrl = releaseJson["download_url"].get<std::string>();
+
+            if (outInfo.downloadUrl.empty())
+            {
+                outError = "download_url is empty in version.json";
+                return false;
+            }
+
+            // Package size not provided in version.json, will be determined during download
+            outInfo.packageSize = 0;
+
             PLOG_INFO << "New version available: " << outInfo.version << " (current: " << currentVersion.toString()
                       << ")";
+            PLOG_INFO << "Download URL: " << outInfo.downloadUrl;
             return true;
         }
         catch (const json::exception& e)
@@ -141,13 +141,10 @@ bool GitHubReleaseChecker::checkLatestRelease(const Version& currentVersion, Upd
 
     try
     {
-        // Make API request
-        auto response = cpr::Get(
-            cpr::Url{
-                impl_->getApiUrl()
-        },
-            cpr::Header{ { "Accept", "application/vnd.github+json" }, { "User-Agent", "DQX-Utility-Updater" } },
-            cpr::Timeout{ 5000 } // 5 second timeout
+        // Fetch version.json from jsDelivr CDN
+        auto response = cpr::Get(cpr::Url{impl_->getApiUrl()},
+                                 cpr::Header{{"User-Agent", "DQX-Utility-Updater"}},
+                                 cpr::Timeout{5000} // 5 second timeout
         );
 
         if (impl_->cancelled)
@@ -159,14 +156,10 @@ bool GitHubReleaseChecker::checkLatestRelease(const Version& currentVersion, Upd
         // Check HTTP status
         if (response.status_code != 200)
         {
-            outError = "GitHub API returned status " + std::to_string(response.status_code);
+            outError = "Update check returned status " + std::to_string(response.status_code);
             if (response.status_code == 404)
             {
-                outError += " (repository or release not found)";
-            }
-            else if (response.status_code == 403)
-            {
-                outError += " (rate limit exceeded)";
+                outError += " (version.json not found)";
             }
             PLOG_ERROR << outError;
             return false;

@@ -1,4 +1,5 @@
 #include "Application.hpp"
+#include "app/Version.hpp"
 #include "ui/AppContext.hpp"
 #include "ui/FontManager.hpp"
 #include "ui/GlobalSettingsPanel.hpp"
@@ -20,6 +21,7 @@
 #include "utils/NativeMessageBox.hpp"
 #include "updater/UpdaterService.hpp"
 #include "updater/Version.hpp"
+#include "updater/ManifestParser.hpp"
 
 #include <plog/Log.h>
 #include <plog/Init.h>
@@ -42,6 +44,33 @@ namespace
 #if DQX_PROFILING_LEVEL == 1
 profiling::detail::FrameStatsAccumulator frame_stats_{ 60 }; // Log every 60 frames (~1 second)
 #endif
+
+// Read installed version from manifest.json, fall back to hardcoded version if not found
+static std::string getInstalledVersion()
+{
+    const std::string manifestPath = "manifest.json";
+    const std::string fallbackVersion = DQX_VERSION_STRING;
+
+    updater::ManifestParser parser;
+    updater::UpdateManifest manifest;
+    std::string error;
+
+    if (parser.parseFile(manifestPath, manifest, error))
+    {
+        if (!manifest.version.empty())
+        {
+            PLOG_INFO << "Installed version from manifest: " << manifest.version;
+            return manifest.version;
+        }
+    }
+    else
+    {
+        PLOG_DEBUG << "Could not read manifest.json: " << error << " (using fallback version)";
+    }
+
+    PLOG_INFO << "Using fallback version: " << fallbackVersion;
+    return fallbackVersion;
+}
 
 static void SDLCALL SDLLogBridge(void* userdata, int category, SDL_LogPriority priority, const char* message)
 {
@@ -194,12 +223,17 @@ void Application::setupManagers()
     mini_manager_ = std::make_unique<ui::MiniModeManager>(*context_, *registry_);
     mode_manager_ = std::make_unique<ui::AppModeManager>(*context_, *registry_, *mini_manager_);
 
-    settings_panel_ = std::make_unique<GlobalSettingsPanel>(*registry_);
+    settings_panel_ = std::make_unique<GlobalSettingsPanel>(*registry_, [this]() {
+        requestExit();
+    });
     error_dialog_ = std::make_unique<ErrorDialog>();
 
     updater_service_ = std::make_unique<updater::UpdaterService>();
     UpdaterService_Set(updater_service_.get());
-    updater_service_->initialize("K1ngst0m", "dqx-utility", updater::Version("0.1.0"));
+
+    // Read installed version from manifest.json (or use fallback if not found)
+    std::string installedVersion = getInstalledVersion();
+    updater_service_->initialize("K1ngst0m", "dqx-utility", updater::Version(installedVersion));
 }
 
 void Application::initializeConfig()
@@ -254,6 +288,12 @@ int Application::run()
     }
     mainLoop();
     return 0;
+}
+
+void Application::requestExit()
+{
+    PLOG_INFO << "Application exit requested";
+    quit_requested_ = true;
 }
 
 void Application::mainLoop()

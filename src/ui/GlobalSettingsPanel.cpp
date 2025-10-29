@@ -1,5 +1,5 @@
 #include "GlobalSettingsPanel.hpp"
-
+#include "app/Version.hpp"
 #include "dialog/DialogWindow.hpp"
 #include "quest/QuestWindow.hpp"
 #include "help/HelpWindow.hpp"
@@ -133,8 +133,9 @@ std::vector<UIWindow*> collectAllWindows(WindowRegistry& registry)
 } // namespace
 
 // Builds a settings panel tied to the window registry.
-GlobalSettingsPanel::GlobalSettingsPanel(WindowRegistry& registry)
+GlobalSettingsPanel::GlobalSettingsPanel(WindowRegistry& registry, ExitCallback exitCallback)
     : registry_(registry)
+    , exit_callback_(std::move(exitCallback))
     , dqxc_launcher_(std::make_unique<DQXClarityLauncher>())
 {
     // Expose launcher globally for UI windows to fetch dialog messages
@@ -841,7 +842,7 @@ void GlobalSettingsPanel::renderUpdateSection()
                         }
                         else
                         {
-                            std::string currentVersion = "0.1.0";
+                            std::string currentVersion = DQX_VERSION_STRING;
                             update_check_hint_ =
                                 i18n::format("settings.updates.up_to_date", {
                                                                                 { "version", currentVersion }
@@ -908,11 +909,13 @@ void GlobalSettingsPanel::renderUpdateSection()
 
             if (ImGui::Button(i18n::get("settings.updates.apply_button")))
             {
-                updaterService->applyUpdate(
-                    [](bool success, const std::string& message)
+                updaterService->applyUpdate([this](bool success, const std::string& message) {
+                    PLOG_INFO << "Update result: " << message;
+                    if (success && exit_callback_)
                     {
-                        PLOG_INFO << "Update result: " << message;
-                    });
+                        exit_callback_();
+                    }
+                });
             }
             ImGui::SameLine();
             ImGui::TextDisabled("%s", i18n::get("settings.updates.apply_hint"));

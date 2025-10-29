@@ -17,12 +17,11 @@ public:
     bool applyUpdate(const std::string& packagePath, const std::string& configTemplatePath, ApplyCallback callback,
                      std::string& outError);
 
+    // Perform update when launched in updater mode
+    static bool performUpdate(const std::string& packagePath, const std::string& targetDir);
+
 private:
     std::string appDir_;
-
-    bool generateBatchScript(const std::string& packagePath, const std::string& configTemplatePath,
-                             std::string& outScriptPath, std::string& outError);
-    bool launchBatchScript(const std::string& scriptPath, std::string& outError);
 };
 
 } // namespace updater
