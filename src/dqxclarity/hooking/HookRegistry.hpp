@@ -41,6 +41,8 @@ struct HookRecord
     uintptr_t hook_address; // Where JMP was written
     uintptr_t detour_address; // Allocated memory for detour
     size_t detour_size; // Size of detour allocation
+    uintptr_t backup_address; // Allocated memory for backup
+    size_t backup_size; // Size of backup allocation
     std::vector<uint8_t> original_bytes; // Original bytes to restore
     std::chrono::system_clock::time_point installed_time; // When hook was installed
     uint32_t hook_checksum; // CRC32 of hook_address region

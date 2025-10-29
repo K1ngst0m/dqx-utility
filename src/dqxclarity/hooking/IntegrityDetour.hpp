@@ -31,6 +31,11 @@ public:
     // Whether installed
     bool IsInstalled() const { return m_installed; }
 
+    uintptr_t GetHookAddress() const { return m_integrity_addr; }
+    uintptr_t GetTrampolineAddress() const { return m_trampoline_addr; }
+
+    const std::vector<uint8_t>& GetOriginalBytes() const { return m_original_bytes; }
+
     void SetLogger(const dqxclarity::Logger& log) { m_log = log; }
 
     void SetDiagnosticsEnabled(bool d) { m_diag = d; }

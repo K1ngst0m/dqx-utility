@@ -70,6 +70,9 @@ public:
 
     const std::vector<uint8_t>& GetOriginalBytes() const { return m_original_bytes; }
 
+    uintptr_t GetDetourAddress() const { return m_detour_address; }
+    uintptr_t GetBackupAddress() const { return m_backup_address; }
+
 private:
     static constexpr size_t kMaxStringLength = 4096;
 

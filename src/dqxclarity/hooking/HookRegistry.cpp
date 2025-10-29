@@ -185,6 +185,8 @@ std::optional<std::vector<HookRecord>> HookRegistry::ReadRegistry()
         file.read(reinterpret_cast<char*>(&record.hook_address), sizeof(record.hook_address));
         file.read(reinterpret_cast<char*>(&record.detour_address), sizeof(record.detour_address));
         file.read(reinterpret_cast<char*>(&record.detour_size), sizeof(record.detour_size));
+        file.read(reinterpret_cast<char*>(&record.backup_address), sizeof(record.backup_address));
+        file.read(reinterpret_cast<char*>(&record.backup_size), sizeof(record.backup_size));
 
         int64_t timestamp_ms;
         file.read(reinterpret_cast<char*>(&timestamp_ms), sizeof(timestamp_ms));
@@ -244,6 +246,8 @@ bool HookRegistry::WriteRegistry(const std::vector<HookRecord>& records)
             file.write(reinterpret_cast<const char*>(&record.hook_address), sizeof(record.hook_address));
             file.write(reinterpret_cast<const char*>(&record.detour_address), sizeof(record.detour_address));
             file.write(reinterpret_cast<const char*>(&record.detour_size), sizeof(record.detour_size));
+            file.write(reinterpret_cast<const char*>(&record.backup_address), sizeof(record.backup_address));
+            file.write(reinterpret_cast<const char*>(&record.backup_size), sizeof(record.backup_size));
 
             int64_t timestamp_ms =
                 std::chrono::duration_cast<std::chrono::milliseconds>(record.installed_time.time_since_epoch()).count();
@@ -444,6 +448,20 @@ size_t HookRegistry::CleanupOrphanedHooks(const std::vector<HookRecord>& orphans
             {
                 if (s_logger_.warn)
                     s_logger_.warn("Failed to free detour memory (may have been freed already)");
+            }
+        }
+
+        if (record.backup_address != 0 && record.backup_size > 0)
+        {
+            if (memory->FreeMemory(record.backup_address, record.backup_size))
+            {
+                if (s_logger_.info)
+                    s_logger_.info("Freed backup memory at 0x" + std::to_string(record.backup_address));
+            }
+            else
+            {
+                if (s_logger_.warn)
+                    s_logger_.warn("Failed to free backup memory (may have been freed already)");
             }
         }
 

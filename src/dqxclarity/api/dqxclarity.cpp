@@ -246,6 +246,33 @@ bool Engine::start_hook(StartPolicy policy)
                 hook_installed = true;
                 if (impl_->log.info)
                     impl_->log.info("Dialog hook installed successfully");
+
+                // Register immediately for crash recovery
+                if (impl_->hook->GetHookAddress() != 0)
+                {
+                    try
+                    {
+                        persistence::HookRecord record;
+                        record.type = persistence::HookType::Dialog;
+                        record.process_id = impl_->memory->GetAttachedPid();
+                        record.hook_address = impl_->hook->GetHookAddress();
+                        record.detour_address = impl_->hook->GetDetourAddress();
+                        record.detour_size = 4096;
+                        record.backup_address = impl_->hook->GetBackupAddress();
+                        record.backup_size = 256;
+                        record.original_bytes = impl_->hook->GetOriginalBytes();
+                        record.installed_time = std::chrono::system_clock::now();
+                        record.hook_checksum = persistence::HookRegistry::ComputeCRC32(
+                            record.original_bytes.data(), record.original_bytes.size());
+                        record.detour_checksum = 0;
+                        persistence::HookRegistry::RegisterHook(record);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        if (impl_->log.warn)
+                            impl_->log.warn(std::string("Failed to register dialog hook: ") + e.what());
+                    }
+                }
             }
             else
             {
@@ -300,6 +327,32 @@ bool Engine::start_hook(StartPolicy policy)
                 impl_->log.warn("Failed to prepare quest hook; continuing without quest capture");
             impl_->quest_hook.reset();
         }
+        else if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0)
+        {
+            // Register immediately for crash recovery
+            try
+            {
+                persistence::HookRecord record;
+                record.type = persistence::HookType::Quest;
+                record.process_id = impl_->memory->GetAttachedPid();
+                record.hook_address = impl_->quest_hook->GetHookAddress();
+                record.detour_address = impl_->quest_hook->GetDetourAddress();
+                record.detour_size = 4096;
+                record.backup_address = impl_->quest_hook->GetBackupAddress();
+                record.backup_size = 256;
+                record.original_bytes = impl_->quest_hook->GetOriginalBytes();
+                record.installed_time = std::chrono::system_clock::now();
+                record.hook_checksum =
+                    persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
+                record.detour_checksum = 0;
+                persistence::HookRegistry::RegisterHook(record);
+            }
+            catch (const std::exception& e)
+            {
+                if (impl_->log.warn)
+                    impl_->log.warn(std::string("Failed to register quest hook: ") + e.what());
+            }
+        }
     }
 
     {
@@ -315,6 +368,32 @@ bool Engine::start_hook(StartPolicy policy)
             if (impl_->log.warn)
                 impl_->log.warn("Failed to prepare player hook; continuing without player capture");
             impl_->player_hook.reset();
+        }
+        else if (impl_->player_hook && impl_->player_hook->GetHookAddress() != 0)
+        {
+            // Register immediately for crash recovery
+            try
+            {
+                persistence::HookRecord record;
+                record.type = persistence::HookType::Player;
+                record.process_id = impl_->memory->GetAttachedPid();
+                record.hook_address = impl_->player_hook->GetHookAddress();
+                record.detour_address = impl_->player_hook->GetDetourAddress();
+                record.detour_size = 4096;
+                record.backup_address = impl_->player_hook->GetBackupAddress();
+                record.backup_size = 256;
+                record.original_bytes = impl_->player_hook->GetOriginalBytes();
+                record.installed_time = std::chrono::system_clock::now();
+                record.hook_checksum =
+                    persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
+                record.detour_checksum = 0;
+                persistence::HookRegistry::RegisterHook(record);
+            }
+            catch (const std::exception& e)
+            {
+                if (impl_->log.warn)
+                    impl_->log.warn(std::string("Failed to register player hook: ") + e.what());
+            }
         }
     }
 
@@ -344,6 +423,32 @@ bool Engine::start_hook(StartPolicy policy)
             if (impl_->log.warn)
                 impl_->log.warn("Failed to prepare corner text hook; continuing without capture");
             impl_->corner_hook.reset();
+        }
+        else if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0)
+        {
+            // Register immediately for crash recovery
+            try
+            {
+                persistence::HookRecord record;
+                record.type = persistence::HookType::Corner;
+                record.process_id = impl_->memory->GetAttachedPid();
+                record.hook_address = impl_->corner_hook->GetHookAddress();
+                record.detour_address = impl_->corner_hook->GetDetourAddress();
+                record.detour_size = 4096;
+                record.backup_address = impl_->corner_hook->GetBackupAddress();
+                record.backup_size = 256;
+                record.original_bytes = impl_->corner_hook->GetOriginalBytes();
+                record.installed_time = std::chrono::system_clock::now();
+                record.hook_checksum =
+                    persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
+                record.detour_checksum = 0;
+                persistence::HookRegistry::RegisterHook(record);
+            }
+            catch (const std::exception& e)
+            {
+                if (impl_->log.warn)
+                    impl_->log.warn(std::string("Failed to register corner hook: ") + e.what());
+            }
         }
     }
 
@@ -379,7 +484,41 @@ bool Engine::start_hook(StartPolicy policy)
             impl_->integrity->AddRestoreTarget(impl_->corner_hook->GetHookAddress(),
                                                impl_->corner_hook->GetOriginalBytes());
         }
-        if (!impl_->integrity->Install())
+        bool integrity_installed = impl_->integrity->Install();
+
+        // Register IntegrityDetour in hook registry for crash recovery
+        if (integrity_installed && impl_->integrity->GetHookAddress() != 0)
+        {
+            try
+            {
+                persistence::HookRecord record;
+                record.type = persistence::HookType::Integrity;
+                record.process_id = impl_->memory->GetAttachedPid();
+                record.hook_address = impl_->integrity->GetHookAddress();
+                record.detour_address = impl_->integrity->GetTrampolineAddress();
+                record.detour_size = 1024;
+                record.backup_address = impl_->integrity->GetStateAddress();
+                record.backup_size = 8;
+                record.original_bytes = impl_->integrity->GetOriginalBytes();
+                record.installed_time = std::chrono::system_clock::now();
+                record.hook_checksum = persistence::HookRegistry::ComputeCRC32(
+                    record.original_bytes.data(), record.original_bytes.size());
+                record.detour_checksum = 0;
+
+                if (!persistence::HookRegistry::RegisterHook(record))
+                {
+                    if (impl_->log.warn)
+                        impl_->log.warn("Failed to register integrity hook in registry");
+                }
+            }
+            catch (const std::exception& e)
+            {
+                if (impl_->log.warn)
+                    impl_->log.warn(std::string("Exception while registering integrity hook: ") + e.what());
+            }
+        }
+
+        if (!integrity_installed)
         {
             if (impl_->log.error)
                 impl_->log.error("Failed to install integrity detour");
@@ -931,92 +1070,6 @@ bool Engine::start_hook(StartPolicy policy)
         });
 
     status_ = Status::Hooked;
-
-    // Register all installed hooks in persistent registry for crash recovery
-    try
-    {
-        if (impl_->hook && impl_->hook->GetHookAddress() != 0)
-        {
-            persistence::HookRecord record;
-            record.type = persistence::HookType::Dialog;
-            record.process_id = impl_->memory->GetAttachedPid();
-            record.hook_address = impl_->hook->GetHookAddress();
-            record.detour_address = 0;
-            record.detour_size = 0;
-            record.original_bytes = impl_->hook->GetOriginalBytes();
-            record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum =
-                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
-            record.detour_checksum = 0;
-            persistence::HookRegistry::RegisterHook(record);
-        }
-        if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0)
-        {
-            persistence::HookRecord record;
-            record.type = persistence::HookType::Quest;
-            record.process_id = impl_->memory->GetAttachedPid();
-            record.hook_address = impl_->quest_hook->GetHookAddress();
-            record.detour_address = 0;
-            record.detour_size = 0;
-            record.original_bytes = impl_->quest_hook->GetOriginalBytes();
-            record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum =
-                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
-            record.detour_checksum = 0;
-            persistence::HookRegistry::RegisterHook(record);
-        }
-        if (impl_->player_hook && impl_->player_hook->GetHookAddress() != 0)
-        {
-            persistence::HookRecord record;
-            record.type = persistence::HookType::Player;
-            record.process_id = impl_->memory->GetAttachedPid();
-            record.hook_address = impl_->player_hook->GetHookAddress();
-            record.detour_address = 0;
-            record.detour_size = 0;
-            record.original_bytes = impl_->player_hook->GetOriginalBytes();
-            record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum =
-                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
-            record.detour_checksum = 0;
-            persistence::HookRegistry::RegisterHook(record);
-        }
-        if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0)
-        {
-            persistence::HookRecord record;
-            record.type = persistence::HookType::Network;
-            record.process_id = impl_->memory->GetAttachedPid();
-            record.hook_address = impl_->network_hook->GetHookAddress();
-            record.detour_address = 0;
-            record.detour_size = 0;
-            record.original_bytes = impl_->network_hook->GetOriginalBytes();
-            record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum =
-                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
-            record.detour_checksum = 0;
-            persistence::HookRegistry::RegisterHook(record);
-        }
-        if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0)
-        {
-            persistence::HookRecord record;
-            record.type = persistence::HookType::Corner;
-            record.process_id = impl_->memory->GetAttachedPid();
-            record.hook_address = impl_->corner_hook->GetHookAddress();
-            record.detour_address = 0;
-            record.detour_size = 0;
-            record.original_bytes = impl_->corner_hook->GetOriginalBytes();
-            record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum =
-                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
-            record.detour_checksum = 0;
-            persistence::HookRegistry::RegisterHook(record);
-        }
-    }
-    catch (const std::exception& e)
-    {
-        if (impl_->log.warn)
-            impl_->log.warn(std::string("Failed to register hooks in persistence: ") + e.what());
-    }
-
     return true;
 }
 
