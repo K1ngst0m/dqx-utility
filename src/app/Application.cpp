@@ -234,12 +234,14 @@ void Application::initializeConfig()
 
     if (updater_service_)
     {
-        updater_service_->checkForUpdatesAsync([](bool updateAvailable) {
-            if (updateAvailable)
+        updater_service_->checkForUpdatesAsync(
+            [](bool updateAvailable)
             {
-                PLOG_INFO << "Update available in background check";
-            }
-        });
+                if (updateAvailable)
+                {
+                    PLOG_INFO << "Update available in background check";
+                }
+            });
     }
 }
 

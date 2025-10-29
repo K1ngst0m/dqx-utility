@@ -35,8 +35,8 @@ namespace
 {
 
 bool run_pattern_waiter(const char* name, const dqxclarity::Pattern& pattern, bool require_executable,
-                      std::chrono::milliseconds poll_interval, std::chrono::milliseconds timeout,
-                      std::atomic<bool>& cancel)
+                        std::chrono::milliseconds poll_interval, std::chrono::milliseconds timeout,
+                        std::atomic<bool>& cancel)
 {
     auto pids = dqxclarity::ProcessFinder::FindByName("DQXGame.exe", false);
     if (pids.empty())
@@ -74,17 +74,17 @@ bool run_pattern_waiter(const char* name, const dqxclarity::Pattern& pattern, bo
 }
 
 bool wait_for_notice_screen(std::atomic<bool>& cancel, std::chrono::milliseconds poll_interval,
-                         std::chrono::milliseconds timeout)
+                            std::chrono::milliseconds timeout)
 {
     return run_pattern_waiter("NoticeWaiter", dqxclarity::Signatures::GetNoticeString(), /*require_executable=*/false,
-                             poll_interval, timeout, cancel);
+                              poll_interval, timeout, cancel);
 }
 
 bool detect_post_login(std::atomic<bool>& cancel, std::chrono::milliseconds poll_interval,
-                     std::chrono::milliseconds timeout)
+                       std::chrono::milliseconds timeout)
 {
-    return run_pattern_waiter("PostLoginDetector", dqxclarity::Signatures::GetWalkthroughPattern(), /*require_executable=*/false,
-                             poll_interval, timeout, cancel);
+    return run_pattern_waiter("PostLoginDetector", dqxclarity::Signatures::GetWalkthroughPattern(),
+                              /*require_executable=*/false, poll_interval, timeout, cancel);
 }
 
 bool scan_player_names(dqxclarity::PlayerInfo& out)
@@ -134,8 +134,8 @@ bool scan_player_names(dqxclarity::PlayerInfo& out)
     };
 
     PatternPollingTask task("PlayerNamePatternScan", Signatures::GetSiblingNamePattern(), false,
-                               std::chrono::milliseconds(250), std::chrono::milliseconds(2000),
-                               TerminationMode::FirstMatch, callback);
+                            std::chrono::milliseconds(250), std::chrono::milliseconds(2000),
+                            TerminationMode::FirstMatch, callback);
 
     auto result = runner.Run(task, cancel);
     memory->DetachProcess();
@@ -155,7 +155,6 @@ bool scan_player_names(dqxclarity::PlayerInfo& out)
 
 namespace dqxclarity
 {
-
 
 } // namespace dqxclarity
 
@@ -655,8 +654,7 @@ void DQXClarityLauncher::lateInitialize()
                     stagnant_ticks = 0;
                     last_seq = seq;
                 }
-                PLOG_DEBUG << "Launcher watchdog heartbeat check: seq=" << seq
-                           << " stagnant_ticks=" << stagnant_ticks;
+                PLOG_DEBUG << "Launcher watchdog heartbeat check: seq=" << seq << " stagnant_ticks=" << stagnant_ticks;
                 const bool fatal = pimpl_->fatal_signal.load(std::memory_order_acquire);
                 const bool stalled = stagnant_ticks >= 6; // Reduced from 6
 
@@ -967,6 +965,3 @@ std::string DQXClarityLauncher::getStatusString() const
 dqxclarity::Status DQXClarityLauncher::getEngineStage() const { return pimpl_->engine->status(); }
 
 std::string DQXClarityLauncher::getLastErrorMessage() const { return pimpl_->getLastErrorMessage(); }
-
-
-

@@ -26,8 +26,7 @@ public:
     UpdaterService& operator=(const UpdaterService&) = delete;
 
     // Initialize updater service
-    void initialize(const std::string& githubOwner, const std::string& githubRepo,
-                   const Version& currentVersion);
+    void initialize(const std::string& githubOwner, const std::string& githubRepo, const Version& currentVersion);
 
     // Shutdown updater service (cancel pending operations)
     void shutdown();

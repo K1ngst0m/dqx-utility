@@ -12,10 +12,7 @@ namespace translate
 
 ILLMTranslator::ILLMTranslator() = default;
 
-ILLMTranslator::~ILLMTranslator()
-{
-    shutdown();
-}
+ILLMTranslator::~ILLMTranslator() { shutdown(); }
 
 bool ILLMTranslator::init(const BackendConfig& cfg)
 {
@@ -38,18 +35,15 @@ bool ILLMTranslator::init(const BackendConfig& cfg)
 
     in_flight_.store(0, std::memory_order_relaxed);
     const auto interval = std::chrono::duration<double>(request_interval_seconds_);
-    last_request_ = std::chrono::steady_clock::now() -
-                    std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
+    last_request_ =
+        std::chrono::steady_clock::now() - std::chrono::duration_cast<std::chrono::steady_clock::duration>(interval);
 
     running_.store(true, std::memory_order_relaxed);
     worker_ = std::thread(&ILLMTranslator::workerLoop, this);
     return true;
 }
 
-bool ILLMTranslator::isReady() const
-{
-    return running_.load(std::memory_order_relaxed) && hasValidRuntimeConfig();
-}
+bool ILLMTranslator::isReady() const { return running_.load(std::memory_order_relaxed) && hasValidRuntimeConfig(); }
 
 void ILLMTranslator::shutdown()
 {
@@ -117,10 +111,7 @@ bool ILLMTranslator::drain(std::vector<Completed>& out)
     return true;
 }
 
-std::string ILLMTranslator::testConnection()
-{
-    return testConnectionImpl();
-}
+std::string ILLMTranslator::testConnection() { return testConnectionImpl(); }
 
 void ILLMTranslator::workerLoop()
 {
@@ -200,7 +191,7 @@ void ILLMTranslator::workerLoop()
         if (success)
         {
             PLOG_DEBUG << providerName() << " translation [" << job.src << " -> " << job.dst << "]: '" << job.text
-                      << "' -> '" << request_result.completed.text << "'";
+                       << "' -> '" << request_result.completed.text << "'";
             std::lock_guard<std::mutex> lk(r_mtx_);
             results_.push_back(std::move(request_result.completed));
         }
@@ -221,20 +212,11 @@ void ILLMTranslator::workerLoop()
 
 void ILLMTranslator::onInit() {}
 
-std::string ILLMTranslator::validateConfig(const BackendConfig&) const
-{
-    return {};
-}
+std::string ILLMTranslator::validateConfig(const BackendConfig&) const { return {}; }
 
-ILLMTranslator::ProviderLimits ILLMTranslator::providerLimits() const
-{
-    return {};
-}
+ILLMTranslator::ProviderLimits ILLMTranslator::providerLimits() const { return {}; }
 
-bool ILLMTranslator::hasValidRuntimeConfig() const
-{
-    return true;
-}
+bool ILLMTranslator::hasValidRuntimeConfig() const { return true; }
 
 bool ILLMTranslator::shouldRetry(const HttpResponse& resp) const
 {
@@ -292,7 +274,8 @@ ILLMTranslator::Prompt ILLMTranslator::buildPrompt(const Job& job) const
     ctx.replacements.emplace_back("{source_text}", job.text);
     augmentPromptContext(job, ctx);
 
-    const std::string default_template = std::string(R"(You are a professional translator familiar with the Dragon Quest series.
+    const std::string default_template =
+        std::string(R"(You are a professional translator familiar with the Dragon Quest series.
 Translate the following Dragon Quest X dialogue into {target_lang}.
 Preserve official DQX terminology and tone; when no official wording exists, lean on standard series phrasing.
 Adhere to the glossary below when available:
@@ -358,7 +341,11 @@ processing::GlossaryManager& ILLMTranslator::sharedGlossaryManager()
 {
     static processing::GlossaryManager manager;
     static std::once_flag once;
-    std::call_once(once, []() { manager.initialize(); });
+    std::call_once(once,
+                   []()
+                   {
+                       manager.initialize();
+                   });
     return manager;
 }
 

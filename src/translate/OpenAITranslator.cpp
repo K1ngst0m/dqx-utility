@@ -6,10 +6,7 @@
 namespace translate
 {
 
-const char* OpenAITranslator::providerName() const
-{
-    return "OpenAI";
-}
+const char* OpenAITranslator::providerName() const { return "OpenAI"; }
 
 std::string OpenAITranslator::validateConfig(const BackendConfig& cfg) const
 {
@@ -67,7 +64,10 @@ void OpenAITranslator::buildRequestBody(const Job& job, const Prompt& prompt, nl
             role = "user";
             break;
         }
-        messages.push_back({ { "role", role }, { "content", message.content } });
+        messages.push_back({
+            { "role",    role            },
+            { "content", message.content }
+        });
     }
     body["messages"] = std::move(messages);
     body["temperature"] = 0.3;
@@ -124,7 +124,9 @@ std::string OpenAITranslator::testConnectionImpl()
         models_url.pop_back();
     models_url += "/v1/models";
 
-    std::vector<Header> headers{ { "Authorization", std::string("Bearer ") + cfg_.api_key } };
+    std::vector<Header> headers{
+        { "Authorization", std::string("Bearer ") + cfg_.api_key }
+    };
     SessionConfig session;
     session.connect_timeout_ms = 3000;
     session.timeout_ms = 8000;

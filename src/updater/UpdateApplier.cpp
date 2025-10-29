@@ -14,12 +14,13 @@ namespace fs = std::filesystem;
 namespace updater
 {
 
-UpdateApplier::UpdateApplier(const std::string& appDir) : appDir_(appDir)
+UpdateApplier::UpdateApplier(const std::string& appDir)
+    : appDir_(appDir)
 {
 }
 
 bool UpdateApplier::applyUpdate(const std::string& packagePath, const std::string& configTemplatePath,
-                               ApplyCallback callback, std::string& outError)
+                                ApplyCallback callback, std::string& outError)
 {
     std::string scriptPath;
     if (!generateBatchScript(packagePath, configTemplatePath, scriptPath, outError))
@@ -45,7 +46,7 @@ bool UpdateApplier::applyUpdate(const std::string& packagePath, const std::strin
 }
 
 bool UpdateApplier::generateBatchScript(const std::string& packagePath, const std::string& configTemplatePath,
-                                       std::string& outScriptPath, std::string& outError)
+                                        std::string& outScriptPath, std::string& outError)
 {
     try
     {
@@ -111,7 +112,7 @@ bool UpdateApplier::generateBatchScript(const std::string& packagePath, const st
 bool UpdateApplier::launchBatchScript(const std::string& scriptPath, std::string& outError)
 {
 #ifdef _WIN32
-    STARTUPINFOA si = {sizeof(si)};
+    STARTUPINFOA si = { sizeof(si) };
     PROCESS_INFORMATION pi = {};
 
     si.dwFlags = STARTF_USESHOWWINDOW;
@@ -120,7 +121,7 @@ bool UpdateApplier::launchBatchScript(const std::string& scriptPath, std::string
     std::string cmdLine = "cmd.exe /c \"" + scriptPath + "\"";
 
     if (!CreateProcessA(nullptr, const_cast<char*>(cmdLine.c_str()), nullptr, nullptr, FALSE,
-                       CREATE_NO_WINDOW | DETACHED_PROCESS, nullptr, appDir_.c_str(), &si, &pi))
+                        CREATE_NO_WINDOW | DETACHED_PROCESS, nullptr, appDir_.c_str(), &si, &pi))
     {
         outError = "Failed to launch update script";
         PLOG_ERROR << outError;

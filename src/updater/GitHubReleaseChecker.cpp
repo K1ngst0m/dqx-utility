@@ -16,10 +16,14 @@ struct GitHubReleaseChecker::Impl
 {
     std::string owner;
     std::string repo;
-    std::atomic<bool> cancelled{false};
+    std::atomic<bool> cancelled{ false };
     std::thread checkThread;
 
-    Impl(const std::string& o, const std::string& r) : owner(o), repo(r) {}
+    Impl(const std::string& o, const std::string& r)
+        : owner(o)
+        , repo(r)
+    {
+    }
 
     ~Impl()
     {
@@ -30,10 +34,7 @@ struct GitHubReleaseChecker::Impl
         }
     }
 
-    std::string getApiUrl() const
-    {
-        return "https://api.github.com/repos/" + owner + "/" + repo + "/releases/latest";
-    }
+    std::string getApiUrl() const { return "https://api.github.com/repos/" + owner + "/" + repo + "/releases/latest"; }
 
     bool parseReleaseJson(const json& releaseJson, const Version& currentVersion, UpdateInfo& outInfo,
                           std::string& outError)
@@ -53,8 +54,8 @@ struct GitHubReleaseChecker::Impl
             // Check if this is a newer version
             if (releaseVersion <= currentVersion)
             {
-                PLOG_INFO << "Current version " << currentVersion.toString() << " is up to date (latest: "
-                          << releaseVersion.toString() << ")";
+                PLOG_INFO << "Current version " << currentVersion.toString()
+                          << " is up to date (latest: " << releaseVersion.toString() << ")";
                 return false; // Not an error, just no update available
             }
 
@@ -118,32 +119,35 @@ void GitHubReleaseChecker::checkLatestReleaseAsync(const Version& currentVersion
     impl_->cancelled = false;
 
     // Launch background thread
-    impl_->checkThread = std::thread([this, currentVersion, callback]() {
-        UpdateInfo info;
-        std::string error;
-        bool success = checkLatestRelease(currentVersion, info, error);
-
-        if (!impl_->cancelled)
+    impl_->checkThread = std::thread(
+        [this, currentVersion, callback]()
         {
-            callback(success, info, error);
-        }
-    });
+            UpdateInfo info;
+            std::string error;
+            bool success = checkLatestRelease(currentVersion, info, error);
+
+            if (!impl_->cancelled)
+            {
+                callback(success, info, error);
+            }
+        });
 
     impl_->checkThread.detach();
 }
 
-bool GitHubReleaseChecker::checkLatestRelease(const Version& currentVersion, UpdateInfo& outInfo,
-                                               std::string& outError)
+bool GitHubReleaseChecker::checkLatestRelease(const Version& currentVersion, UpdateInfo& outInfo, std::string& outError)
 {
     PLOG_INFO << "Checking GitHub for updates: " << impl_->owner << "/" << impl_->repo;
 
     try
     {
         // Make API request
-        auto response = cpr::Get(cpr::Url{impl_->getApiUrl()},
-                                 cpr::Header{{"Accept", "application/vnd.github+json"},
-                                             {"User-Agent", "DQX-Utility-Updater"}},
-                                 cpr::Timeout{5000} // 5 second timeout
+        auto response = cpr::Get(
+            cpr::Url{
+                impl_->getApiUrl()
+        },
+            cpr::Header{ { "Accept", "application/vnd.github+json" }, { "User-Agent", "DQX-Utility-Updater" } },
+            cpr::Timeout{ 5000 } // 5 second timeout
         );
 
         if (impl_->cancelled)
@@ -186,9 +190,6 @@ bool GitHubReleaseChecker::checkLatestRelease(const Version& currentVersion, Upd
     }
 }
 
-void GitHubReleaseChecker::cancel()
-{
-    impl_->cancelled = true;
-}
+void GitHubReleaseChecker::cancel() { impl_->cancelled = true; }
 
 } // namespace updater

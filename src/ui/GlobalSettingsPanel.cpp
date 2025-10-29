@@ -828,21 +828,27 @@ void GlobalSettingsPanel::renderUpdateSection()
                 update_check_hint_.clear();
                 update_check_hint_timer_ = 0.0f;
 
-                updaterService->checkForUpdatesAsync([this, updaterService](bool updateAvailable) {
-                    if (updateAvailable)
+                updaterService->checkForUpdatesAsync(
+                    [this, updaterService](bool updateAvailable)
                     {
-                        auto updateInfo = updaterService->getUpdateInfo();
-                        update_check_hint_ = i18n::format("settings.updates.update_available",
-                                                          {{ "version", updateInfo.version }});
-                    }
-                    else
-                    {
-                        std::string currentVersion = "0.1.0";
-                        update_check_hint_ = i18n::format("settings.updates.up_to_date",
-                                                          {{ "version", currentVersion }});
-                    }
-                    update_check_hint_timer_ = 5.0f;
-                });
+                        if (updateAvailable)
+                        {
+                            auto updateInfo = updaterService->getUpdateInfo();
+                            update_check_hint_ = i18n::format("settings.updates.update_available",
+                                                              {
+                                                                  { "version", updateInfo.version }
+                            });
+                        }
+                        else
+                        {
+                            std::string currentVersion = "0.1.0";
+                            update_check_hint_ =
+                                i18n::format("settings.updates.up_to_date", {
+                                                                                { "version", currentVersion }
+                            });
+                        }
+                        update_check_hint_timer_ = 5.0f;
+                    });
             }
 
             if (!update_check_hint_.empty() && update_check_hint_timer_ > 0.0f)
@@ -858,14 +864,18 @@ void GlobalSettingsPanel::renderUpdateSection()
         else if (state == updater::UpdateState::Available)
         {
             auto updateInfo = updaterService->getUpdateInfo();
-            std::string available_text = i18n::format("settings.updates.update_available",
-                                                      {{ "version", updateInfo.version }});
+            std::string available_text =
+                i18n::format("settings.updates.update_available", {
+                                                                      { "version", updateInfo.version }
+            });
             ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%s", available_text.c_str());
 
             char size_buf[32];
             std::snprintf(size_buf, sizeof(size_buf), "%.2f", updateInfo.packageSize / (1024.0f * 1024.0f));
-            std::string size_text = i18n::format("settings.updates.update_size",
-                                                 {{ "size", std::string(size_buf) }});
+            std::string size_text =
+                i18n::format("settings.updates.update_size", {
+                                                                 { "size", std::string(size_buf) }
+            });
             ImGui::TextDisabled("%s", size_text.c_str());
 
             if (ImGui::Button(i18n::get("settings.updates.download_button")))
@@ -878,8 +888,10 @@ void GlobalSettingsPanel::renderUpdateSection()
             auto progress = updaterService->getDownloadProgress();
             char percent_buf[16];
             std::snprintf(percent_buf, sizeof(percent_buf), "%d", static_cast<int>(progress.percentage));
-            std::string downloading_text = i18n::format("settings.updates.downloading",
-                                                        {{ "percent", std::string(percent_buf) }});
+            std::string downloading_text =
+                i18n::format("settings.updates.downloading", {
+                                                                 { "percent", std::string(percent_buf) }
+            });
             ImGui::Text("%s", downloading_text.c_str());
             ImGui::ProgressBar(progress.percentage / 100.0f);
             ImGui::SameLine();
@@ -896,9 +908,11 @@ void GlobalSettingsPanel::renderUpdateSection()
 
             if (ImGui::Button(i18n::get("settings.updates.apply_button")))
             {
-                updaterService->applyUpdate([](bool success, const std::string& message) {
-                    PLOG_INFO << "Update result: " << message;
-                });
+                updaterService->applyUpdate(
+                    [](bool success, const std::string& message)
+                    {
+                        PLOG_INFO << "Update result: " << message;
+                    });
             }
             ImGui::SameLine();
             ImGui::TextDisabled("%s", i18n::get("settings.updates.apply_hint"));
@@ -910,8 +924,9 @@ void GlobalSettingsPanel::renderUpdateSection()
         else if (state == updater::UpdateState::Failed)
         {
             auto error = updaterService->getLastError();
-            std::string failed_text = i18n::format("settings.updates.failed",
-                                                   {{ "error", error.message }});
+            std::string failed_text = i18n::format("settings.updates.failed", {
+                                                                                  { "error", error.message }
+            });
             ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "%s", failed_text.c_str());
 
             if (ImGui::Button(i18n::get("settings.updates.retry_button")))

@@ -22,7 +22,7 @@ struct UpdaterService::Impl
     Version currentVersion;
 
     // State (atomic for thread-safety)
-    std::atomic<UpdateState> state{UpdateState::Idle};
+    std::atomic<UpdateState> state{ UpdateState::Idle };
 
     // Update information
     mutable std::mutex infoMutex;
@@ -56,6 +56,7 @@ struct UpdaterService::Impl
     bool initialized = false;
 
     Impl() = default;
+
     ~Impl()
     {
         // Ensure threads are joined
@@ -70,14 +71,15 @@ struct UpdaterService::Impl
     }
 };
 
-UpdaterService::UpdaterService() : impl_(std::make_unique<Impl>())
+UpdaterService::UpdaterService()
+    : impl_(std::make_unique<Impl>())
 {
 }
 
 UpdaterService::~UpdaterService() = default;
 
 void UpdaterService::initialize(const std::string& githubOwner, const std::string& githubRepo,
-                                 const Version& currentVersion)
+                                const Version& currentVersion)
 {
     if (!isPackagedBuild())
     {
@@ -151,7 +153,8 @@ void UpdaterService::checkForUpdatesAsync(UpdateCheckCallback callback)
     // Use GitHubReleaseChecker to check for updates
     impl_->releaseChecker->checkLatestReleaseAsync(
         impl_->currentVersion,
-        [this](bool success, const UpdateInfo& info, const std::string& error) {
+        [this](bool success, const UpdateInfo& info, const std::string& error)
+        {
             if (success)
             {
                 // Update available
@@ -212,9 +215,9 @@ void UpdaterService::startDownload(DownloadProgressCallback progressCallback)
     std::string tempPath = std::filesystem::temp_directory_path().string() + "/dqx-utility-update-package.zip";
 
     impl_->downloader->downloadAsync(
-        downloadUrl,
-        tempPath,
-        [this](const DownloadProgress& progress) {
+        downloadUrl, tempPath,
+        [this](const DownloadProgress& progress)
+        {
             std::lock_guard<std::mutex> lock(impl_->infoMutex);
             impl_->downloadProgress = progress;
 
@@ -223,7 +226,8 @@ void UpdaterService::startDownload(DownloadProgressCallback progressCallback)
                 impl_->progressCallback(progress);
             }
         },
-        [this, tempPath](bool success, const std::string& filePath, const std::string& error) {
+        [this, tempPath](bool success, const std::string& filePath, const std::string& error)
+        {
             if (success)
             {
                 PLOG_INFO << "Package downloaded: " << filePath;
@@ -280,25 +284,27 @@ void UpdaterService::applyUpdate(UpdateCompleteCallback callback)
     std::string configTemplatePath = impl_->appDirectory + "/assets/templates/config.toml";
     std::string error;
 
-    bool success = impl_->applier->applyUpdate(impl_->downloadedPackagePath, configTemplatePath,
-                                               [this](bool success, const std::string& message) {
-                                                   if (success)
-                                                   {
-                                                       impl_->state = UpdateState::Completed;
-                                                   }
-                                                   else
-                                                   {
-                                                       impl_->state = UpdateState::Failed;
-                                                       std::lock_guard<std::mutex> lock(impl_->infoMutex);
-                                                       impl_->lastError = UpdateError(message);
-                                                   }
+    bool success = impl_->applier->applyUpdate(
+        impl_->downloadedPackagePath, configTemplatePath,
+        [this](bool success, const std::string& message)
+        {
+            if (success)
+            {
+                impl_->state = UpdateState::Completed;
+            }
+            else
+            {
+                impl_->state = UpdateState::Failed;
+                std::lock_guard<std::mutex> lock(impl_->infoMutex);
+                impl_->lastError = UpdateError(message);
+            }
 
-                                                   if (impl_->completeCallback)
-                                                   {
-                                                       impl_->completeCallback(success, message);
-                                                   }
-                                               },
-                                               error);
+            if (impl_->completeCallback)
+            {
+                impl_->completeCallback(success, message);
+            }
+        },
+        error);
 
     if (!success)
     {
@@ -313,10 +319,7 @@ void UpdaterService::applyUpdate(UpdateCompleteCallback callback)
     }
 }
 
-UpdateState UpdaterService::getState() const
-{
-    return impl_->state.load();
-}
+UpdateState UpdaterService::getState() const { return impl_->state.load(); }
 
 UpdateInfo UpdaterService::getUpdateInfo() const
 {
@@ -341,10 +344,7 @@ bool UpdaterService::isUpdateAvailable() const
     return impl_->state == UpdateState::Available || impl_->state == UpdateState::Downloaded;
 }
 
-bool UpdaterService::isInitialized() const
-{
-    return impl_ && impl_->initialized;
-}
+bool UpdaterService::isInitialized() const { return impl_ && impl_->initialized; }
 
 bool UpdaterService::isPackagedBuild() const
 {
@@ -362,8 +362,7 @@ bool UpdaterService::isPackagedBuild() const
             return false;
         }
 
-        std::string manifestContent((std::istreambuf_iterator<char>(manifestFile)),
-                                     std::istreambuf_iterator<char>());
+        std::string manifestContent((std::istreambuf_iterator<char>(manifestFile)), std::istreambuf_iterator<char>());
 
         size_t isReleasePos = manifestContent.find("\"is_release\"");
         if (isReleasePos == std::string::npos)
@@ -398,12 +397,6 @@ namespace
 updater::UpdaterService* g_updaterService = nullptr;
 }
 
-updater::UpdaterService* UpdaterService_Get()
-{
-    return g_updaterService;
-}
+updater::UpdaterService* UpdaterService_Get() { return g_updaterService; }
 
-void UpdaterService_Set(updater::UpdaterService* service)
-{
-    g_updaterService = service;
-}
+void UpdaterService_Set(updater::UpdaterService* service) { g_updaterService = service; }

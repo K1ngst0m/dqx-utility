@@ -17,8 +17,11 @@ public:
                        TerminationMode mode, MatchCallback on_match = nullptr);
 
     std::string_view Name() const override { return name_; }
+
     std::chrono::milliseconds PollInterval() const override { return interval_; }
+
     std::optional<std::chrono::milliseconds> Timeout() const override { return timeout_; }
+
     TerminationMode Mode() const override { return mode_; }
 
     TaskDecision Evaluate(IMemoryScanner& scanner, const TickContext& ctx) override;
@@ -34,4 +37,3 @@ private:
 };
 
 } // namespace dqxclarity
-

@@ -614,7 +614,6 @@ bool Engine::start_hook(StartPolicy policy)
     if (impl_->log.info)
         impl_->log.info("Hook installed");
 
-
     // Start poller thread to capture dialog events and publish to ring buffer
     impl_->poll_stop.store(false);
     impl_->poller = std::thread(
@@ -772,7 +771,7 @@ bool Engine::start_hook(StartPolicy policy)
                                 {
                                     auto wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(age).count();
                                     impl_->log.debug("Memory reader timeout (waited " + std::to_string(wait_ms) +
-                                                    "ms, hook didn't capture)");
+                                                     "ms, hook didn't capture)");
                                 }
                                 ready_to_publish.push_back(std::move(memory_readers[i]));
                             }
@@ -946,8 +945,8 @@ bool Engine::start_hook(StartPolicy policy)
             record.detour_size = 0;
             record.original_bytes = impl_->hook->GetOriginalBytes();
             record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum = persistence::HookRegistry::ComputeCRC32(
-                record.original_bytes.data(), record.original_bytes.size());
+            record.hook_checksum =
+                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
             record.detour_checksum = 0;
             persistence::HookRegistry::RegisterHook(record);
         }
@@ -961,8 +960,8 @@ bool Engine::start_hook(StartPolicy policy)
             record.detour_size = 0;
             record.original_bytes = impl_->quest_hook->GetOriginalBytes();
             record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum = persistence::HookRegistry::ComputeCRC32(
-                record.original_bytes.data(), record.original_bytes.size());
+            record.hook_checksum =
+                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
             record.detour_checksum = 0;
             persistence::HookRegistry::RegisterHook(record);
         }
@@ -976,8 +975,8 @@ bool Engine::start_hook(StartPolicy policy)
             record.detour_size = 0;
             record.original_bytes = impl_->player_hook->GetOriginalBytes();
             record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum = persistence::HookRegistry::ComputeCRC32(
-                record.original_bytes.data(), record.original_bytes.size());
+            record.hook_checksum =
+                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
             record.detour_checksum = 0;
             persistence::HookRegistry::RegisterHook(record);
         }
@@ -991,8 +990,8 @@ bool Engine::start_hook(StartPolicy policy)
             record.detour_size = 0;
             record.original_bytes = impl_->network_hook->GetOriginalBytes();
             record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum = persistence::HookRegistry::ComputeCRC32(
-                record.original_bytes.data(), record.original_bytes.size());
+            record.hook_checksum =
+                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
             record.detour_checksum = 0;
             persistence::HookRegistry::RegisterHook(record);
         }
@@ -1006,8 +1005,8 @@ bool Engine::start_hook(StartPolicy policy)
             record.detour_size = 0;
             record.original_bytes = impl_->corner_hook->GetOriginalBytes();
             record.installed_time = std::chrono::system_clock::now();
-            record.hook_checksum = persistence::HookRegistry::ComputeCRC32(
-                record.original_bytes.data(), record.original_bytes.size());
+            record.hook_checksum =
+                persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
             record.detour_checksum = 0;
             persistence::HookRegistry::RegisterHook(record);
         }

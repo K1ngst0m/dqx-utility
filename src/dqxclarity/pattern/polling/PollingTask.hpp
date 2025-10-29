@@ -34,20 +34,11 @@ struct TaskDecision
     Status status = Status::Continue;
     std::string error_message;
 
-    static TaskDecision Continue()
-    {
-        return TaskDecision{ Status::Continue, {} };
-    }
+    static TaskDecision Continue() { return TaskDecision{ Status::Continue, {} }; }
 
-    static TaskDecision Match()
-    {
-        return TaskDecision{ Status::Match, {} };
-    }
+    static TaskDecision Match() { return TaskDecision{ Status::Match, {} }; }
 
-    static TaskDecision Error(std::string message)
-    {
-        return TaskDecision{ Status::Error, std::move(message) };
-    }
+    static TaskDecision Error(std::string message) { return TaskDecision{ Status::Error, std::move(message) }; }
 };
 
 class IPollingTask

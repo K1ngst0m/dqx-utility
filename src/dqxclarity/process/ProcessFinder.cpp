@@ -38,8 +38,8 @@ std::vector<ProcessInfo> ProcessFinder::FindAll()
 #ifdef _WIN32
         info.is_wine_process = false;
 #else
-        info.is_wine_process = (proc.path.find("wine") != std::string::npos ||
-                                proc.path.find(".exe") != std::string::npos);
+        info.is_wine_process =
+            (proc.path.find("wine") != std::string::npos || proc.path.find(".exe") != std::string::npos);
 #endif
 
         result.push_back(info);
@@ -130,8 +130,8 @@ std::optional<ProcessInfo> ProcessFinder::GetProcessInfo(pid_t pid)
 #ifdef _WIN32
     info.is_wine_process = false;
 #else
-    info.is_wine_process = (process->path.find("wine") != std::string::npos ||
-                            process->path.find(".exe") != std::string::npos);
+    info.is_wine_process =
+        (process->path.find("wine") != std::string::npos || process->path.find(".exe") != std::string::npos);
 #endif
 
     return info;
@@ -148,8 +148,7 @@ bool ProcessFinder::IsWineProcess(pid_t pid)
         return false;
     }
 
-    return (process->path.find("wine") != std::string::npos ||
-            process->path.find(".exe") != std::string::npos);
+    return (process->path.find("wine") != std::string::npos || process->path.find(".exe") != std::string::npos);
 #endif
 }
 

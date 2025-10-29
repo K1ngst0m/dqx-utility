@@ -117,7 +117,8 @@ bool ProcessMemory::SetMemoryProtection(uintptr_t address, size_t size, MemoryPr
 
     libmem::Prot lm_protection = convert_protection_flags(protection);
 
-    auto result = libmem::ProtMemory(&m_impl->process.value(), static_cast<libmem::Address>(address), size, lm_protection);
+    auto result =
+        libmem::ProtMemory(&m_impl->process.value(), static_cast<libmem::Address>(address), size, lm_protection);
     return result.has_value();
 }
 
@@ -201,4 +202,3 @@ void ProcessMemory::FlushInstructionCache(uintptr_t address, size_t size)
 }
 
 } // namespace dqxclarity
-

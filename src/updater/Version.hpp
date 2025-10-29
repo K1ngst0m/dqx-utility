@@ -21,7 +21,9 @@ public:
 
     // Getters
     int major() const { return major_; }
+
     int minor() const { return minor_; }
+
     int patch() const { return patch_; }
 
     // Convert to string (e.g., "0.1.0")

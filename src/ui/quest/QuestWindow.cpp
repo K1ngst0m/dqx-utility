@@ -752,8 +752,8 @@ void QuestWindow::render()
         }
 
         // Unified animator update (fade + optional scroll)
-        animator_.update(
-            state_.ui_state(), io.DeltaTime, activity_monitor_.isActive(), activity_monitor_.hoverActive());
+        animator_.update(state_.ui_state(), io.DeltaTime, activity_monitor_.isActive(),
+                         activity_monitor_.hoverActive());
 
         state_.ui_state().window_pos = win_pos;
         state_.ui_state().window_size = win_size;

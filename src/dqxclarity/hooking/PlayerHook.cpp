@@ -252,7 +252,8 @@ bool PlayerHook::PollPlayerData()
     {
         std::ostringstream oss;
         oss << "Captured player info: player=\"" << m_last_data.player_name << "\", sibling=\""
-            << m_last_data.sibling_name << "\", relationship=" << player_relationship_to_string(m_last_data.relationship);
+            << m_last_data.sibling_name
+            << "\", relationship=" << player_relationship_to_string(m_last_data.relationship);
         m_logger.info(oss.str());
     }
 

@@ -24,4 +24,3 @@ struct PlayerInfo
 };
 
 } // namespace dqxclarity
-

@@ -28,15 +28,21 @@ public:
     bool IsPatched() const;
 
     void SetLogger(const dqxclarity::Logger& log) { m_logger = log; }
+
     void SetVerbose(bool enabled) { m_verbose = enabled; }
+
     void SetInstructionSafeSteal(bool enabled) { m_instr_safe = enabled; }
+
     void SetReadbackBytes(size_t n) { m_readback_n = n; }
+
     void SetCachedRegions(const std::vector<MemoryRegion>& regions) { m_cached_regions = regions; }
 
     bool PollPlayerData();
+
     const PlayerInfo& GetLastPlayer() const { return m_last_data; }
 
     uintptr_t GetHookAddress() const { return m_hook_address; }
+
     const std::vector<uint8_t>& GetOriginalBytes() const { return m_original_bytes; }
 
 private:

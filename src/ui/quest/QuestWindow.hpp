@@ -113,6 +113,7 @@ private:
     float apply_hint_timer_ = 0.0f;
     std::uint64_t last_applied_seq_ = 0;
     bool should_be_removed_ = false;
+
     struct ActivityMonitor
     {
         void beginFrame()
@@ -122,8 +123,11 @@ private:
         }
 
         void markActive() { active_ = true; }
+
         void setHover(bool hovered) { hover_ = hovered; }
+
         bool isActive() const { return active_; }
+
         bool hoverActive() const { return hover_; }
 
     private:

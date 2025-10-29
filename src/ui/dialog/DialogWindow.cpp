@@ -853,10 +853,9 @@ void DialogWindow::renderDialog()
                     {
                         std::string text_to_retry = it->second;
                         std::string target_lang_code = toTargetCode(config.target_lang_enum);
-                        std::string processed_text =
-                            text_pipeline_->process(text_to_retry, target_lang_code,
-                                                    config.glossary_enabled &&
-                                                        !isLLMBackend(config.translation_backend));
+                        std::string processed_text = text_pipeline_->process(
+                            text_to_retry, target_lang_code,
+                            config.glossary_enabled && !isLLMBackend(config.translation_backend));
                         auto submit = session_.submit(processed_text, config.translation_backend,
                                                       config.target_lang_enum, translator_.get());
 
@@ -888,8 +887,8 @@ void DialogWindow::renderDialog()
             scroll_to_bottom_requested_ = false;
         }
 
-        animator_.update(
-            state_.ui_state(), io.DeltaTime, activity_monitor_.isActive(), activity_monitor_.hoverActive());
+        animator_.update(state_.ui_state(), io.DeltaTime, activity_monitor_.isActive(),
+                         activity_monitor_.hoverActive());
 
         const bool was_pending_resize = state_.ui_state().pending_resize;
 

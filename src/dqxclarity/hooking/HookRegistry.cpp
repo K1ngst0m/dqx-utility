@@ -11,9 +11,9 @@
 #include <fstream>
 
 #ifdef _WIN32
-    #include <windows.h>
+#include <windows.h>
 #else
-    #include <unistd.h>
+#include <unistd.h>
 #endif
 
 namespace dqxclarity
@@ -46,10 +46,7 @@ constexpr auto CRC32_TABLE = GenerateCRC32Table();
 
 dqxclarity::Logger HookRegistry::s_logger_ = {};
 
-void HookRegistry::SetLogger(const dqxclarity::Logger& logger)
-{
-    s_logger_ = logger;
-}
+void HookRegistry::SetLogger(const dqxclarity::Logger& logger) { s_logger_ = logger; }
 
 bool HookRegistry::CheckAndCleanup()
 {
@@ -63,8 +60,8 @@ bool HookRegistry::CheckAndCleanup()
     size_t cleaned = CleanupOrphanedHooks(orphans);
 
     if (cleaned > 0 && s_logger_.info)
-        s_logger_.info("Successfully cleaned up " + std::to_string(cleaned) + " of " +
-                      std::to_string(orphans.size()) + " orphaned hooks");
+        s_logger_.info("Successfully cleaned up " + std::to_string(cleaned) + " of " + std::to_string(orphans.size()) +
+                       " orphaned hooks");
 
     return cleaned > 0;
 }
@@ -168,8 +165,8 @@ std::optional<std::vector<HookRecord>> HookRegistry::ReadRegistry()
     if (version != VERSION)
     {
         if (s_logger_.warn)
-            s_logger_.warn("Registry version mismatch (got " + std::to_string(version) +
-                          ", expected " + std::to_string(VERSION) + ")");
+            s_logger_.warn("Registry version mismatch (got " + std::to_string(version) + ", expected " +
+                           std::to_string(VERSION) + ")");
         return std::nullopt;
     }
 
@@ -191,8 +188,7 @@ std::optional<std::vector<HookRecord>> HookRegistry::ReadRegistry()
 
         int64_t timestamp_ms;
         file.read(reinterpret_cast<char*>(&timestamp_ms), sizeof(timestamp_ms));
-        record.installed_time =
-            std::chrono::system_clock::time_point(std::chrono::milliseconds(timestamp_ms));
+        record.installed_time = std::chrono::system_clock::time_point(std::chrono::milliseconds(timestamp_ms));
 
         uint16_t original_bytes_length;
         file.read(reinterpret_cast<char*>(&original_bytes_length), sizeof(original_bytes_length));
@@ -249,9 +245,8 @@ bool HookRegistry::WriteRegistry(const std::vector<HookRecord>& records)
             file.write(reinterpret_cast<const char*>(&record.detour_address), sizeof(record.detour_address));
             file.write(reinterpret_cast<const char*>(&record.detour_size), sizeof(record.detour_size));
 
-            int64_t timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                       record.installed_time.time_since_epoch())
-                                       .count();
+            int64_t timestamp_ms =
+                std::chrono::duration_cast<std::chrono::milliseconds>(record.installed_time.time_since_epoch()).count();
             file.write(reinterpret_cast<const char*>(&timestamp_ms), sizeof(timestamp_ms));
 
             uint16_t original_bytes_length = static_cast<uint16_t>(record.original_bytes.size());
@@ -294,9 +289,11 @@ bool HookRegistry::RegisterHook(const HookRecord& record)
         return false;
     }
 
-    existing->erase(std::remove_if(existing->begin(),
-                                   existing->end(),
-                                   [&record](const HookRecord& r) { return r.type == record.type; }),
+    existing->erase(std::remove_if(existing->begin(), existing->end(),
+                                   [&record](const HookRecord& r)
+                                   {
+                                       return r.type == record.type;
+                                   }),
                     existing->end());
 
     existing->push_back(record);
@@ -304,9 +301,8 @@ bool HookRegistry::RegisterHook(const HookRecord& record)
     bool success = WriteRegistry(*existing);
     if (success && s_logger_.info)
     {
-        s_logger_.info("Registered " + std::string(HookTypeToString(record.type)) +
-                      " at 0x" + std::to_string(record.hook_address) +
-                      " for PID " + std::to_string(record.process_id));
+        s_logger_.info("Registered " + std::string(HookTypeToString(record.type)) + " at 0x" +
+                       std::to_string(record.hook_address) + " for PID " + std::to_string(record.process_id));
     }
 
     return success;
@@ -323,9 +319,11 @@ bool HookRegistry::UnregisterHook(HookType type)
     }
 
     size_t original_size = existing->size();
-    existing->erase(std::remove_if(existing->begin(),
-                                   existing->end(),
-                                   [type](const HookRecord& r) { return r.type == type; }),
+    existing->erase(std::remove_if(existing->begin(), existing->end(),
+                                   [type](const HookRecord& r)
+                                   {
+                                       return r.type == type;
+                                   }),
                     existing->end());
 
     if (existing->size() == original_size)
@@ -365,8 +363,7 @@ std::vector<HookRecord> HookRegistry::LoadOrphanedHooks()
     else
     {
         if (s_logger_.warn)
-            s_logger_.warn("Found " + std::to_string(records->size()) +
-                          " orphaned hooks from previous session");
+            s_logger_.warn("Found " + std::to_string(records->size()) + " orphaned hooks from previous session");
     }
 
     return *records;
@@ -380,10 +377,9 @@ size_t HookRegistry::CleanupOrphanedHooks(const std::vector<HookRecord>& orphans
     {
         if (s_logger_.info)
         {
-            s_logger_.info("Attempting to clean up orphaned " +
-                          std::string(HookTypeToString(record.type)) +
-                          " (PID: " + std::to_string(record.process_id) +
-                          ", addr: 0x" + std::to_string(record.hook_address) + ")");
+            s_logger_.info("Attempting to clean up orphaned " + std::string(HookTypeToString(record.type)) +
+                           " (PID: " + std::to_string(record.process_id) + ", addr: 0x" +
+                           std::to_string(record.hook_address) + ")");
         }
 
         if (!IsProcessAlive(record.process_id))
@@ -410,7 +406,7 @@ size_t HookRegistry::CleanupOrphanedHooks(const std::vector<HookRecord>& orphans
         {
             if (s_logger_.error)
                 s_logger_.error("Failed to read current bytes at hook address (expected " +
-                              std::to_string(record.original_bytes.size()) + " bytes)");
+                                std::to_string(record.original_bytes.size()) + " bytes)");
             continue;
         }
 
@@ -426,9 +422,8 @@ size_t HookRegistry::CleanupOrphanedHooks(const std::vector<HookRecord>& orphans
             continue;
         }
 
-        if (!memory->WriteMemory(record.hook_address,
-                                const_cast<uint8_t*>(record.original_bytes.data()),
-                                record.original_bytes.size()))
+        if (!memory->WriteMemory(record.hook_address, const_cast<uint8_t*>(record.original_bytes.data()),
+                                 record.original_bytes.size()))
         {
             if (s_logger_.error)
                 s_logger_.error("Failed to restore original bytes");
@@ -458,8 +453,8 @@ size_t HookRegistry::CleanupOrphanedHooks(const std::vector<HookRecord>& orphans
 
     if (cleaned_count > 0 && s_logger_.info)
     {
-        s_logger_.info("Cleanup complete: " + std::to_string(cleaned_count) +
-                      " of " + std::to_string(orphans.size()) + " hooks cleaned");
+        s_logger_.info("Cleanup complete: " + std::to_string(cleaned_count) + " of " + std::to_string(orphans.size()) +
+                       " hooks cleaned");
     }
 
     return cleaned_count;

@@ -5,10 +5,7 @@
 namespace translate
 {
 
-const char* ZhipuGLMTranslator::providerName() const
-{
-    return "ZhipuGLM";
-}
+const char* ZhipuGLMTranslator::providerName() const { return "ZhipuGLM"; }
 
 std::string ZhipuGLMTranslator::validateConfig(const BackendConfig& cfg) const
 {
@@ -67,7 +64,10 @@ void ZhipuGLMTranslator::buildRequestBody(const Job& job, const Prompt& prompt, 
             role = "user";
             break;
         }
-        messages.push_back({ { "role", role }, { "content", message.content } });
+        messages.push_back({
+            { "role",    role            },
+            { "content", message.content }
+        });
     }
     body["messages"] = std::move(messages);
     body["temperature"] = 0.3;

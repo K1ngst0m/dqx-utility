@@ -120,9 +120,11 @@ private:
         }
 
         void markActive() { active_ = true; }
+
         void setHover(bool hovered) { hover_ = hovered; }
 
         bool isActive() const { return active_; }
+
         bool hoverActive() const { return hover_; }
 
     private:

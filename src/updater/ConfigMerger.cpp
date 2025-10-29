@@ -72,7 +72,7 @@ bool ConfigMerger::mergeConfigs(const std::string& existingConfigPath, const std
 }
 
 bool ConfigMerger::mergeConfigStrings(const std::string& existingConfig, const std::string& templateConfig,
-                                     std::string& outMergedConfig, std::string& outError)
+                                      std::string& outMergedConfig, std::string& outError)
 {
     try
     {

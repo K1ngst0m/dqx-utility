@@ -10,7 +10,9 @@ namespace fs = std::filesystem;
 namespace updater
 {
 
-BackupManager::BackupManager(const std::string& appDir) : appDir_(appDir), backupDir_(appDir + "/backup")
+BackupManager::BackupManager(const std::string& appDir)
+    : appDir_(appDir)
+    , backupDir_(appDir + "/backup")
 {
 }
 
@@ -26,7 +28,7 @@ bool BackupManager::createBackup(std::string& outError)
 
         fs::create_directories(backupDir_);
 
-        std::vector<std::string> filesToBackup = {"dqx-utility.exe", "SDL3.dll"};
+        std::vector<std::string> filesToBackup = { "dqx-utility.exe", "SDL3.dll" };
 
         for (const auto& file : filesToBackup)
         {
@@ -116,10 +118,7 @@ bool BackupManager::restoreFromBackup(std::string& outError)
     }
 }
 
-bool BackupManager::hasBackup() const
-{
-    return fs::exists(backupDir_) && !fs::is_empty(backupDir_);
-}
+bool BackupManager::hasBackup() const { return fs::exists(backupDir_) && !fs::is_empty(backupDir_); }
 
 void BackupManager::cleanupBackup()
 {

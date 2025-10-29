@@ -11,7 +11,6 @@ using pid_t = DWORD;
 #include <sys/types.h>
 #endif
 
-
 namespace dqxclarity
 {
 

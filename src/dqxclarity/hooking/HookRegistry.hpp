@@ -36,15 +36,15 @@ enum class HookType : uint8_t
  */
 struct HookRecord
 {
-    HookType type;                                        // Type of hook
-    uint32_t process_id;                                  // Target process PID
-    uintptr_t hook_address;                               // Where JMP was written
-    uintptr_t detour_address;                             // Allocated memory for detour
-    size_t detour_size;                                   // Size of detour allocation
-    std::vector<uint8_t> original_bytes;                  // Original bytes to restore
+    HookType type; // Type of hook
+    uint32_t process_id; // Target process PID
+    uintptr_t hook_address; // Where JMP was written
+    uintptr_t detour_address; // Allocated memory for detour
+    size_t detour_size; // Size of detour allocation
+    std::vector<uint8_t> original_bytes; // Original bytes to restore
     std::chrono::system_clock::time_point installed_time; // When hook was installed
-    uint32_t hook_checksum;                               // CRC32 of hook_address region
-    uint32_t detour_checksum;                             // CRC32 of detour code
+    uint32_t hook_checksum; // CRC32 of hook_address region
+    uint32_t detour_checksum; // CRC32 of detour code
 };
 
 /**
@@ -68,7 +68,7 @@ class HookRegistry
 {
 public:
     static bool CheckAndCleanup();
-    
+
     static void SetLogger(const dqxclarity::Logger& logger);
 
     /**
@@ -171,7 +171,7 @@ private:
 
     static bool WriteRegistry(const std::vector<HookRecord>& records);
     static std::optional<std::vector<HookRecord>> ReadRegistry();
-    
+
     static dqxclarity::Logger s_logger_;
 };
 

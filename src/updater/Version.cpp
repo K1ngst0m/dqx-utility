@@ -6,15 +6,24 @@
 namespace updater
 {
 
-Version::Version() : major_(0), minor_(0), patch_(0)
+Version::Version()
+    : major_(0)
+    , minor_(0)
+    , patch_(0)
 {
 }
 
-Version::Version(int major, int minor, int patch) : major_(major), minor_(minor), patch_(patch)
+Version::Version(int major, int minor, int patch)
+    : major_(major)
+    , minor_(minor)
+    , patch_(patch)
 {
 }
 
-Version::Version(const std::string& versionString) : major_(0), minor_(0), patch_(0)
+Version::Version(const std::string& versionString)
+    : major_(0)
+    , minor_(0)
+    , patch_(0)
 {
     if (!parseString(versionString))
     {

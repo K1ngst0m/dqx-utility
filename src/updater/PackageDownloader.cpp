@@ -15,8 +15,8 @@ namespace updater
 
 struct PackageDownloader::Impl
 {
-    std::atomic<bool> downloading{false};
-    std::atomic<bool> cancelled{false};
+    std::atomic<bool> downloading{ false };
+    std::atomic<bool> cancelled{ false };
     std::thread downloadThread;
 
     ~Impl()
@@ -38,15 +38,16 @@ struct PackageDownloader::Impl
     }
 };
 
-PackageDownloader::PackageDownloader() : impl_(std::make_unique<Impl>())
+PackageDownloader::PackageDownloader()
+    : impl_(std::make_unique<Impl>())
 {
 }
 
 PackageDownloader::~PackageDownloader() = default;
 
 void PackageDownloader::downloadAsync(const std::string& url, const std::string& destPath,
-                                     PackageProgressCallback progressCallback,
-                                     PackageDownloadCallback completeCallback)
+                                      PackageProgressCallback progressCallback,
+                                      PackageDownloadCallback completeCallback)
 {
     if (impl_->downloading)
     {
@@ -61,113 +62,111 @@ void PackageDownloader::downloadAsync(const std::string& url, const std::string&
     impl_->downloading = true;
     impl_->cancelled = false;
 
-    impl_->downloadThread = std::thread([this, url, destPath, progressCallback, completeCallback]() {
-        PLOG_INFO << "Starting download: " << url;
-
-        std::ofstream outputFile(destPath, std::ios::binary);
-        if (!outputFile.is_open())
+    impl_->downloadThread = std::thread(
+        [this, url, destPath, progressCallback, completeCallback]()
         {
-            PLOG_ERROR << "Failed to create output file: " << destPath;
-            impl_->downloading = false;
-            if (completeCallback)
+            PLOG_INFO << "Starting download: " << url;
+
+            std::ofstream outputFile(destPath, std::ios::binary);
+            if (!outputFile.is_open())
             {
-                completeCallback(false, "", "Failed to create output file");
-            }
-            return;
-        }
-
-        auto startTime = std::chrono::steady_clock::now();
-        size_t lastBytes = 0;
-        auto lastProgressTime = startTime;
-
-        cpr::Response response = cpr::Download(
-            outputFile,
-            cpr::Url{url},
-            cpr::ProgressCallback{[&](cpr::cpr_off_t downloadTotal, cpr::cpr_off_t downloadNow,
-                                     cpr::cpr_off_t, cpr::cpr_off_t, intptr_t) -> bool {
-                if (impl_->cancelled)
+                PLOG_ERROR << "Failed to create output file: " << destPath;
+                impl_->downloading = false;
+                if (completeCallback)
                 {
-                    return false;
+                    completeCallback(false, "", "Failed to create output file");
                 }
+                return;
+            }
 
-                if (downloadTotal > 0 && progressCallback)
-                {
-                    auto now = std::chrono::steady_clock::now();
-                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastProgressTime).count();
+            auto startTime = std::chrono::steady_clock::now();
+            size_t lastBytes = 0;
+            auto lastProgressTime = startTime;
 
-                    if (elapsed >= 100)
+            cpr::Response response = cpr::Download(
+                outputFile, cpr::Url{ url },
+                cpr::ProgressCallback{
+                    [&](cpr::cpr_off_t downloadTotal, cpr::cpr_off_t downloadNow, cpr::cpr_off_t, cpr::cpr_off_t,
+                        intptr_t) -> bool
                     {
-                        double bytesPerSecond = 0.0;
-                        if (elapsed > 0)
+                        if (impl_->cancelled)
                         {
-                            bytesPerSecond = (downloadNow - lastBytes) * 1000.0 / elapsed;
+                            return false;
                         }
 
-                        DownloadProgress progress;
-                        progress.bytesDownloaded = static_cast<size_t>(downloadNow);
-                        progress.totalBytes = static_cast<size_t>(downloadTotal);
-                        progress.percentage = (static_cast<float>(downloadNow) / downloadTotal) * 100.0f;
-                        progress.speed = impl_->formatSpeed(bytesPerSecond);
+                        if (downloadTotal > 0 && progressCallback)
+                        {
+                            auto now = std::chrono::steady_clock::now();
+                            auto elapsed =
+                                std::chrono::duration_cast<std::chrono::milliseconds>(now - lastProgressTime).count();
 
-                        progressCallback(progress);
+                            if (elapsed >= 100)
+                            {
+                                double bytesPerSecond = 0.0;
+                                if (elapsed > 0)
+                                {
+                                    bytesPerSecond = (downloadNow - lastBytes) * 1000.0 / elapsed;
+                                }
 
-                        lastBytes = downloadNow;
-                        lastProgressTime = now;
-                    }
+                                DownloadProgress progress;
+                                progress.bytesDownloaded = static_cast<size_t>(downloadNow);
+                                progress.totalBytes = static_cast<size_t>(downloadTotal);
+                                progress.percentage = (static_cast<float>(downloadNow) / downloadTotal) * 100.0f;
+                                progress.speed = impl_->formatSpeed(bytesPerSecond);
+
+                                progressCallback(progress);
+
+                                lastBytes = downloadNow;
+                                lastProgressTime = now;
+                            }
+                        }
+
+                        return true;
+                    } },
+                cpr::Timeout{ 60000 });
+
+            outputFile.close();
+
+            impl_->downloading = false;
+
+            if (impl_->cancelled)
+            {
+                PLOG_INFO << "Download cancelled";
+                std::remove(destPath.c_str());
+                if (completeCallback)
+                {
+                    completeCallback(false, "", "Download cancelled");
                 }
+                return;
+            }
 
-                return true;
-            }},
-            cpr::Timeout{60000}
-        );
+            if (response.status_code != 200)
+            {
+                PLOG_ERROR << "Download failed with status: " << response.status_code;
+                std::remove(destPath.c_str());
+                if (completeCallback)
+                {
+                    completeCallback(false, "", "HTTP error " + std::to_string(response.status_code));
+                }
+                return;
+            }
 
-        outputFile.close();
-
-        impl_->downloading = false;
-
-        if (impl_->cancelled)
-        {
-            PLOG_INFO << "Download cancelled";
-            std::remove(destPath.c_str());
+            PLOG_INFO << "Download completed: " << destPath;
             if (completeCallback)
             {
-                completeCallback(false, "", "Download cancelled");
+                completeCallback(true, destPath, "");
             }
-            return;
-        }
-
-        if (response.status_code != 200)
-        {
-            PLOG_ERROR << "Download failed with status: " << response.status_code;
-            std::remove(destPath.c_str());
-            if (completeCallback)
-            {
-                completeCallback(false, "", "HTTP error " + std::to_string(response.status_code));
-            }
-            return;
-        }
-
-        PLOG_INFO << "Download completed: " << destPath;
-        if (completeCallback)
-        {
-            completeCallback(true, destPath, "");
-        }
-    });
+        });
 
     impl_->downloadThread.detach();
 }
 
-void PackageDownloader::cancel()
-{
-    impl_->cancelled = true;
-}
+void PackageDownloader::cancel() { impl_->cancelled = true; }
 
-bool PackageDownloader::isDownloading() const
-{
-    return impl_->downloading.load();
-}
+bool PackageDownloader::isDownloading() const { return impl_->downloading.load(); }
 
-bool PackageDownloader::verifyChecksum(const std::string& filePath, const std::string& expectedSha256, std::string& outError)
+bool PackageDownloader::verifyChecksum(const std::string& filePath, const std::string& expectedSha256,
+                                       std::string& outError)
 {
     try
     {
@@ -179,7 +178,8 @@ bool PackageDownloader::verifyChecksum(const std::string& filePath, const std::s
         }
 
         std::vector<unsigned char> hash(picosha2::k_digest_size);
-        picosha2::hash256(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>(), hash.begin(), hash.end());
+        picosha2::hash256(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>(), hash.begin(),
+                          hash.end());
 
         std::string actualSha256 = picosha2::bytes_to_hex_string(hash.begin(), hash.end());
 

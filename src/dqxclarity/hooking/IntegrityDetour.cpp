@@ -726,8 +726,7 @@ void IntegrityDetour::Remove()
                     m_log.error("Failed to restore original bytes at integrity address during cleanup");
             }
             m_memory->FlushInstructionCache(m_integrity_addr, m_original_bytes.size());
-            LogBytes("Integrity restored", m_integrity_addr,
-                        (std::max<size_t>)(m_original_bytes.size(), (size_t)8));
+            LogBytes("Integrity restored", m_integrity_addr, (std::max<size_t>)(m_original_bytes.size(), (size_t)8));
         }
         if (m_trampoline_addr)
         {

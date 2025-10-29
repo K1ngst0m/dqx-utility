@@ -63,8 +63,7 @@ PollingResult PollingRunner::Run(IPollingTask& task, std::atomic<bool>& cancel_t
         }
     }
 
-    result.elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
+    result.elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
     result.ticks = ctx.tick_count;
     return result;
 }
