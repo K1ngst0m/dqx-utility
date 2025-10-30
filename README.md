@@ -55,7 +55,36 @@ Just right click(empty space for global setting, otherwise window specific setti
 - C++20 compatible compiler (MSVC 2022+ or Clang 15+)
 - Internet connection (for downloading dependencies)
 
-check `cmake --list-presets` for more details
+### Quick Build
+
+Check available presets:
+```bash
+cmake --list-presets
+```
+
+### FreeLLM API Keys (for source builds)
+
+**Important**: Pre-built releases from GitHub include API keys for the free FreeLLM translation backend. If you build from source, you have two options:
+
+**Option 1: Use FreeLLM (requires API keys)**
+
+The application can still compile without FreeLLM keys, but the FreeLLM backend will show an error at runtime. To use FreeLLM when building from source, pass your own API keys via CMake:
+
+```bash
+cmake --preset <preset> \
+  -DFREELLM_API_KEY_1="your_key_here" \
+  -DFREELLM_API_KEY_2="your_key_here" \
+  -DFREELLM_API_KEY_3="your_key_here" \
+  -DFREELLM_API_KEY_4="your_key_here" \
+  -DFREELLM_API_KEY_5="your_key_here" \
+  -DFREELLM_API_KEY_6="your_key_here"
+```
+
+**Option 2: Use other translation backends**
+
+You can use any of the other supported translation services (OpenAI, Google, Qwen, Youdao, Niutrans, ZhipuGLM) by configuring them in `config.toml` with your own API keys. These backends don't require build-time configuration.
+
+**Note**: For security reasons, API keys for FreeLLM are not included in the source repository. Pre-built releases have keys embedded during the CI/CD build process.
 
 ## Privacy & Safety
 

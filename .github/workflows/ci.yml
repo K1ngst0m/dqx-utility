@@ -32,7 +32,14 @@ jobs:
             deps-${{ runner.os }}-
 
       - name: Configure
-        run: cmake --preset windows-msvc-${{ matrix.build_type }}
+        run: |
+          cmake --preset windows-msvc-${{ matrix.build_type }} `
+            -DFREELLM_API_KEY_1="${{ secrets.FREELLM_API_KEY_1 }}" `
+            -DFREELLM_API_KEY_2="${{ secrets.FREELLM_API_KEY_2 }}" `
+            -DFREELLM_API_KEY_3="${{ secrets.FREELLM_API_KEY_3 }}" `
+            -DFREELLM_API_KEY_4="${{ secrets.FREELLM_API_KEY_4 }}" `
+            -DFREELLM_API_KEY_5="${{ secrets.FREELLM_API_KEY_5 }}" `
+            -DFREELLM_API_KEY_6="${{ secrets.FREELLM_API_KEY_6 }}"
 
       - name: Build
         run: cmake --build --preset windows-msvc-${{ matrix.build_type }}

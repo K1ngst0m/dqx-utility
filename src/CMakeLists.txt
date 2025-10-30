@@ -6,6 +6,24 @@ configure_file(
   @ONLY
 )
 
+# API Keys configuration for FreeLLM translator
+# Define cache variables (default to empty strings)
+# For CI/CD: Pass via -D flags from GitHub Secrets
+# For source builders: Pass via -D flags or leave empty (runtime error will guide users)
+set(FREELLM_API_KEY_1 "" CACHE STRING "FreeLLM API Key 1")
+set(FREELLM_API_KEY_2 "" CACHE STRING "FreeLLM API Key 2")
+set(FREELLM_API_KEY_3 "" CACHE STRING "FreeLLM API Key 3")
+set(FREELLM_API_KEY_4 "" CACHE STRING "FreeLLM API Key 4")
+set(FREELLM_API_KEY_5 "" CACHE STRING "FreeLLM API Key 5")
+set(FREELLM_API_KEY_6 "" CACHE STRING "FreeLLM API Key 6")
+
+# Generate ApiKeys.h from template
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/translate/ApiKeys.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/translate/ApiKeys.h
+  @ONLY
+)
+
 add_library(dqxu_core STATIC)
 
 target_sources(dqxu_core
@@ -69,6 +87,8 @@ target_sources(dqxu_core
     translate/ILLMTranslator.hpp
     translate/GoogleTranslator.cpp
     translate/GoogleTranslator.hpp
+    translate/FreeLLMTranslator.cpp
+    translate/FreeLLMTranslator.hpp
     translate/NiutransTranslator.cpp
     translate/NiutransTranslator.hpp
     translate/OpenAITranslator.cpp

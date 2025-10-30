@@ -20,3 +20,6 @@ imgui.ini
 unknown_labels.txt
 Testing/Temporary/**
 toolchains/*
+
+# Generated API keys
+src/translate/ApiKeys.h

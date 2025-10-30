@@ -18,7 +18,8 @@ enum class Backend
     ZhipuGLM = 2,
     QwenMT = 3,
     Niutrans = 4,
-    Youdao = 5
+    Youdao = 5,
+    FreeLLM = 6
 };
 
 struct BackendConfig

@@ -5,6 +5,7 @@
 #include "QwenMTTranslator.hpp"
 #include "NiutransTranslator.hpp"
 #include "YoudaoTranslator.hpp"
+#include "FreeLLMTranslator.hpp"
 
 #include <memory>
 
@@ -26,6 +27,8 @@ std::unique_ptr<ITranslator> createTranslator(Backend backend)
         return std::make_unique<NiutransTranslator>();
     case Backend::Youdao:
         return std::make_unique<YoudaoTranslator>();
+    case Backend::FreeLLM:
+        return std::make_unique<FreeLLMTranslator>();
     default:
         return nullptr;
     }

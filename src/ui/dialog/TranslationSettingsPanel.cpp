@@ -170,7 +170,8 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
     const char* backend_items[] = {
         i18n::get("dialog.translate.backend.items.openai_compat"), i18n::get("dialog.translate.backend.items.google"),
         i18n::get("dialog.translate.backend.items.glm4_zhipu"),    i18n::get("dialog.translate.backend.items.qwen_mt"),
-        i18n::get("dialog.translate.backend.items.niutrans"),      i18n::get("dialog.translate.backend.items.youdao")
+        i18n::get("dialog.translate.backend.items.niutrans"),      i18n::get("dialog.translate.backend.items.youdao"),
+        i18n::get("dialog.translate.backend.items.freellm")
     };
     int current_backend = static_cast<int>(config.translation_backend);
     ImGui::SetNextItemWidth(220.0f);
@@ -211,7 +212,8 @@ bool TranslationSettingsPanel::renderBackendSpecificConfig(TranslationConfig& co
     bool prompt_changed = false;
 
     if (config.translation_backend == TranslationConfig::TranslationBackend::OpenAI ||
-        config.translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM)
+        config.translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM ||
+        config.translation_backend == TranslationConfig::TranslationBackend::FreeLLM)
     {
         ImGui::Spacing();
         ImGui::TextUnformatted(i18n::get("dialog.settings.system_prompt"));
@@ -313,6 +315,31 @@ bool TranslationSettingsPanel::renderBackendSpecificConfig(TranslationConfig& co
                                      TranslationConfig::YoudaoMode::Text;
             youdao_mode_changed = true;
         }
+    }
+    else if (config.translation_backend == TranslationConfig::TranslationBackend::FreeLLM)
+    {
+        // FreeLLM backend - only show model dropdown (no API keys/URLs needed)
+        ImGui::TextUnformatted(i18n::get("dialog.settings.model"));
+        ImGui::SetNextItemWidth(300.0f);
+
+        int model_idx = 0;
+        if (std::string(config.freellm_model.data()).find("ep-w8sv4r") == 0)
+            model_idx = 1; // DeepSeek
+        else
+            model_idx = 0; // Qwen (default)
+
+        const char* freellm_models[] = { "Qwen", "DeepSeek" };
+        if (ImGui::Combo("##freellm_model", &model_idx, freellm_models, IM_ARRAYSIZE(freellm_models)))
+        {
+            const char* selected_model_id = (model_idx == 0)
+                ? "ep-c193qt-1761835797295793905"  // Qwen
+                : "ep-w8sv4r-1761835960223672978"; // DeepSeek
+            std::snprintf(config.freellm_model.data(), config.freellm_model.size(), "%s", selected_model_id);
+            model_changed = true;
+        }
+
+        ImGui::Spacing();
+        ImGui::TextDisabled("%s", i18n::get("dialog.settings.freellm_note"));
     }
 
     return base_url_changed || model_changed || openai_key_changed || google_key_changed || zhipu_key_changed ||

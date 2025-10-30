@@ -110,6 +110,18 @@ BackendConfig BackendConfig::from(const ::TranslationConfig& cfg_ui)
         out.api_secret = safe_key(cfg_ui.youdao_app_secret);
         break;
     }
+    case ::TranslationConfig::TranslationBackend::FreeLLM:
+    {
+        // URL and keys are hardcoded in FreeLLMTranslator
+        out.base_url.clear(); // Not used
+        out.api_key.clear();  // Not used
+
+        // Model is user-selected from dropdown
+        out.model = safe_model(cfg_ui.freellm_model);
+        if (out.model.empty())
+            out.model = "ep-c193qt-1761835797295793905"; // Default to Qwen
+        break;
+    }
     }
 
     return out;

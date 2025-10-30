@@ -26,7 +26,8 @@ struct TranslationConfig
         ZhipuGLM = 2,
         QwenMT = 3,
         Niutrans = 4,
-        Youdao = 5
+        Youdao = 5,
+        FreeLLM = 6
     };
 
     enum class YoudaoMode
@@ -65,6 +66,9 @@ struct TranslationConfig
     std::array<char, ApiKeySize> youdao_app_key{};
     std::array<char, ApiKeySize> youdao_app_secret{};
     YoudaoMode youdao_mode = YoudaoMode::Text;
+
+    // FreeLLM settings
+    std::array<char, ModelSize> freellm_model{};
 
     // Custom system prompt for translation
     std::array<char, PromptSize> custom_prompt{};
@@ -105,6 +109,10 @@ struct TranslationConfig
         youdao_app_secret.fill('\0');
         youdao_mode = YoudaoMode::Text;
 
+        freellm_model.fill('\0');
+        // Default to Qwen model
+        std::snprintf(freellm_model.data(), freellm_model.size(), "%s", "ep-c193qt-1761835797295793905");
+
         custom_prompt.fill('\0');
     }
 
@@ -133,6 +141,7 @@ struct TranslationConfig
         youdao_app_key = other.youdao_app_key;
         youdao_app_secret = other.youdao_app_secret;
         youdao_mode = other.youdao_mode;
+        freellm_model = other.freellm_model;
         custom_prompt = other.custom_prompt;
     }
 };
