@@ -177,6 +177,12 @@ target_sources(dqxu_core
 
 target_sources(dqxu_core
   PRIVATE
+    quest/QuestManager.cpp
+    quest/QuestManager.hpp
+)
+
+target_sources(dqxu_core
+  PRIVATE
     updater/UpdateTypes.hpp
     updater/Version.cpp
     updater/Version.hpp

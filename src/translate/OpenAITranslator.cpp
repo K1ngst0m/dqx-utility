@@ -71,6 +71,8 @@ void OpenAITranslator::buildRequestBody(const Job& job, const Prompt& prompt, nl
     }
     body["messages"] = std::move(messages);
     body["temperature"] = 0.3;
+    body["chat_template_kwargs"] = nlohmann::json::object();
+    body["chat_template_kwargs"]["thinking"] = false;
 }
 
 ILLMTranslator::ParseResult OpenAITranslator::parseResponse(const Job& job, const HttpResponse& resp,
