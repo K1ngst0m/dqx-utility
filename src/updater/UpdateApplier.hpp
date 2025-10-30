@@ -17,9 +17,6 @@ public:
     bool applyUpdate(const std::string& packagePath, const std::string& configTemplatePath, ApplyCallback callback,
                      std::string& outError);
 
-    // Perform update when launched in updater mode
-    static bool performUpdate(const std::string& packagePath, const std::string& targetDir);
-
 private:
     std::string appDir_;
 };

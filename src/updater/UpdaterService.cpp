@@ -212,7 +212,15 @@ void UpdaterService::startDownload(DownloadProgressCallback progressCallback)
         downloadUrl = impl_->updateInfo.downloadUrl;
     }
 
-    std::string tempPath = std::filesystem::temp_directory_path().string() + "/dqx-utility-update-package.zip";
+    std::string tempDir = impl_->appDirectory + "/update-temp";
+    std::error_code ec;
+    std::filesystem::create_directories(tempDir, ec);
+    if (ec) {
+        PLOG_ERROR << "Failed to create update-temp directory: " << ec.message();
+        return;
+    }
+    
+    std::string tempPath = tempDir + "/update-package.zip";
 
     impl_->downloader->downloadAsync(
         downloadUrl, tempPath,

@@ -131,9 +131,8 @@ CPMAddPackage(
 # miniz - ZIP extraction library for updater
 CPMAddPackage(
   NAME miniz
-  GITHUB_REPOSITORY richgel999/miniz
-  GIT_TAG 3.0.2
-  DOWNLOAD_ONLY YES
+  URL https://github.com/richgel999/miniz/releases/download/3.1.0/miniz-3.1.0.zip
+  VERSION 3.1.0
 )
 
 # picosha2 - SHA-256 hash library for updater

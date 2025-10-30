@@ -1,5 +1,7 @@
 #pragma once
 
+#include "UpdateTypes.hpp"
+
 #include <string>
 #include <vector>
 
@@ -12,7 +14,7 @@ public:
     BackupManager(const std::string& appDir);
     ~BackupManager() = default;
 
-    bool createBackup(std::string& outError);
+    bool createBackup(const UpdateManifest& manifest, std::string& outError);
     bool restoreFromBackup(std::string& outError);
     bool hasBackup() const;
     void cleanupBackup();

@@ -115,6 +115,8 @@ target_sources(dqxu_core
     platform/SingleInstanceGuard.hpp
     platform/WineDetector.cpp
     platform/WineDetector.hpp
+    platform/ProcessUtils.cpp
+    platform/ProcessUtils.hpp
 )
 
 target_sources(dqxu_core
@@ -143,6 +145,9 @@ target_sources(dqxu_core
     utils/HttpCommon.hpp
     utils/NativeMessageBox.cpp
     utils/NativeMessageBox.hpp
+    utils/ZipExtractor.cpp
+    utils/ZipExtractor.hpp
+    ${miniz_SOURCE_DIR}/miniz.c
 )
 
 target_sources(dqxu_core
@@ -177,6 +182,7 @@ target_include_directories(dqxu_core
     ${CMAKE_CURRENT_SOURCE_DIR}/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/platform
     ${CMAKE_CURRENT_SOURCE_DIR}/services
+    ${miniz_SOURCE_DIR}
   PUBLIC
     ${tomlplusplus_SOURCE_DIR}/include
     ${plog_SOURCE_DIR}/include

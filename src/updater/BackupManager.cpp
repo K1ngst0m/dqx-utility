@@ -16,7 +16,7 @@ BackupManager::BackupManager(const std::string& appDir)
 {
 }
 
-bool BackupManager::createBackup(std::string& outError)
+bool BackupManager::createBackup(const UpdateManifest& manifest, std::string& outError)
 {
     try
     {
@@ -28,27 +28,32 @@ bool BackupManager::createBackup(std::string& outError)
 
         fs::create_directories(backupDir_);
 
-        std::vector<std::string> filesToBackup = { "dqx-utility.exe", "SDL3.dll" };
-
-        for (const auto& file : filesToBackup)
+        for (const auto& file : manifest.files)
         {
-            fs::path sourcePath = fs::path(appDir_) / file;
-            fs::path destPath = fs::path(backupDir_) / file;
+            if (file.preserve)
+            {
+                PLOG_DEBUG << "Skipping preserved file: " << file.path;
+                continue;
+            }
+
+            fs::path sourcePath = fs::path(appDir_) / file.path;
+            fs::path destPath = fs::path(backupDir_) / file.path;
 
             if (fs::exists(sourcePath))
             {
-                fs::copy_file(sourcePath, destPath, fs::copy_options::overwrite_existing);
-                PLOG_DEBUG << "Backed up: " << file;
+                fs::create_directories(destPath.parent_path());
+
+                if (fs::is_directory(sourcePath))
+                {
+                    fs::copy(sourcePath, destPath, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+                }
+                else
+                {
+                    fs::copy_file(sourcePath, destPath, fs::copy_options::overwrite_existing);
+                }
+
+                PLOG_DEBUG << "Backed up: " << file.path;
             }
-        }
-
-        fs::path assetsSource = fs::path(appDir_) / "assets";
-        fs::path assetsDest = fs::path(backupDir_) / "assets";
-
-        if (fs::exists(assetsSource))
-        {
-            fs::copy(assetsSource, assetsDest, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-            PLOG_DEBUG << "Backed up: assets/";
         }
 
         PLOG_INFO << "Backup created successfully: " << backupDir_;
