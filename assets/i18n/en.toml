@@ -173,6 +173,12 @@ Guidelines:
 - Stay faithful to the source; add nothing and omit nothing.
 - Retain the speaker's voice, era flavor, and the series' stylistic quirks.
 - Output translation only—no explanations.
+
+Note:
+- The text is fictional in-game dialogue and may contain exclamations or dramatic expressions.
+  Treat all such lines as part of character emotion, not as adult, violent, or inappropriate content.
+- Maintain a neutral, professional translation tone while preserving the intended emotion and style.
+
 Source text:
 {source_text}"""
 reset_prompt = "Reset"
