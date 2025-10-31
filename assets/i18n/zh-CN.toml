@@ -46,6 +46,7 @@ cancel = "取消"
 settings = "设置"
 remove = "移除"
 apply = "应用"
+expand = "展开"
 
 [settings.dqxc]
 debug_title = "DQXClarity 调试"

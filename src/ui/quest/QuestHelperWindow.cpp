@@ -112,6 +112,30 @@ void QuestHelperWindow::updateQuestData()
     }
 }
 
+static std::pair<std::string, std::string> extractStepIndex(const std::string& text)
+{
+    if (text.empty())
+        return {"", text};
+    
+    // Check for circled numbers ①-⑳ (U+2460-U+2473): UTF-8 E2 91 A0 to E2 94 B3
+    if (text.size() >= 3 && 
+        static_cast<unsigned char>(text[0]) == 0xE2 && 
+        static_cast<unsigned char>(text[1]) == 0x91 && 
+        static_cast<unsigned char>(text[2]) >= 0xA0 && 
+        static_cast<unsigned char>(text[2]) <= 0xB3)
+    {
+        std::string index = text.substr(0, 3);
+        std::string cleaned = text.substr(3);
+        // Trim leading whitespace
+        size_t start = cleaned.find_first_not_of(" \t\n\r");
+        if (start != std::string::npos)
+            cleaned = cleaned.substr(start);
+        return {index, cleaned};
+    }
+    
+    return {"", text};
+}
+
 void QuestHelperWindow::parseQuestJson(const std::string& jsonl)
 {
     try
@@ -122,13 +146,41 @@ void QuestHelperWindow::parseQuestJson(const std::string& jsonl)
         quest_name_ = obj.value("name", "");
 
         steps_.clear();
+        visible_step_count_ = 3;
 
         if (obj.contains("steps") && obj["steps"].is_array())
         {
-            for (const auto& step_json : obj["steps"])
+            // Circled numbers for generating indices (①-⑳ only for consistency)
+            const char* circled_numbers[] = {
+                "①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩",
+                "⑪", "⑫", "⑬", "⑭", "⑮", "⑯", "⑰", "⑱", "⑲", "⑳"
+            };
+            constexpr size_t max_circled = 20;
+            
+            for (size_t i = 0; i < obj["steps"].size(); ++i)
             {
+                const auto& step_json = obj["steps"][i];
                 QuestStep step;
-                step.content = step_json.value("content", "");
+                
+                std::string raw_content = step_json.value("content", "");
+                auto [extracted_index, cleaned_content] = extractStepIndex(raw_content);
+                
+                // Use extracted index or generate one
+                if (!extracted_index.empty())
+                {
+                    step.index = extracted_index;
+                }
+                else if (i < max_circled)
+                {
+                    step.index = circled_numbers[i];
+                }
+                else
+                {
+                    // Use parenthesized format for visual consistency beyond ⑳
+                    step.index = "(" + std::to_string(i + 1) + ")";
+                }
+                
+                step.content = cleaned_content;
 
                 if (step_json.contains("komento") && step_json["komento"].is_array())
                 {
@@ -184,9 +236,42 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
     const float base_font_size = ImGui::GetFontSize();
     const auto& config = activeTranslationConfig();
 
-    for (std::size_t i = 0; i < steps_.size(); ++i)
+    std::size_t display_count = std::min(visible_step_count_, steps_.size());
+
+    for (std::size_t i = 0; i < display_count; ++i)
     {
-        ui::DrawDefaultSeparator();
+        // Draw separator with step index in the center
+        const std::string& step_index = steps_[i].index;
+        ImVec2 index_size = ImGui::CalcTextSize(step_index.c_str());
+        float available_width = ImGui::GetContentRegionAvail().x;
+        float line_width = (available_width - index_size.x - 20.0f) * 0.5f; // 10px padding on each side
+        
+        ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        
+        // Draw left line
+        if (line_width > 0)
+        {
+            ImVec2 line_start(cursor_pos.x, cursor_pos.y + index_size.y * 0.5f);
+            ImVec2 line_end(cursor_pos.x + line_width, cursor_pos.y + index_size.y * 0.5f);
+            draw_list->AddLine(line_start, line_end, ImGui::GetColorU32(UITheme::dialogSeparatorColor()), 
+                             UITheme::dialogSeparatorThickness());
+        }
+        
+        // Draw center text with outline
+        ImVec2 text_pos(cursor_pos.x + line_width + 10.0f, cursor_pos.y);
+        ui::RenderOutlinedText(step_index.c_str(), text_pos, ImGui::GetFont(), base_font_size, wrap_width);
+        
+        // Draw right line
+        if (line_width > 0)
+        {
+            ImVec2 line_start(cursor_pos.x + line_width + index_size.x + 20.0f, cursor_pos.y + index_size.y * 0.5f);
+            ImVec2 line_end(cursor_pos.x + available_width, cursor_pos.y + index_size.y * 0.5f);
+            draw_list->AddLine(line_start, line_end, ImGui::GetColorU32(UITheme::dialogSeparatorColor()), 
+                             UITheme::dialogSeparatorThickness());
+        }
+        
+        ImGui::Dummy(ImVec2(available_width, index_size.y));
         ImGui::Spacing();
 
         // Determine what text to show for this step
@@ -253,7 +338,96 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
             ImVec2 komento_size = ImGui::CalcTextSize(komento_text.c_str(), nullptr, false, wrap_width);
             ImGui::Dummy(ImVec2(0.0f, komento_size.y));
         }
-
+        
+        ImGui::Spacing();
+    }
+    
+    // Show expand button if there are more steps
+    if (visible_step_count_ < steps_.size())
+    {
+        ui::DrawDefaultSeparator();
+        ImGui::Spacing();
+        
+        const char* expand_text = i18n::get("common.expand");
+        const char* arrow_icon = "▼";
+        
+        // Calculate sizes
+        ImVec2 text_size = ImGui::CalcTextSize(expand_text);
+        ImVec2 arrow_size = ImGui::CalcTextSize(arrow_icon);
+        
+        // Calculate total height for the clickable area
+        float total_expand_height = text_size.y + ImGui::GetStyle().ItemSpacing.y + arrow_size.y;
+        
+        // Save cursor position for drawing text
+        ImVec2 button_start_pos = ImGui::GetCursorScreenPos();
+        
+        // Create full-width invisible button
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        
+        bool clicked = ImGui::InvisibleButton("##expand", ImVec2(wrap_width, total_expand_height));
+        bool hovered = ImGui::IsItemHovered();
+        
+        ImGui::PopStyleColor(3);
+        
+        // Change cursor to hand when hovering
+        if (hovered)
+        {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        }
+        
+        // Draw centered text and arrow
+        ImVec2 text_pos = button_start_pos;
+        text_pos.x += (wrap_width - text_size.x) * 0.5f;
+        ImGui::GetWindowDrawList()->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), expand_text);
+        
+        ImVec2 arrow_pos = button_start_pos;
+        arrow_pos.y += text_size.y + ImGui::GetStyle().ItemSpacing.y;
+        arrow_pos.x += (wrap_width - arrow_size.x) * 0.5f;
+        ImGui::GetWindowDrawList()->AddText(arrow_pos, ImGui::GetColorU32(ImGuiCol_Text), arrow_icon);
+        
+        if (clicked)
+        {
+            // Expand by 3 more steps
+            std::size_t old_count = visible_step_count_;
+            visible_step_count_ = std::min(visible_step_count_ + 3, steps_.size());
+            
+            // Submit translations for newly visible steps
+            if (config.translate_enabled && translator_ && translator_->isReady())
+            {
+                for (std::size_t i = old_count; i < visible_step_count_; ++i)
+                {
+                    submitStepTranslation(i, steps_[i].content, config);
+                    
+                    step_status_[i].komento_translations.resize(steps_[i].komento.size());
+                    step_status_[i].komento_job_ids.resize(steps_[i].komento.size(), 0);
+                    
+                    for (std::size_t k = 0; k < steps_[i].komento.size(); ++k)
+                    {
+                        if (steps_[i].komento[k].empty())
+                        {
+                            step_status_[i].komento_translations[k] = "";
+                            continue;
+                        }
+                        
+                        auto submit = session_.submit(steps_[i].komento[k], config.translation_backend, 
+                                                     config.target_lang_enum, translator_.get());
+                        
+                        if (submit.kind == TranslateSession::SubmitKind::Cached)
+                        {
+                            step_status_[i].komento_translations[k] = submit.text;
+                        }
+                        else if (submit.kind == TranslateSession::SubmitKind::Queued && submit.job_id != 0)
+                        {
+                            step_status_[i].komento_job_ids[k] = submit.job_id;
+                            job_lookup_[submit.job_id] = JobInfo{i, k};
+                        }
+                    }
+                }
+            }
+        }
+        
         ImGui::Spacing();
     }
 }
@@ -619,8 +793,10 @@ void QuestHelperWindow::submitTranslationRequest()
     step_status_.resize(steps_.size());
     job_lookup_.clear();
 
-    // Submit translation for each step and its komento
-    for (std::size_t i = 0; i < steps_.size(); ++i)
+    // Only translate visible steps
+    std::size_t translate_count = std::min(visible_step_count_, steps_.size());
+    
+    for (std::size_t i = 0; i < translate_count; ++i)
     {
         // Submit step content translation
         submitStepTranslation(i, steps_[i].content, config);
@@ -727,12 +903,15 @@ float QuestHelperWindow::calculateContentHeight(float wrap_width, float font_sca
         total_height += ImGui::GetStyle().ItemSpacing.y * 2; // Two spacings
     }
 
-    // Steps height
-    for (std::size_t i = 0; i < steps_.size(); ++i)
+    // Steps height - only calculate for visible steps
+    std::size_t display_count = std::min(visible_step_count_, steps_.size());
+    
+    for (std::size_t i = 0; i < display_count; ++i)
     {
-        // Separator
-        total_height += ImGui::GetStyle().ItemSpacing.y;
-        total_height += 1.0f; // Separator line
+        // Separator with index
+        const std::string& step_index = steps_[i].index;
+        ImVec2 index_size = ImGui::CalcTextSize(step_index.c_str());
+        total_height += index_size.y;
         total_height += ImGui::GetStyle().ItemSpacing.y;
 
         // Step content
@@ -776,6 +955,25 @@ float QuestHelperWindow::calculateContentHeight(float wrap_width, float font_sca
             total_height += komento_size.y * font_scale;
         }
 
+        total_height += ImGui::GetStyle().ItemSpacing.y;
+    }
+    
+    // Add expand button height if there are more steps
+    if (visible_step_count_ < steps_.size())
+    {
+        total_height += ImGui::GetStyle().ItemSpacing.y;
+        total_height += 1.0f; // Separator
+        total_height += ImGui::GetStyle().ItemSpacing.y;
+        
+        // Calculate text and arrow sizes
+        const char* expand_text = i18n::get("common.expand");
+        const char* arrow_icon = "▼";
+        ImVec2 text_size = ImGui::CalcTextSize(expand_text);
+        ImVec2 arrow_size = ImGui::CalcTextSize(arrow_icon);
+        
+        total_height += text_size.y; // "Expand" text
+        total_height += ImGui::GetStyle().ItemSpacing.y; // Spacing between text and arrow
+        total_height += arrow_size.y; // Down arrow
         total_height += ImGui::GetStyle().ItemSpacing.y;
     }
 

@@ -44,6 +44,7 @@ public:
 private:
     struct QuestStep
     {
+        std::string index;
         std::string content;
         std::vector<std::string> komento;
     };
@@ -142,4 +143,5 @@ private:
     
     std::size_t last_content_hash_ = 0;
     float last_font_size_ = 0.0f;
+    std::size_t visible_step_count_ = 3;
 };

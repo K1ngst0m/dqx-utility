@@ -46,6 +46,7 @@ cancel = "Cancel"
 settings = "Settings"
 remove = "Remove"
 apply = "Apply"
+expand = "Expand"
 
 [settings.dqxc]
 debug_title = "DQXClarity Debug"
