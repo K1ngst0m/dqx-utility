@@ -36,6 +36,7 @@ quit = "Quit"
 default_windows = "Default windows"
 default_dialog = "Default dialog window"
 default_quest = "Default quest window"
+default_quest_helper = "Default quest helper window"
 
 [common]
 start = "Start"

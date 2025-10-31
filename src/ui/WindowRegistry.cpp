@@ -77,6 +77,12 @@ void WindowRegistry::removeWindow(UIWindow* window)
             quest->setDefaultInstance(false);
         default_quest_ = nullptr;
     }
+    if (window == default_quest_helper_)
+    {
+        if (auto* quest_helper = dynamic_cast<QuestHelperWindow*>(window))
+            quest_helper->setDefaultInstance(false);
+        default_quest_helper_ = nullptr;
+    }
     windows_.erase(std::remove_if(windows_.begin(), windows_.end(),
                                   [&](const std::unique_ptr<UIWindow>& entry)
                                   {

@@ -101,6 +101,8 @@ void applyStoredState(QuestHelperWindow& window, const QuestHelperStateManager& 
     window.state() = stored;
     window.state().quest_helper.applyDefaults();
     sanitizeDialogState(window.state());
+    window.refreshFontBinding();
+    window.initTranslatorIfEnabled();
 }
 } // namespace
 

@@ -158,6 +158,13 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
                     cm->setDefaultQuestEnabled(!quest_enabled);
                 }
 
+                bool quest_helper_enabled = cm->isDefaultQuestHelperEnabled();
+                std::string quest_helper_label = ui::LocalizedOrFallback("menu.default_quest_helper", "Default quest helper window");
+                if (ImGui::MenuItem(quest_helper_label.c_str(), nullptr, quest_helper_enabled))
+                {
+                    cm->setDefaultQuestHelperEnabled(!quest_helper_enabled);
+                }
+
                 ImGui::EndMenu();
             }
         }
