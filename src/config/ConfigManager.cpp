@@ -3,6 +3,7 @@
 #include "../ui/WindowRegistry.hpp"
 #include "../ui/dialog/DialogWindow.hpp"
 #include "../ui/quest/QuestWindow.hpp"
+#include "../ui/quest/QuestHelperWindow.hpp"
 #include "../ui/Localization.hpp"
 #include "../state/DialogStateManager.hpp"
 #include "../utils/ErrorReporter.hpp"
@@ -94,6 +95,13 @@ void applyStoredState(QuestWindow& window, const QuestStateManager& stored)
     window.refreshFontBinding();
     window.initTranslatorIfEnabled();
 }
+
+void applyStoredState(QuestHelperWindow& window, const QuestHelperStateManager& stored)
+{
+    window.state() = stored;
+    window.state().quest_helper.applyDefaults();
+    sanitizeDialogState(window.state());
+}
 } // namespace
 
 static ConfigManager* g_cfg_mgr = nullptr;
@@ -173,6 +181,7 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     appearance.insert("padding_y", state.ui_state().padding.y);
     appearance.insert("rounding", state.ui_state().rounding);
     appearance.insert("border_thickness", state.ui_state().border_thickness);
+    appearance.insert("border_enabled", state.ui_state().border_enabled);
     appearance.insert("background_alpha", state.ui_state().background_alpha);
     appearance.insert("font_size", state.ui_state().font_size);
     appearance.insert("vignette_thickness", state.ui_state().vignette_thickness);
@@ -312,6 +321,8 @@ static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, s
             state.ui_state().rounding = static_cast<float>(*v);
         if (auto v = (*appearance)["border_thickness"].value<double>())
             state.ui_state().border_thickness = static_cast<float>(*v);
+        if (auto v = (*appearance)["border_enabled"].value<bool>())
+            state.ui_state().border_enabled = *v;
         if (auto v = (*appearance)["background_alpha"].value<double>())
             state.ui_state().background_alpha = static_cast<float>(*v);
         if (auto v = (*appearance)["font_size"].value<double>())
@@ -502,6 +513,29 @@ void ConfigManager::setDefaultQuestEnabled(bool enabled)
         saveAll();
 }
 
+void ConfigManager::setDefaultQuestHelperEnabled(bool enabled)
+{
+    if (default_quest_helper_enabled_ == enabled)
+        return;
+    if (!enabled && registry_)
+    {
+        if (auto* current_default = registry_->defaultQuestHelperWindow())
+        {
+            default_quest_helper_name_ = current_default->displayName();
+            default_quest_helper_state_ = current_default->state();
+            sanitizeDialogState(*default_quest_helper_state_);
+        }
+    }
+    default_quest_helper_enabled_ = enabled;
+    if (suppress_default_window_updates_)
+        return;
+
+    enforceDefaultQuestHelperState();
+
+    if (registry_)
+        saveAll();
+}
+
 void ConfigManager::reconcileDefaultWindowStates() { enforceDefaultWindowStates(); }
 
 void ConfigManager::enforceDefaultDialogState()
@@ -604,10 +638,61 @@ void ConfigManager::enforceDefaultQuestState()
     }
 }
 
+void ConfigManager::enforceDefaultQuestHelperState()
+{
+    if (!registry_)
+        return;
+
+    auto* current_default = registry_->defaultQuestHelperWindow();
+    if (default_quest_helper_enabled_)
+    {
+        if (!current_default)
+        {
+            auto& quest_helper = registry_->createQuestHelperWindow(true);
+            if (!default_quest_helper_name_.empty())
+            {
+                quest_helper.rename(default_quest_helper_name_.c_str());
+            }
+            else
+            {
+                default_quest_helper_name_ = quest_helper.displayName();
+            }
+            registry_->markQuestHelperAsDefault(quest_helper);
+            if (default_quest_helper_state_)
+            {
+                applyStoredState(quest_helper, *default_quest_helper_state_);
+            }
+            else
+            {
+                sanitizeDialogState(quest_helper.state());
+            }
+            current_default = &quest_helper;
+        }
+        else
+        {
+            default_quest_helper_name_ = current_default->displayName();
+        }
+
+        if (current_default)
+        {
+            default_quest_helper_state_ = current_default->state();
+            sanitizeDialogState(*default_quest_helper_state_);
+        }
+    }
+    else if (current_default)
+    {
+        default_quest_helper_name_ = current_default->displayName();
+        default_quest_helper_state_ = current_default->state();
+        sanitizeDialogState(*default_quest_helper_state_);
+        registry_->removeWindow(current_default);
+    }
+}
+
 void ConfigManager::enforceDefaultWindowStates()
 {
     enforceDefaultDialogState();
     enforceDefaultQuestState();
+    enforceDefaultQuestHelperState();
 }
 
 void ConfigManager::setUIScale(float scale)
@@ -650,6 +735,7 @@ bool ConfigManager::saveAll()
     global.insert("ui_language", ui_language_);
     global.insert("default_dialog_enabled", default_dialog_enabled_);
     global.insert("default_quest_enabled", default_quest_enabled_);
+    global.insert("default_quest_helper_enabled", default_quest_helper_enabled_);
 
     toml::table translation;
     translation.insert("translate_enabled", global_translation_config_.translate_enabled);
@@ -766,6 +852,31 @@ bool ConfigManager::saveAll()
         root.insert("quests", std::move(quests_arr));
     }
 
+    if (auto* current_default_quest_helper = registry_->defaultQuestHelperWindow())
+    {
+        default_quest_helper_name_ = current_default_quest_helper->displayName();
+        default_quest_helper_state_ = current_default_quest_helper->state();
+        sanitizeDialogState(*default_quest_helper_state_);
+    }
+
+    auto quest_helper_windows = registry_->windowsByType(UIWindowType::QuestHelper);
+    toml::array quest_helpers_arr;
+    if (!default_quest_helper_enabled_ && default_quest_helper_state_ && !default_quest_helper_name_.empty())
+    {
+        quest_helpers_arr.push_back(dialogStateToToml(default_quest_helper_name_, *default_quest_helper_state_));
+    }
+    for (auto* w : quest_helper_windows)
+    {
+        auto* qhw = dynamic_cast<QuestHelperWindow*>(w);
+        if (!qhw)
+            continue;
+        quest_helpers_arr.push_back(dialogStateToToml(qhw->displayName(), qhw->state()));
+    }
+    if (!quest_helpers_arr.empty())
+    {
+        root.insert("quest_helpers", std::move(quest_helpers_arr));
+    }
+
     std::string tmp = config_path_ + ".tmp";
     std::ofstream ofs(tmp, std::ios::binary);
     if (!ofs)
@@ -823,6 +934,8 @@ bool ConfigManager::loadAndApply()
                 setDefaultDialogEnabled(*v);
             if (auto v = (*g)["default_quest_enabled"].value<bool>())
                 setDefaultQuestEnabled(*v);
+            if (auto v = (*g)["default_quest_helper_enabled"].value<bool>())
+                setDefaultQuestHelperEnabled(*v);
 
             global_translation_config_.applyDefaults();
             if (global_translation_config_.custom_prompt[0] == '\0')
@@ -1168,6 +1281,55 @@ bool ConfigManager::loadAndApply()
                 registry_->createQuestWindow(true);
             }
         }
+
+        auto processQuestHelperTable = [&](const toml::table& tbl, std::size_t index) {
+            QuestHelperWindow* qh_window = nullptr;
+            auto existing_quest_helpers = registry_->windowsByType(UIWindowType::QuestHelper);
+            if (index < existing_quest_helpers.size())
+            {
+                qh_window = dynamic_cast<QuestHelperWindow*>(existing_quest_helpers[index]);
+            }
+            if (!qh_window)
+            {
+                qh_window = &registry_->createQuestHelperWindow(false);
+            }
+            std::string name;
+            QuestHelperStateManager quest_helper_state;
+            if (tomlToDialogState(tbl, quest_helper_state, name))
+            {
+                qh_window->rename(name.c_str());
+                applyStoredState(*qh_window, quest_helper_state);
+                qh_window->setDefaultInstance(false);
+                if (default_quest_helper_enabled_ && index == 0)
+                {
+                    registry_->markQuestHelperAsDefault(*qh_window);
+                    default_quest_helper_name_ = qh_window->displayName();
+                    default_quest_helper_state_ = qh_window->state();
+                    sanitizeDialogState(*default_quest_helper_state_);
+                }
+            }
+        };
+
+        if (auto* quest_helper_arr = root["quest_helpers"].as_array())
+        {
+            std::size_t index = 0;
+            for (auto&& node : *quest_helper_arr)
+            {
+                if (auto* qh_tbl = node.as_table())
+                {
+                    processQuestHelperTable(*qh_tbl, index);
+                    ++index;
+                }
+            }
+        }
+        else
+        {
+            if (default_quest_helper_enabled_ && registry_->windowsByType(UIWindowType::QuestHelper).empty())
+            {
+                registry_->createQuestHelperWindow(true);
+            }
+        }
+
         guard.restore();
         enforceDefaultWindowStates();
         return true;

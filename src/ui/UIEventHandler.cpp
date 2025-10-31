@@ -3,6 +3,7 @@
 #include "WindowRegistry.hpp"
 #include "dialog/DialogWindow.hpp"
 #include "quest/QuestWindow.hpp"
+#include "quest/QuestHelperWindow.hpp"
 #include "help/HelpWindow.hpp"
 #include "config/ConfigManager.hpp"
 #include "Localization.hpp"
@@ -43,6 +44,14 @@ bool UIEventHandler::IsMouseOutsideDialogs() const
                                                      state.ui_state().window_pos.y + state.ui_state().window_size.y),
                                               false);
         }
+        if (auto* quest_helper = dynamic_cast<QuestHelperWindow*>(window))
+        {
+            const auto& state = quest_helper->state();
+            return ImGui::IsMouseHoveringRect(state.ui_state().window_pos,
+                                              ImVec2(state.ui_state().window_pos.x + state.ui_state().window_size.x,
+                                                     state.ui_state().window_pos.y + state.ui_state().window_size.y),
+                                              false);
+        }
         if (auto* help = dynamic_cast<HelpWindow*>(window))
         {
             const auto& state = help->state();
@@ -63,6 +72,13 @@ bool UIEventHandler::IsMouseOutsideDialogs() const
 
     auto quests = registry_.windowsByType(UIWindowType::Quest);
     for (auto* window : quests)
+    {
+        if (is_mouse_over(window))
+            return false;
+    }
+
+    auto quest_helpers = registry_.windowsByType(UIWindowType::QuestHelper);
+    for (auto* window : quest_helpers)
     {
         if (is_mouse_over(window))
             return false;

@@ -7,6 +7,7 @@
 
 #include "../state/DialogStateManager.hpp"
 #include "../state/QuestStateManager.hpp"
+#include "../state/QuestHelperStateManager.hpp"
 #include "../state/TranslationConfig.hpp"
 
 class WindowRegistry;
@@ -77,6 +78,10 @@ public:
     bool isDefaultQuestEnabled() const { return default_quest_enabled_; }
 
     void setDefaultQuestEnabled(bool enabled);
+
+    bool isDefaultQuestHelperEnabled() const { return default_quest_helper_enabled_; }
+
+    void setDefaultQuestHelperEnabled(bool enabled);
     void reconcileDefaultWindowStates();
 
     // Assign registry pointer (used for save/apply)
@@ -119,6 +124,7 @@ private:
     bool applyDialogs(const struct DialogsSnapshot& snap); // fwd declen't exist, will implement inline
     void enforceDefaultDialogState();
     void enforceDefaultQuestState();
+    void enforceDefaultQuestHelperState();
     void enforceDefaultWindowStates();
 
     std::string config_path_;
@@ -143,10 +149,13 @@ private:
 
     bool default_dialog_enabled_ = true;
     bool default_quest_enabled_ = true;
+    bool default_quest_helper_enabled_ = true;
     std::string default_dialog_name_;
     std::string default_quest_name_;
+    std::string default_quest_helper_name_;
     std::optional<DialogStateManager> default_dialog_state_;
     std::optional<QuestStateManager> default_quest_state_;
+    std::optional<QuestHelperStateManager> default_quest_helper_state_;
     bool suppress_default_window_updates_ = false;
 
     struct ImGuiStyleBackup

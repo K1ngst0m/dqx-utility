@@ -2,6 +2,7 @@
 
 #include "dialog/DialogWindow.hpp"
 #include "quest/QuestWindow.hpp"
+#include "quest/QuestHelperWindow.hpp"
 #include "help/HelpWindow.hpp"
 #include "UIHelper.hpp"
 #include "FontManager.hpp"
@@ -45,6 +46,17 @@ HelpWindow& WindowRegistry::createHelpWindow()
     HelpWindow& ref = *help;
     windows_.push_back(std::move(help));
     ++help_counter_;
+    return ref;
+}
+
+QuestHelperWindow& WindowRegistry::createQuestHelperWindow(bool mark_default)
+{
+    auto quest_helper = std::make_unique<QuestHelperWindow>(font_manager_, makeQuestHelperName());
+    QuestHelperWindow& ref = *quest_helper;
+    windows_.push_back(std::move(quest_helper));
+    ++quest_helper_counter_;
+    if (mark_default)
+        markQuestHelperAsDefault(ref);
     return ref;
 }
 
@@ -151,6 +163,16 @@ void WindowRegistry::markQuestAsDefault(QuestWindow& window)
     default_quest_ = &window;
 }
 
+void WindowRegistry::markQuestHelperAsDefault(QuestHelperWindow& window)
+{
+    if (default_quest_helper_ == &window)
+        return;
+    if (default_quest_helper_)
+        default_quest_helper_->setDefaultInstance(false);
+    window.setDefaultInstance(true);
+    default_quest_helper_ = &window;
+}
+
 // Generates a sequential dialog name using alphabetic suffixes.
 std::string WindowRegistry::makeDialogName()
 {
@@ -182,4 +204,13 @@ std::string WindowRegistry::makeHelpName()
         return ui::LocalizedOrFallback("window.help.default_name", "Help");
     }
     return ui::LocalizedOrFallback("window.help.default_name", "Help") + " " + std::to_string(help_counter_ + 1);
+}
+
+std::string WindowRegistry::makeQuestHelperName()
+{
+    if (quest_helper_counter_ == 0)
+    {
+        return ui::LocalizedOrFallback("window.quest_helper.default_name", "Quest Helper");
+    }
+    return ui::LocalizedOrFallback("window.quest_helper.default_name", "Quest Helper") + " " + std::to_string(quest_helper_counter_ + 1);
 }

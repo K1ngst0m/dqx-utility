@@ -23,6 +23,7 @@
 #include "updater/Version.hpp"
 #include "updater/ManifestParser.hpp"
 #include "quest/QuestManager.hpp"
+#include "services/QuestManagerService.hpp"
 
 #include <plog/Log.h>
 #include <plog/Init.h>
@@ -238,6 +239,7 @@ void Application::setupManagers()
 
     // Initialize QuestManager
     quest_manager_ = std::make_unique<QuestManager>();
+    QuestManagerService_Set(quest_manager_.get());
     if (!quest_manager_->initialize("assets/quests.jsonl"))
     {
         PLOG_ERROR << "Failed to initialize QuestManager";

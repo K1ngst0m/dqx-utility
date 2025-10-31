@@ -8,12 +8,14 @@ enum class UIWindowType
 {
     Dialog = 0,
     Quest = 1,
-    Help = 2
+    Help = 2,
+    QuestHelper = 3
 };
 
 class DialogWindow;
 class QuestWindow;
 class HelpWindow;
+class QuestHelperWindow;
 class FontManager;
 
 // UIWindow defines the minimal interface for renderable ImGui windows.
@@ -38,6 +40,7 @@ public:
     DialogWindow& createDialogWindow(bool mark_default = false);
     QuestWindow& createQuestWindow(bool mark_default = false);
     HelpWindow& createHelpWindow();
+    QuestHelperWindow& createQuestHelperWindow(bool mark_default = false);
     void removeWindow(UIWindow* window);
     void processRemovals(); // Remove windows marked for removal
 
@@ -49,19 +52,25 @@ public:
 
     QuestWindow* defaultQuestWindow() const { return default_quest_; }
 
+    QuestHelperWindow* defaultQuestHelperWindow() const { return default_quest_helper_; }
+
     void markDialogAsDefault(DialogWindow& window);
     void markQuestAsDefault(QuestWindow& window);
+    void markQuestHelperAsDefault(QuestHelperWindow& window);
 
 private:
     std::string makeDialogName();
     std::string makeQuestName();
     std::string makeHelpName();
+    std::string makeQuestHelperName();
 
     FontManager& font_manager_;
     std::vector<std::unique_ptr<UIWindow>> windows_;
     int dialog_counter_ = 0;
     int quest_counter_ = 0;
     int help_counter_ = 0;
+    int quest_helper_counter_ = 0;
     DialogWindow* default_dialog_ = nullptr;
     QuestWindow* default_quest_ = nullptr;
+    QuestHelperWindow* default_quest_helper_ = nullptr;
 };

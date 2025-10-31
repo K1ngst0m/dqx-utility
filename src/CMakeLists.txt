@@ -78,6 +78,10 @@ target_sources(dqxu_core
     ui/quest/QuestSettingsView.hpp
     ui/quest/QuestWindow.cpp
     ui/quest/QuestWindow.hpp
+    ui/quest/QuestHelperWindow.cpp
+    ui/quest/QuestHelperWindow.hpp
+    ui/quest/QuestHelperSettingsView.cpp
+    ui/quest/QuestHelperSettingsView.hpp
 )
 
 target_sources(dqxu_core
@@ -145,6 +149,8 @@ target_sources(dqxu_core
     services/DQXClarityLauncher.hpp
     services/DQXClarityService.cpp
     services/DQXClarityService.hpp
+    services/QuestManagerService.cpp
+    services/QuestManagerService.hpp
 )
 
 target_sources(dqxu_core
