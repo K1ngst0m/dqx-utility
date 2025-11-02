@@ -1,4 +1,5 @@
 #include "GlobalSettingsPanel.hpp"
+#include "app/Application.hpp"
 #include "app/Version.hpp"
 #include "dialog/DialogWindow.hpp"
 #include "quest/QuestWindow.hpp"
@@ -770,19 +771,25 @@ void GlobalSettingsPanel::renderWindowManagementSection()
     {
         if (auto* cm = ConfigManager_Get())
         {
-            bool default_dialog = cm->isDefaultDialogEnabled();
+            auto& gs = cm->globalState();
+
+            bool default_dialog = gs.defaultDialogEnabled();
             std::string dialog_label =
                 ui::LocalizedOrFallback("settings.window.default_dialog", "Default dialog window");
             if (ImGui::Checkbox(dialog_label.c_str(), &default_dialog))
             {
-                cm->setDefaultDialogEnabled(default_dialog);
+                gs.setDefaultDialogEnabled(default_dialog);
+                registry_.setDefaultDialogEnabled(default_dialog);
+                ConfigManager_SaveAll();
             }
 
-            bool default_quest = cm->isDefaultQuestEnabled();
+            bool default_quest = gs.defaultQuestEnabled();
             std::string quest_label = ui::LocalizedOrFallback("settings.window.default_quest", "Default quest window");
             if (ImGui::Checkbox(quest_label.c_str(), &default_quest))
             {
-                cm->setDefaultQuestEnabled(default_quest);
+                gs.setDefaultQuestEnabled(default_quest);
+                registry_.setDefaultQuestEnabled(default_quest);
+                ConfigManager_SaveAll();
             }
 
             ImGui::Spacing();

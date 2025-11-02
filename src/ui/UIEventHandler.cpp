@@ -8,6 +8,7 @@
 #include "config/ConfigManager.hpp"
 #include "Localization.hpp"
 #include "UIHelper.hpp"
+#include "../app/Application.hpp"
 
 #include <string>
 
@@ -145,25 +146,32 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
             std::string defaults_menu_label = ui::LocalizedOrFallback("menu.default_windows", "Default windows");
             if (ImGui::BeginMenu(defaults_menu_label.c_str()))
             {
-                bool dialog_enabled = cm->isDefaultDialogEnabled();
+                auto& gs = cm->globalState();
+                bool dialog_enabled = gs.defaultDialogEnabled();
                 std::string dialog_label = ui::LocalizedOrFallback("menu.default_dialog", "Default dialog window");
                 if (ImGui::MenuItem(dialog_label.c_str(), nullptr, dialog_enabled))
                 {
-                    cm->setDefaultDialogEnabled(!dialog_enabled);
+                    gs.setDefaultDialogEnabled(!dialog_enabled);
+                    registry_.setDefaultDialogEnabled(!dialog_enabled);
+                    ConfigManager_SaveAll();
                 }
 
-                bool quest_enabled = cm->isDefaultQuestEnabled();
+                bool quest_enabled = gs.defaultQuestEnabled();
                 std::string quest_label = ui::LocalizedOrFallback("menu.default_quest", "Default quest window");
                 if (ImGui::MenuItem(quest_label.c_str(), nullptr, quest_enabled))
                 {
-                    cm->setDefaultQuestEnabled(!quest_enabled);
+                    gs.setDefaultQuestEnabled(!quest_enabled);
+                    registry_.setDefaultQuestEnabled(!quest_enabled);
+                    ConfigManager_SaveAll();
                 }
 
-                bool quest_helper_enabled = cm->isDefaultQuestHelperEnabled();
+                bool quest_helper_enabled = gs.defaultQuestHelperEnabled();
                 std::string quest_helper_label = ui::LocalizedOrFallback("menu.default_quest_helper", "Default quest helper window");
                 if (ImGui::MenuItem(quest_helper_label.c_str(), nullptr, quest_helper_enabled))
                 {
-                    cm->setDefaultQuestHelperEnabled(!quest_helper_enabled);
+                    gs.setDefaultQuestHelperEnabled(!quest_helper_enabled);
+                    registry_.setDefaultQuestHelperEnabled(!quest_helper_enabled);
+                    ConfigManager_SaveAll();
                 }
 
                 ImGui::EndMenu();

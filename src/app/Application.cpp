@@ -105,6 +105,7 @@ static void SDLCALL SDLLogBridge(void* userdata, int category, SDL_LogPriority p
 
 } // namespace
 
+
 Application::Application(int argc, char** argv)
     : argc_(argc)
     , argv_(argv)
@@ -218,7 +219,7 @@ void Application::setupManagers()
     font_manager_ = std::make_unique<FontManager>();
     registry_ = std::make_unique<WindowRegistry>(*font_manager_);
 
-    config_ = std::make_unique<ConfigManager>();
+    config_ = std::make_unique<ConfigManager>(*registry_);
     ConfigManager_Set(config_.get());
 
     event_handler_ = std::make_unique<ui::UIEventHandler>(*context_, *registry_);
@@ -250,7 +251,6 @@ void Application::initializeConfig()
 {
     PROFILE_SCOPE_FUNCTION();
 
-    config_->setRegistry(registry_.get());
     if (!config_->loadAtStartup())
     {
         utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration, "Failed to load configuration",
@@ -268,7 +268,7 @@ void Application::initializeConfig()
     last_window_topmost_ = gs.windowAlwaysOnTop();
     context_->setWindowAlwaysOnTop(last_window_topmost_);
 
-    config_->reconcileDefaultWindowStates();
+    registry_->syncDefaultWindows(gs);
 
     if (registry_->windowsByType(UIWindowType::Help).empty())
         registry_->createHelpWindow();
@@ -383,7 +383,7 @@ void Application::handleQuitRequests()
         UpdaterService_Set(nullptr);
     }
 
-    saveConfig();
+    ConfigManager_SaveAll();
     running_ = false;
 }
 
@@ -394,7 +394,7 @@ void Application::cleanup()
         updater_service_->shutdown();
         UpdaterService_Set(nullptr);
     }
-    saveConfig();
+    ConfigManager_SaveAll();
 }
 
 bool Application::checkSingleInstance()
@@ -492,11 +492,3 @@ void Application::handleUIRequests()
     }
 }
 
-void Application::saveConfig()
-{
-    if (config_ && !config_->saveAll())
-    {
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration, "Failed to save configuration",
-                                          config_->lastError());
-    }
-}

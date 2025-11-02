@@ -33,6 +33,8 @@ public:
     int run();
     void requestExit();
 
+    WindowRegistry* registry() { return registry_.get(); }
+
 private:
     bool initialize();
     bool initializeLogging();
@@ -56,7 +58,6 @@ private:
 
     bool checkSingleInstance();
     void parseCommandLineArgs();
-    void saveConfig();
 
     std::unique_ptr<AppContext> context_;
     std::unique_ptr<FontManager> font_manager_;
@@ -81,3 +82,4 @@ private:
     [[maybe_unused]] int argc_ = 0;
     [[maybe_unused]] char** argv_ = nullptr;
 };
+

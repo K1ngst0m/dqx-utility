@@ -17,6 +17,10 @@ class QuestWindow;
 class HelpWindow;
 class QuestHelperWindow;
 class FontManager;
+class GlobalStateManager;
+struct DialogStateManager;
+struct QuestStateManager;
+struct QuestHelperStateManager;
 
 // UIWindow defines the minimal interface for renderable ImGui windows.
 class UIWindow
@@ -36,6 +40,7 @@ class WindowRegistry
 {
 public:
     WindowRegistry(FontManager& font_manager);
+    ~WindowRegistry();
 
     DialogWindow& createDialogWindow(bool mark_default = false);
     QuestWindow& createQuestWindow(bool mark_default = false);
@@ -46,7 +51,7 @@ public:
 
     std::vector<std::unique_ptr<UIWindow>>& windows() { return windows_; }
 
-    std::vector<UIWindow*> windowsByType(UIWindowType type);
+    std::vector<UIWindow*> windowsByType(UIWindowType type) const;
 
     DialogWindow* defaultDialogWindow() const { return default_dialog_; }
 
@@ -57,6 +62,11 @@ public:
     void markDialogAsDefault(DialogWindow& window);
     void markQuestAsDefault(QuestWindow& window);
     void markQuestHelperAsDefault(QuestHelperWindow& window);
+
+    void setDefaultDialogEnabled(bool enabled);
+    void setDefaultQuestEnabled(bool enabled);
+    void setDefaultQuestHelperEnabled(bool enabled);
+    void syncDefaultWindows(const GlobalStateManager& state);
 
 private:
     std::string makeDialogName();
@@ -73,4 +83,11 @@ private:
     DialogWindow* default_dialog_ = nullptr;
     QuestWindow* default_quest_ = nullptr;
     QuestHelperWindow* default_quest_helper_ = nullptr;
+
+    std::unique_ptr<DialogStateManager> saved_dialog_state_;
+    std::unique_ptr<QuestStateManager> saved_quest_state_;
+    std::unique_ptr<QuestHelperStateManager> saved_quest_helper_state_;
+    std::string saved_dialog_name_;
+    std::string saved_quest_name_;
+    std::string saved_quest_helper_name_;
 };

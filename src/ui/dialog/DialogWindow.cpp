@@ -305,10 +305,11 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
     return static_cast<int>(state_.content_state().segments.size()) - 1;
 }
 
-DialogWindow::DialogWindow(FontManager& font_manager, int instance_id, const std::string& name, bool is_default)
+DialogWindow::DialogWindow(FontManager& font_manager, WindowRegistry& registry, int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
     , cached_backend_(translate::Backend::OpenAI)
     , settings_view_(state_, font_manager_, session_)
+    , registry_(registry)
 {
 
     name_ = name;
@@ -1085,14 +1086,7 @@ void DialogWindow::renderDialogContextMenu()
     bool is_docked = state_.ui_state().is_docked;
 
     // Get total dialog count from config manager registry
-    int dialog_count = 0;
-    if (auto* cm = ConfigManager_Get())
-    {
-        if (auto* reg = cm->registry())
-        {
-            dialog_count = static_cast<int>(reg->windowsByType(UIWindowType::Dialog).size());
-        }
-    }
+    int dialog_count = static_cast<int>(registry_.windowsByType(UIWindowType::Dialog).size());
 
     // Render the context menu
     std::string popup_id = "DialogContextMenu###" + id_suffix_;

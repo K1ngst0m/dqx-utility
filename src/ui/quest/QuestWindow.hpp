@@ -20,7 +20,7 @@ class QuestSettingsView;
 class QuestWindow : public UIWindow
 {
 public:
-    QuestWindow(FontManager& font_manager, const std::string& name, bool is_default = false);
+    QuestWindow(FontManager& font_manager, WindowRegistry& registry, const std::string& name, bool is_default = false);
     ~QuestWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Quest; }
@@ -140,4 +140,5 @@ private:
     bool last_used_global_translation_ = false;
     ui::WindowAnimator animator_;
     bool is_default_instance_ = false;
+    WindowRegistry& registry_;
 };

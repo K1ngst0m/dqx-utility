@@ -21,9 +21,10 @@
 
 using json = nlohmann::json;
 
-QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, const std::string& name)
+QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, WindowRegistry& registry, const std::string& name)
     : font_manager_(font_manager)
     , name_(name)
+    , registry_(registry)
 {
     static int quest_helper_counter = 0;
     ++quest_helper_counter;
@@ -461,14 +462,7 @@ void QuestHelperWindow::renderContextMenu()
 
         ImGui::Separator();
 
-        int quest_helper_count = 0;
-        if (auto* cm = ConfigManager_Get())
-        {
-            if (auto* reg = cm->registry())
-            {
-                quest_helper_count = static_cast<int>(reg->windowsByType(UIWindowType::QuestHelper).size());
-            }
-        }
+        int quest_helper_count = static_cast<int>(registry_.windowsByType(UIWindowType::QuestHelper).size());
         bool can_remove = quest_helper_count > 1;
         if (ImGui::MenuItem(i18n::get("common.remove"), nullptr, false, can_remove))
         {

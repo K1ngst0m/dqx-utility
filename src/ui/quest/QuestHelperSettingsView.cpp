@@ -7,6 +7,7 @@
 #include "QuestHelperStateManager.hpp"
 #include "../FontManager.hpp"
 #include "../../config/ConfigManager.hpp"
+#include "../../app/Application.hpp"
 #include "../../translate/ITranslator.hpp"
 #include "../../translate/TranslateSession.hpp"
 
@@ -30,13 +31,7 @@ void QuestHelperSettingsView::render(translate::ITranslator* translator, std::st
 
     if (ImGui::Button(i18n::get("dialog.settings.save_config")))
     {
-        extern bool ConfigManager_SaveAll();
-        bool ok = ConfigManager_SaveAll();
-        if (!ok)
-        {
-            ImGui::SameLine();
-            ImGui::TextColored(UITheme::warningColor(), "%s", i18n::get("dialog.settings.save_config_failed"));
-        }
+        ConfigManager_SaveAll();
     }
     ImGui::Spacing();
 

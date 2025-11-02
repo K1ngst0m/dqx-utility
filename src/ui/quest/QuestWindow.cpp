@@ -486,9 +486,10 @@ bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string
 
 } // namespace
 
-QuestWindow::QuestWindow(FontManager& font_manager, const std::string& name, bool is_default)
+QuestWindow::QuestWindow(FontManager& font_manager, WindowRegistry& registry, const std::string& name, bool is_default)
     : font_manager_(font_manager)
     , name_(name)
+    , registry_(registry)
 {
     static int quest_counter = 0;
     ++quest_counter;
@@ -1060,14 +1061,7 @@ void QuestWindow::renderContextMenu()
     }
 
     bool is_docked = state_.ui_state().is_docked;
-    int quest_count = 0;
-    if (auto* cm = ConfigManager_Get())
-    {
-        if (auto* reg = cm->registry())
-        {
-            quest_count = static_cast<int>(reg->windowsByType(UIWindowType::Quest).size());
-        }
-    }
+    int quest_count = static_cast<int>(registry_.windowsByType(UIWindowType::Quest).size());
 
     if (ImGui::BeginPopup(popup_id.c_str()))
     {

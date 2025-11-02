@@ -21,7 +21,7 @@ class ITranslator;
 class QuestHelperWindow : public UIWindow
 {
 public:
-    QuestHelperWindow(FontManager& font_manager, const std::string& name);
+    QuestHelperWindow(FontManager& font_manager, WindowRegistry& registry, const std::string& name);
     ~QuestHelperWindow() override;
 
     UIWindowType type() const override { return UIWindowType::QuestHelper; }
@@ -144,4 +144,5 @@ private:
     std::size_t last_content_hash_ = 0;
     float last_font_size_ = 0.0f;
     std::size_t visible_step_count_ = 3;
+    WindowRegistry& registry_;
 };

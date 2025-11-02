@@ -1,7 +1,5 @@
 #include "ConfigManager.hpp"
 
-#include "DefaultWindowManager.hpp"
-#include "WindowStateOperations.hpp"
 #include "StateSerializer.hpp"
 #include "WindowStateApplier.hpp"
 #include "../ui/WindowRegistry.hpp"
@@ -41,34 +39,6 @@ inline void safe_strncpy(char* dest, const char* src, size_t dest_size)
 #endif
 }
 
-struct ScopedFlagGuard
-{
-    bool& flag;
-    bool previous;
-    bool active;
-
-    ScopedFlagGuard(bool& target, bool value)
-        : flag(target)
-        , previous(target)
-        , active(true)
-    {
-        flag = value;
-    }
-
-    ~ScopedFlagGuard()
-    {
-        if (active)
-            flag = previous;
-    }
-
-    void restore()
-    {
-        if (!active)
-            return;
-        flag = previous;
-        active = false;
-    }
-};
 } // namespace
 
 static ConfigManager* g_cfg_mgr = nullptr;
@@ -85,7 +55,8 @@ static long long file_mtime_ms(const fs::path& p)
     return std::chrono::duration_cast<std::chrono::milliseconds>(sctp.time_since_epoch()).count();
 }
 
-ConfigManager::ConfigManager()
+ConfigManager::ConfigManager(WindowRegistry& registry)
+    : registry_(registry)
 {
     config_path_ = "config.toml";
     last_mtime_ = file_mtime_ms(config_path_);
@@ -94,119 +65,14 @@ ConfigManager::ConfigManager()
 
 ConfigManager::~ConfigManager() = default;
 
-void ConfigManager::setDefaultDialogEnabled(bool enabled)
-{
-    if (global_state_.defaultDialogEnabled() == enabled)
-        return;
-    
-    global_state_.setDefaultDialogEnabled(enabled);
-    
-    if (default_dialog_mgr_)
-    {
-        default_dialog_mgr_->setEnabled(enabled, suppress_default_window_updates_, registry_);
-        
-        if (!suppress_default_window_updates_ && registry_)
-            saveAll();
-    }
-}
-
-void ConfigManager::setDefaultQuestEnabled(bool enabled)
-{
-    if (global_state_.defaultQuestEnabled() == enabled)
-        return;
-    
-    global_state_.setDefaultQuestEnabled(enabled);
-    
-    if (default_quest_mgr_)
-    {
-        default_quest_mgr_->setEnabled(enabled, suppress_default_window_updates_, registry_);
-        
-        if (!suppress_default_window_updates_ && registry_)
-            saveAll();
-    }
-}
-
-void ConfigManager::setDefaultQuestHelperEnabled(bool enabled)
-{
-    if (global_state_.defaultQuestHelperEnabled() == enabled)
-        return;
-    
-    global_state_.setDefaultQuestHelperEnabled(enabled);
-    
-    if (default_quest_helper_mgr_)
-    {
-        default_quest_helper_mgr_->setEnabled(enabled, suppress_default_window_updates_, registry_);
-        
-        if (!suppress_default_window_updates_ && registry_)
-            saveAll();
-    }
-}
-
-void ConfigManager::reconcileDefaultWindowStates()
-{
-    enforceDefaultWindowStates();
-}
-
-
-
-
-void ConfigManager::enforceDefaultWindowStates()
-{
-    if (default_dialog_mgr_)
-        default_dialog_mgr_->enforceState(registry_);
-    if (default_quest_mgr_)
-        default_quest_mgr_->enforceState(registry_);
-    if (default_quest_helper_mgr_)
-        default_quest_helper_mgr_->enforceState(registry_);
-}
-
-
-void ConfigManager::setRegistry(WindowRegistry* reg)
-{
-    registry_ = reg;
-    
-    if (registry_)
-    {
-        // Initialize window managers with their operations
-        auto dialog_ops = std::make_unique<WindowStateOperations<DialogWindow, DialogStateManager>>(registry_, UIWindowType::Dialog);
-        default_dialog_mgr_ = std::make_unique<DefaultWindowManager>(std::move(dialog_ops), "dialogs");
-        
-        auto quest_ops = std::make_unique<WindowStateOperations<QuestWindow, QuestStateManager>>(registry_, UIWindowType::Quest);
-        default_quest_mgr_ = std::make_unique<DefaultWindowManager>(std::move(quest_ops), "quests");
-        
-        auto quest_helper_ops = std::make_unique<WindowStateOperations<QuestHelperWindow, QuestHelperStateManager>>(registry_, UIWindowType::QuestHelper);
-        default_quest_helper_mgr_ = std::make_unique<DefaultWindowManager>(std::move(quest_helper_ops), "quest_helpers");
-        
-        // Sync enabled states to newly created managers
-        if (default_dialog_mgr_)
-        {
-            default_dialog_mgr_->setEnabled(global_state_.defaultDialogEnabled(), true, registry_);
-        }
-        if (default_quest_mgr_)
-        {
-            default_quest_mgr_->setEnabled(global_state_.defaultQuestEnabled(), true, registry_);
-        }
-        if (default_quest_helper_mgr_)
-        {
-            default_quest_helper_mgr_->setEnabled(global_state_.defaultQuestHelperEnabled(), true, registry_);
-        }
-    }
-}
 
 bool ConfigManager::saveAll()
 {
     last_error_.clear();
-    if (!registry_)
-    {
-        last_error_ = "No registry assigned";
-        utils::ErrorReporter::ReportError(utils::ErrorCategory::Configuration, "Unable to save configuration",
-                                          "Window registry was not available while saving settings.");
-        return false;
-    }
 
     toml::table root = StateSerializer::serializeGlobal(global_state_);
 
-    auto windows = registry_->windowsByType(UIWindowType::Dialog);
+    auto windows = registry_.windowsByType(UIWindowType::Dialog);
     toml::array arr;
     for (auto* w : windows)
     {
@@ -218,7 +84,7 @@ bool ConfigManager::saveAll()
     }
     root.insert("dialogs", std::move(arr));
 
-    auto quest_windows = registry_->windowsByType(UIWindowType::Quest);
+    auto quest_windows = registry_.windowsByType(UIWindowType::Quest);
     toml::array quests_arr;
     for (auto* w : quest_windows)
     {
@@ -232,7 +98,7 @@ bool ConfigManager::saveAll()
         root.insert("quests", std::move(quests_arr));
     }
 
-    auto quest_helper_windows = registry_->windowsByType(UIWindowType::QuestHelper);
+    auto quest_helper_windows = registry_.windowsByType(UIWindowType::QuestHelper);
     toml::array quest_helpers_arr;
     for (auto* w : quest_helper_windows)
     {
@@ -280,7 +146,6 @@ bool ConfigManager::loadAndApply()
     {
         return false; // missing file is not an error
     }
-    ScopedFlagGuard guard(suppress_default_window_updates_, true);
     try
     {
         toml::table root = toml::parse(ifs);
@@ -326,10 +191,6 @@ bool ConfigManager::loadAndApply()
             
             processing::Diagnostics::SetVerbose(level >= 5);
         }
-        
-        setDefaultDialogEnabled(global_state_.defaultDialogEnabled());
-        setDefaultQuestEnabled(global_state_.defaultQuestEnabled());
-        setDefaultQuestHelperEnabled(global_state_.defaultQuestHelperEnabled());
 
         if (auto* arr = root["dialogs"].as_array())
         {
@@ -362,23 +223,23 @@ bool ConfigManager::loadAndApply()
 
             if (!dialog_configs.empty())
             {
-                auto windows = registry_->windowsByType(UIWindowType::Dialog);
+                auto windows = registry_.windowsByType(UIWindowType::Dialog);
                 int have = static_cast<int>(windows.size());
                 int want = static_cast<int>(dialog_configs.size());
 
                 if (want > have)
                 {
                     for (int i = 0; i < want - have; ++i)
-                        registry_->createDialogWindow();
-                    windows = registry_->windowsByType(UIWindowType::Dialog);
+                        registry_.createDialogWindow();
+                    windows = registry_.windowsByType(UIWindowType::Dialog);
                 }
                 else if (want < have)
                 {
                     for (int i = have - 1; i >= want; --i)
                     {
-                        registry_->removeWindow(windows[i]);
+                        registry_.removeWindow(windows[i]);
                     }
-                    windows = registry_->windowsByType(UIWindowType::Dialog);
+                    windows = registry_.windowsByType(UIWindowType::Dialog);
                 }
 
                 int n = std::min(static_cast<int>(windows.size()), want);
@@ -407,7 +268,7 @@ bool ConfigManager::loadAndApply()
                     dw->setDefaultInstance(false);
                     if (global_state_.defaultDialogEnabled() && i == 0)
                     {
-                        registry_->markDialogAsDefault(*dw);
+                        registry_.markDialogAsDefault(*dw);
                     }
                 }
             }
@@ -455,7 +316,7 @@ bool ConfigManager::loadAndApply()
                 return;
             }
 
-            auto quests = registry_->windowsByType(UIWindowType::Quest);
+            auto quests = registry_.windowsByType(UIWindowType::Quest);
             QuestWindow* quest_window = nullptr;
             if (index < quests.size())
             {
@@ -463,7 +324,7 @@ bool ConfigManager::loadAndApply()
             }
             if (!quest_window)
             {
-                quest_window = &registry_->createQuestWindow();
+                quest_window = &registry_.createQuestWindow();
             }
 
             if (quest_window)
@@ -472,7 +333,7 @@ bool ConfigManager::loadAndApply()
                 quest_window->setDefaultInstance(false);
                 if (global_state_.defaultQuestEnabled() && index == 0)
                 {
-                    registry_->markQuestAsDefault(*quest_window);
+                    registry_.markQuestAsDefault(*quest_window);
                 }
             }
         };
@@ -495,22 +356,22 @@ bool ConfigManager::loadAndApply()
         }
         else
         {
-            if (global_state_.defaultQuestEnabled() && registry_->windowsByType(UIWindowType::Quest).empty())
+            if (global_state_.defaultQuestEnabled() && registry_.windowsByType(UIWindowType::Quest).empty())
             {
-                registry_->createQuestWindow(true);
+                registry_.createQuestWindow(true);
             }
         }
 
         auto processQuestHelperTable = [&](const toml::table& tbl, std::size_t index) {
             QuestHelperWindow* qh_window = nullptr;
-            auto existing_quest_helpers = registry_->windowsByType(UIWindowType::QuestHelper);
+            auto existing_quest_helpers = registry_.windowsByType(UIWindowType::QuestHelper);
             if (index < existing_quest_helpers.size())
             {
                 qh_window = dynamic_cast<QuestHelperWindow*>(existing_quest_helpers[index]);
             }
             if (!qh_window)
             {
-                qh_window = &registry_->createQuestHelperWindow(false);
+                qh_window = &registry_.createQuestHelperWindow(false);
             }
             std::string name;
             QuestHelperStateManager quest_helper_state;
@@ -521,7 +382,7 @@ bool ConfigManager::loadAndApply()
                 qh_window->setDefaultInstance(false);
                 if (global_state_.defaultQuestHelperEnabled() && index == 0)
                 {
-                    registry_->markQuestHelperAsDefault(*qh_window);
+                    registry_.markQuestHelperAsDefault(*qh_window);
                 }
             }
         };
@@ -540,14 +401,12 @@ bool ConfigManager::loadAndApply()
         }
         else
         {
-            if (global_state_.defaultQuestHelperEnabled() && registry_->windowsByType(UIWindowType::QuestHelper).empty())
+            if (global_state_.defaultQuestHelperEnabled() && registry_.windowsByType(UIWindowType::QuestHelper).empty())
             {
-                registry_->createQuestHelperWindow(true);
+                registry_.createQuestHelperWindow(true);
             }
         }
 
-        guard.restore();
-        enforceDefaultWindowStates();
         return true;
     }
     catch (const toml::parse_error& pe)
@@ -583,7 +442,6 @@ void ConfigManager::pollAndApply()
     if (mtime == 0 || mtime == last_mtime_)
         return;
 
-    // Hot-reload: reapply config if file changed externally
     if (loadAndApply())
     {
         last_mtime_ = mtime;
@@ -597,14 +455,15 @@ void ConfigManager::pollAndApply()
     }
 }
 
-
 ConfigManager* ConfigManager_Get() { return g_cfg_mgr; }
 
 void ConfigManager_Set(ConfigManager* mgr) { g_cfg_mgr = mgr; }
 
 bool ConfigManager_SaveAll()
 {
-    if (g_cfg_mgr)
-        return g_cfg_mgr->saveAll();
+    if (auto* cm = ConfigManager_Get())
+    {
+        return cm->saveAll();
+    }
     return false;
 }
