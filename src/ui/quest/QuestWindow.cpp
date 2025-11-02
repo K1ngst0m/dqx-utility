@@ -683,7 +683,7 @@ void QuestWindow::render()
             ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
             ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
         }
-        else if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        else if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
         {
             ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
         }
@@ -700,7 +700,7 @@ void QuestWindow::render()
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
     if (auto* cm = ConfigManager_Get())
     {
-        if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
         {
             flags |= ImGuiWindowFlags_NoMove;
         }
@@ -1117,16 +1117,17 @@ void QuestWindow::renderContextMenu()
             {
                 if (auto* cm = ConfigManager_Get())
                 {
-                    auto mode = cm->getAppMode();
-                    bool sel_normal = (mode == ConfigManager::AppMode::Normal);
-                    bool sel_borderless = (mode == ConfigManager::AppMode::Borderless);
-                    bool sel_mini = (mode == ConfigManager::AppMode::Mini);
+                    auto& gs = cm->globalState();
+                    auto mode = gs.appMode();
+                    bool sel_normal = (mode == GlobalStateManager::AppMode::Normal);
+                    bool sel_borderless = (mode == GlobalStateManager::AppMode::Borderless);
+                    bool sel_mini = (mode == GlobalStateManager::AppMode::Mini);
                     if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal))
-                        cm->setAppMode(ConfigManager::AppMode::Normal);
+                        gs.setAppMode(GlobalStateManager::AppMode::Normal);
                     if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless))
-                        cm->setAppMode(ConfigManager::AppMode::Borderless);
+                        gs.setAppMode(GlobalStateManager::AppMode::Borderless);
                     if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, sel_mini))
-                        cm->setAppMode(ConfigManager::AppMode::Mini);
+                        gs.setAppMode(GlobalStateManager::AppMode::Mini);
                 }
                 ImGui::EndMenu();
             }

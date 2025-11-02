@@ -14,24 +14,24 @@ AppModeManager::AppModeManager(AppContext& app_context, WindowRegistry& registry
 {
 }
 
-void AppModeManager::ApplyModeSettings(ConfigManager::AppMode mode)
+void AppModeManager::ApplyModeSettings(GlobalStateManager::AppMode mode)
 {
     switch (mode)
     {
-    case ConfigManager::AppMode::Mini:
+    case GlobalStateManager::AppMode::Mini:
         app_context_.setWindowBorderless(true);
         app_context_.setWindowAlwaysOnTop(true);
         app_context_.restoreWindow();
         app_context_.setWindowSize(600, 800);
         break;
 
-    case ConfigManager::AppMode::Borderless:
+    case GlobalStateManager::AppMode::Borderless:
         app_context_.setWindowBorderless(true);
         app_context_.setWindowAlwaysOnTop(false);
         app_context_.maximizeWindow();
         break;
 
-    case ConfigManager::AppMode::Normal:
+    case GlobalStateManager::AppMode::Normal:
         app_context_.setWindowBorderless(false);
         app_context_.setWindowAlwaysOnTop(true);
         app_context_.restoreWindow();
@@ -40,11 +40,11 @@ void AppModeManager::ApplyModeSettings(ConfigManager::AppMode mode)
     }
 }
 
-void AppModeManager::HandleModeChange(ConfigManager::AppMode old_mode, ConfigManager::AppMode new_mode)
+void AppModeManager::HandleModeChange(GlobalStateManager::AppMode old_mode, GlobalStateManager::AppMode new_mode)
 {
     ApplyModeSettings(new_mode);
 
-    if (old_mode == ConfigManager::AppMode::Mini && new_mode != ConfigManager::AppMode::Mini)
+    if (old_mode == GlobalStateManager::AppMode::Mini && new_mode != GlobalStateManager::AppMode::Mini)
     {
         mini_manager_.RestoreDialogsFromMiniMode();
     }

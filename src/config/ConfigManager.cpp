@@ -89,22 +89,17 @@ ConfigManager::ConfigManager()
 {
     config_path_ = "config.toml";
     last_mtime_ = file_mtime_ms(config_path_);
-    global_translation_config_.applyDefaults();
-    
-    // Initialize window managers (will be configured when registry is set)
-    // Note: These are initialized without operations yet - will be set in setRegistry()
-    
-    // Logging level will be applied when config is loaded via setLoggingLevel()
+    global_state_.applyDefaults();
 }
 
 ConfigManager::~ConfigManager() = default;
 
 void ConfigManager::setDefaultDialogEnabled(bool enabled)
 {
-    if (default_dialog_enabled_ == enabled)
+    if (global_state_.defaultDialogEnabled() == enabled)
         return;
     
-    default_dialog_enabled_ = enabled;
+    global_state_.setDefaultDialogEnabled(enabled);
     
     if (default_dialog_mgr_)
     {
@@ -117,10 +112,10 @@ void ConfigManager::setDefaultDialogEnabled(bool enabled)
 
 void ConfigManager::setDefaultQuestEnabled(bool enabled)
 {
-    if (default_quest_enabled_ == enabled)
+    if (global_state_.defaultQuestEnabled() == enabled)
         return;
     
-    default_quest_enabled_ = enabled;
+    global_state_.setDefaultQuestEnabled(enabled);
     
     if (default_quest_mgr_)
     {
@@ -133,10 +128,10 @@ void ConfigManager::setDefaultQuestEnabled(bool enabled)
 
 void ConfigManager::setDefaultQuestHelperEnabled(bool enabled)
 {
-    if (default_quest_helper_enabled_ == enabled)
+    if (global_state_.defaultQuestHelperEnabled() == enabled)
         return;
     
-    default_quest_helper_enabled_ = enabled;
+    global_state_.setDefaultQuestHelperEnabled(enabled);
     
     if (default_quest_helper_mgr_)
     {
@@ -165,22 +160,6 @@ void ConfigManager::enforceDefaultWindowStates()
         default_quest_helper_mgr_->enforceState(registry_);
 }
 
-void ConfigManager::setUIScale(float scale)
-{
-    if (scale <= 0.1f)
-        scale = 0.1f;
-    if (scale > 3.0f)
-        scale = 3.0f;
-    if (!base_.valid)
-    {
-        base_.style = ImGui::GetStyle();
-        base_.valid = true;
-    }
-    ui_scale_ = scale;
-    ImGui::GetStyle() = base_.style;
-    ImGui::GetStyle().ScaleAllSizes(ui_scale_);
-    ImGui::GetIO().FontGlobalScale = ui_scale_;
-}
 
 void ConfigManager::setRegistry(WindowRegistry* reg)
 {
@@ -201,15 +180,15 @@ void ConfigManager::setRegistry(WindowRegistry* reg)
         // Sync enabled states to newly created managers
         if (default_dialog_mgr_)
         {
-            default_dialog_mgr_->setEnabled(default_dialog_enabled_, true, registry_);
+            default_dialog_mgr_->setEnabled(global_state_.defaultDialogEnabled(), true, registry_);
         }
         if (default_quest_mgr_)
         {
-            default_quest_mgr_->setEnabled(default_quest_enabled_, true, registry_);
+            default_quest_mgr_->setEnabled(global_state_.defaultQuestEnabled(), true, registry_);
         }
         if (default_quest_helper_mgr_)
         {
-            default_quest_helper_mgr_->setEnabled(default_quest_helper_enabled_, true, registry_);
+            default_quest_helper_mgr_->setEnabled(global_state_.defaultQuestHelperEnabled(), true, registry_);
         }
     }
 }
@@ -225,84 +204,7 @@ bool ConfigManager::saveAll()
         return false;
     }
 
-    toml::table root;
-    toml::table global;
-    global.insert("ui_scale", ui_scale_);
-    global.insert("append_logs", append_logs_);
-    global.insert("borderless_windows", borderless_windows_);
-    global.insert("app_mode", static_cast<int>(app_mode_));
-    global.insert("window_always_on_top", window_always_on_top_);
-    global.insert("ui_language", ui_language_);
-    global.insert("default_dialog_enabled", default_dialog_enabled_);
-    global.insert("default_quest_enabled", default_quest_enabled_);
-    global.insert("default_quest_helper_enabled", default_quest_helper_enabled_);
-
-    toml::table translation;
-    translation.insert("translate_enabled", global_translation_config_.translate_enabled);
-    translation.insert("auto_apply_changes", global_translation_config_.auto_apply_changes);
-    translation.insert("include_dialog_stream", global_translation_config_.include_dialog_stream);
-    translation.insert("include_corner_stream", global_translation_config_.include_corner_stream);
-    translation.insert("translation_backend", static_cast<int>(global_translation_config_.translation_backend));
-    std::string global_target_lang;
-    switch (global_translation_config_.target_lang_enum)
-    {
-    case TranslationConfig::TargetLang::EN_US:
-        global_target_lang = "en-us";
-        break;
-    case TranslationConfig::TargetLang::ZH_CN:
-        global_target_lang = "zh-cn";
-        break;
-    case TranslationConfig::TargetLang::ZH_TW:
-        global_target_lang = "zh-tw";
-        break;
-    }
-    translation.insert("target_lang", global_target_lang);
-    translation.insert("custom_prompt", std::string(global_translation_config_.custom_prompt.data()));
-
-    toml::table openai;
-    openai.insert("api_key", std::string(global_translation_config_.openai_api_key.data()));
-    openai.insert("base_url", std::string(global_translation_config_.openai_base_url.data()));
-    openai.insert("model", std::string(global_translation_config_.openai_model.data()));
-    translation.insert("openai", std::move(openai));
-
-    toml::table google;
-    google.insert("api_key", std::string(global_translation_config_.google_api_key.data()));
-    translation.insert("google", std::move(google));
-
-    toml::table qwen;
-    qwen.insert("api_key", std::string(global_translation_config_.qwen_api_key.data()));
-    qwen.insert("model", std::string(global_translation_config_.qwen_model.data()));
-    translation.insert("qwen", std::move(qwen));
-
-    toml::table niutrans;
-    niutrans.insert("api_key", std::string(global_translation_config_.niutrans_api_key.data()));
-    translation.insert("niutrans", std::move(niutrans));
-
-    toml::table zhipu;
-    zhipu.insert("api_key", std::string(global_translation_config_.zhipu_api_key.data()));
-    zhipu.insert("base_url", std::string(global_translation_config_.zhipu_base_url.data()));
-    zhipu.insert("model", std::string(global_translation_config_.zhipu_model.data()));
-    translation.insert("zhipu", std::move(zhipu));
-
-    toml::table youdao;
-    youdao.insert("app_key", std::string(global_translation_config_.youdao_app_key.data()));
-    youdao.insert("app_secret", std::string(global_translation_config_.youdao_app_secret.data()));
-    youdao.insert("mode", static_cast<int>(global_translation_config_.youdao_mode));
-    translation.insert("youdao", std::move(youdao));
-    global.insert("translation", std::move(translation));
-
-    root.insert("global", std::move(global));
-
-    // [app.debug] section
-    toml::table app;
-    toml::table debug;
-    debug.insert("profiling_level", profiling_level_);
-    debug.insert("logging_level", logging_level_);
-    debug.insert("verbose", verbose_);
-    debug.insert("compatibility_mode", compatibility_mode_);
-    debug.insert("hook_wait_timeout_ms", hook_wait_timeout_ms_);
-    app.insert("debug", std::move(debug));
-    root.insert("app", std::move(app));
+    toml::table root = StateSerializer::serializeGlobal(global_state_);
 
     auto windows = registry_->windowsByType(UIWindowType::Dialog);
     toml::array arr;
@@ -382,186 +284,52 @@ bool ConfigManager::loadAndApply()
     try
     {
         toml::table root = toml::parse(ifs);
-        // global
-        if (auto* g = root["global"].as_table())
+        
+        // Deserialize global state
+        StateSerializer::deserializeGlobal(root, global_state_);
+        
+        // Apply side effects for settings that need special handling
+        global_state_.applyUIScale(global_state_.uiScale());
+        
+        // Apply profiling level with logger side effects
         {
-            if (auto v = (*g)["ui_scale"].value<float>())
-                setUIScale(*v);
-            if (auto v = (*g)["append_logs"].value<bool>())
-                append_logs_ = *v;
-            if (auto v = (*g)["borderless_windows"].value<bool>())
-                borderless_windows_ = *v;
-            if (auto v = (*g)["app_mode"].value<int>())
-                app_mode_ = static_cast<AppMode>(*v);
-            if (auto v = (*g)["window_always_on_top"].value<bool>())
-                window_always_on_top_ = *v;
-            if (auto v = (*g)["ui_language"].value<std::string>())
-                ui_language_ = *v;
-            if (auto v = (*g)["default_dialog_enabled"].value<bool>())
-                setDefaultDialogEnabled(*v);
-            if (auto v = (*g)["default_quest_enabled"].value<bool>())
-                setDefaultQuestEnabled(*v);
-            if (auto v = (*g)["default_quest_helper_enabled"].value<bool>())
-                setDefaultQuestHelperEnabled(*v);
-
-            global_translation_config_.applyDefaults();
-            if (global_translation_config_.custom_prompt[0] == '\0')
+            int level = global_state_.profilingLevel();
+#if DQX_PROFILING_LEVEL >= 1
+            if (auto* prof_logger = plog::get<profiling::kProfilingLogInstance>())
             {
-                safe_strncpy(global_translation_config_.custom_prompt.data(),
-                             i18n::get("dialog.settings.default_prompt"),
-                             global_translation_config_.custom_prompt.size());
-            }
-            if (auto* trans = (*g)["translation"].as_table())
-            {
-                if (auto v = (*trans)["translate_enabled"].value<bool>())
-                    global_translation_config_.translate_enabled = *v;
-                if (auto v = (*trans)["auto_apply_changes"].value<bool>())
-                    global_translation_config_.auto_apply_changes = *v;
-                if (auto v = (*trans)["include_dialog_stream"].value<bool>())
-                    global_translation_config_.include_dialog_stream = *v;
-                if (auto v = (*trans)["include_corner_stream"].value<bool>())
-                    global_translation_config_.include_corner_stream = *v;
-                if (auto v = (*trans)["translation_backend"].value<int>())
-                    global_translation_config_.translation_backend =
-                        static_cast<TranslationConfig::TranslationBackend>(*v);
-                if (auto v = (*trans)["target_lang"].value<std::string>())
+                if (level == 0)
                 {
-                    if (*v == "en-us")
-                        global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::EN_US;
-                    else if (*v == "zh-cn")
-                        global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
-                    else if (*v == "zh-tw")
-                        global_translation_config_.target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
+                    prof_logger->setMaxSeverity(plog::none);
                 }
-                if (auto v = (*trans)["custom_prompt"].value<std::string>())
-                    safe_strncpy(global_translation_config_.custom_prompt.data(), v->c_str(),
-                                 global_translation_config_.custom_prompt.size());
-                if (auto* openai_tbl = (*trans)["openai"].as_table())
+                else
                 {
-                    if (auto v = (*openai_tbl)["base_url"].value<std::string>())
-                        safe_strncpy(global_translation_config_.openai_base_url.data(), v->c_str(),
-                                     global_translation_config_.openai_base_url.size());
-                    if (auto v = (*openai_tbl)["model"].value<std::string>())
-                        safe_strncpy(global_translation_config_.openai_model.data(), v->c_str(),
-                                     global_translation_config_.openai_model.size());
-                    if (auto v = (*openai_tbl)["api_key"].value<std::string>())
-                        safe_strncpy(global_translation_config_.openai_api_key.data(), v->c_str(),
-                                     global_translation_config_.openai_api_key.size());
-                }
-                if (auto* google_tbl = (*trans)["google"].as_table())
-                {
-                    if (auto v = (*google_tbl)["api_key"].value<std::string>())
-                        safe_strncpy(global_translation_config_.google_api_key.data(), v->c_str(),
-                                     global_translation_config_.google_api_key.size());
-                }
-                if (auto* qwen_tbl = (*trans)["qwen"].as_table())
-                {
-                    if (auto v = (*qwen_tbl)["api_key"].value<std::string>())
-                        safe_strncpy(global_translation_config_.qwen_api_key.data(), v->c_str(),
-                                     global_translation_config_.qwen_api_key.size());
-                    if (auto v = (*qwen_tbl)["model"].value<std::string>())
-                        safe_strncpy(global_translation_config_.qwen_model.data(), v->c_str(),
-                                     global_translation_config_.qwen_model.size());
-                }
-                if (auto* niutrans_tbl = (*trans)["niutrans"].as_table())
-                {
-                    if (auto v = (*niutrans_tbl)["api_key"].value<std::string>())
-                        safe_strncpy(global_translation_config_.niutrans_api_key.data(), v->c_str(),
-                                     global_translation_config_.niutrans_api_key.size());
-                }
-                if (auto* zhipu_tbl = (*trans)["zhipu"].as_table())
-                {
-                    if (auto v = (*zhipu_tbl)["base_url"].value<std::string>())
-                        safe_strncpy(global_translation_config_.zhipu_base_url.data(), v->c_str(),
-                                     global_translation_config_.zhipu_base_url.size());
-                    if (auto v = (*zhipu_tbl)["model"].value<std::string>())
-                        safe_strncpy(global_translation_config_.zhipu_model.data(), v->c_str(),
-                                     global_translation_config_.zhipu_model.size());
-                    if (auto v = (*zhipu_tbl)["api_key"].value<std::string>())
-                        safe_strncpy(global_translation_config_.zhipu_api_key.data(), v->c_str(),
-                                     global_translation_config_.zhipu_api_key.size());
-                }
-                if (auto* youdao_tbl = (*trans)["youdao"].as_table())
-                {
-                    if (auto v = (*youdao_tbl)["app_key"].value<std::string>())
-                        safe_strncpy(global_translation_config_.youdao_app_key.data(), v->c_str(),
-                                     global_translation_config_.youdao_app_key.size());
-                    if (auto v = (*youdao_tbl)["app_secret"].value<std::string>())
-                        safe_strncpy(global_translation_config_.youdao_app_secret.data(), v->c_str(),
-                                     global_translation_config_.youdao_app_secret.size());
-                    if (auto v = (*youdao_tbl)["mode"].value<int>())
-                    {
-                        if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
-                            global_translation_config_.youdao_mode = TranslationConfig::YoudaoMode::LargeModel;
-                        else
-                            global_translation_config_.youdao_mode = TranslationConfig::YoudaoMode::Text;
-                    }
-                }
-
-                if (auto v = (*trans)["custom_prompt"].value<std::string>())
-                    safe_strncpy(global_translation_config_.custom_prompt.data(), v->c_str(),
-                                 global_translation_config_.custom_prompt.size());
-                if (auto v = (*trans)["openai_base_url"].value<std::string>())
-                    safe_strncpy(global_translation_config_.openai_base_url.data(), v->c_str(),
-                                 global_translation_config_.openai_base_url.size());
-                if (auto v = (*trans)["openai_model"].value<std::string>())
-                    safe_strncpy(global_translation_config_.openai_model.data(), v->c_str(),
-                                 global_translation_config_.openai_model.size());
-                if (auto v = (*trans)["openai_api_key"].value<std::string>())
-                    safe_strncpy(global_translation_config_.openai_api_key.data(), v->c_str(),
-                                 global_translation_config_.openai_api_key.size());
-                if (auto v = (*trans)["google_api_key"].value<std::string>())
-                    safe_strncpy(global_translation_config_.google_api_key.data(), v->c_str(),
-                                 global_translation_config_.google_api_key.size());
-                if (auto v = (*trans)["qwen_api_key"].value<std::string>())
-                    safe_strncpy(global_translation_config_.qwen_api_key.data(), v->c_str(),
-                                 global_translation_config_.qwen_api_key.size());
-                if (auto v = (*trans)["qwen_model"].value<std::string>())
-                    safe_strncpy(global_translation_config_.qwen_model.data(), v->c_str(),
-                                 global_translation_config_.qwen_model.size());
-                if (auto v = (*trans)["niutrans_api_key"].value<std::string>())
-                    safe_strncpy(global_translation_config_.niutrans_api_key.data(), v->c_str(),
-                                 global_translation_config_.niutrans_api_key.size());
-                if (auto v = (*trans)["zhipu_base_url"].value<std::string>())
-                    safe_strncpy(global_translation_config_.zhipu_base_url.data(), v->c_str(),
-                                 global_translation_config_.zhipu_base_url.size());
-                if (auto v = (*trans)["zhipu_model"].value<std::string>())
-                    safe_strncpy(global_translation_config_.zhipu_model.data(), v->c_str(),
-                                 global_translation_config_.zhipu_model.size());
-                if (auto v = (*trans)["zhipu_api_key"].value<std::string>())
-                    safe_strncpy(global_translation_config_.zhipu_api_key.data(), v->c_str(),
-                                 global_translation_config_.zhipu_api_key.size());
-                if (auto v = (*trans)["youdao_app_key"].value<std::string>())
-                    safe_strncpy(global_translation_config_.youdao_app_key.data(), v->c_str(),
-                                 global_translation_config_.youdao_app_key.size());
-                if (auto v = (*trans)["youdao_app_secret"].value<std::string>())
-                    safe_strncpy(global_translation_config_.youdao_app_secret.data(), v->c_str(),
-                                 global_translation_config_.youdao_app_secret.size());
-                if (auto v = (*trans)["youdao_mode"].value<int>())
-                {
-                    if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
-                        global_translation_config_.youdao_mode = TranslationConfig::YoudaoMode::LargeModel;
-                    else
-                        global_translation_config_.youdao_mode = TranslationConfig::YoudaoMode::Text;
+                    prof_logger->setMaxSeverity(plog::debug);
                 }
             }
-            markGlobalTranslationDirty();
+#endif
         }
-
-        // Parse [app.debug] section
-        if (auto* dbg = root["app"]["debug"].as_table())
+        
+        // Apply logging level with plog side effects
         {
-            if (auto v = (*dbg)["profiling_level"].value<int>())
-                setProfilingLevel(*v);
-            if (auto v = (*dbg)["logging_level"].value<int>())
-                setLoggingLevel(*v);
-            if (auto v = (*dbg)["verbose"].value<bool>())
-                setVerbose(*v);
-            if (auto v = (*dbg)["compatibility_mode"].value<bool>())
-                setCompatibilityMode(*v);
-            if (auto v = (*dbg)["hook_wait_timeout_ms"].value<int>())
-                setHookWaitTimeoutMs(*v);
+            int level = global_state_.loggingLevel();
+            auto severity = static_cast<plog::Severity>(level);
+            
+            if (auto* logger = plog::get())
+            {
+                logger->setMaxSeverity(severity);
+            }
+            
+            if (auto* diag_logger = plog::get<processing::Diagnostics::kLogInstance>())
+            {
+                diag_logger->setMaxSeverity(severity);
+            }
+            
+            processing::Diagnostics::SetVerbose(level >= 5);
         }
+        
+        setDefaultDialogEnabled(global_state_.defaultDialogEnabled());
+        setDefaultQuestEnabled(global_state_.defaultQuestEnabled());
+        setDefaultQuestHelperEnabled(global_state_.defaultQuestHelperEnabled());
 
         if (auto* arr = root["dialogs"].as_array())
         {
@@ -637,7 +405,7 @@ bool ConfigManager::loadAndApply()
                     dw->initTranslatorIfEnabled();
 
                     dw->setDefaultInstance(false);
-                    if (default_dialog_enabled_ && i == 0)
+                    if (global_state_.defaultDialogEnabled() && i == 0)
                     {
                         registry_->markDialogAsDefault(*dw);
                     }
@@ -702,7 +470,7 @@ bool ConfigManager::loadAndApply()
             {
                 applyQuestConfig(*quest_window, quest_state, quest_name);
                 quest_window->setDefaultInstance(false);
-                if (default_quest_enabled_ && index == 0)
+                if (global_state_.defaultQuestEnabled() && index == 0)
                 {
                     registry_->markQuestAsDefault(*quest_window);
                 }
@@ -727,7 +495,7 @@ bool ConfigManager::loadAndApply()
         }
         else
         {
-            if (default_quest_enabled_ && registry_->windowsByType(UIWindowType::Quest).empty())
+            if (global_state_.defaultQuestEnabled() && registry_->windowsByType(UIWindowType::Quest).empty())
             {
                 registry_->createQuestWindow(true);
             }
@@ -751,7 +519,7 @@ bool ConfigManager::loadAndApply()
                 qh_window->rename(name.c_str());
                 WindowStateApplier::apply(*qh_window, quest_helper_state);
                 qh_window->setDefaultInstance(false);
-                if (default_quest_helper_enabled_ && index == 0)
+                if (global_state_.defaultQuestHelperEnabled() && index == 0)
                 {
                     registry_->markQuestHelperAsDefault(*qh_window);
                 }
@@ -772,7 +540,7 @@ bool ConfigManager::loadAndApply()
         }
         else
         {
-            if (default_quest_helper_enabled_ && registry_->windowsByType(UIWindowType::QuestHelper).empty())
+            if (global_state_.defaultQuestHelperEnabled() && registry_->windowsByType(UIWindowType::QuestHelper).empty())
             {
                 registry_->createQuestHelperWindow(true);
             }
@@ -829,72 +597,6 @@ void ConfigManager::pollAndApply()
     }
 }
 
-void ConfigManager::setProfilingLevel(int level)
-{
-    // Clamp to valid range [0, 2]
-    level = std::max(0, std::min(2, level));
-
-    // Cap at build-time profiling level
-#ifndef DQX_PROFILING_LEVEL
-#define DQX_PROFILING_LEVEL 0
-#endif
-    profiling_level_ = std::min(level, DQX_PROFILING_LEVEL);
-
-    // Update profiling logger (instance 2) severity based on profiling level
-#if DQX_PROFILING_LEVEL >= 1
-    if (auto* prof_logger = plog::get<profiling::kProfilingLogInstance>())
-    {
-        if (profiling_level_ == 0)
-        {
-            // Disable profiling logs completely
-            prof_logger->setMaxSeverity(plog::none);
-        }
-        else
-        {
-            // Enable profiling logs (level 1=timer, level 2=tracy+timer both use debug severity)
-            prof_logger->setMaxSeverity(plog::debug);
-        }
-    }
-#endif
-
-    // Note: Runtime profiling level control is limited by compile-time DQX_PROFILING_LEVEL
-    // When DQX_PROFILING_LEVEL=0, profiling macros compile to no-ops regardless of runtime setting
-}
-
-void ConfigManager::setLoggingLevel(int level)
-{
-    // Validate severity range [0=none, 6=verbose]
-    level = std::max(0, std::min(6, level));
-    logging_level_ = level;
-
-    auto severity = static_cast<plog::Severity>(level);
-
-    // Apply logging level to all plog instances
-    if (auto* logger = plog::get())
-    {
-        logger->setMaxSeverity(severity); // Instance 0: main logger (logs/run.log)
-    }
-
-    if (auto* diag_logger = plog::get<processing::Diagnostics::kLogInstance>())
-    {
-        diag_logger->setMaxSeverity(severity); // Instance 1: diagnostics logger (logs/dialog.log)
-    }
-
-    // Note: Profiling logger (instance 2) severity is controlled by profiling_level, not logging_level
-    // See setProfilingLevel() for profiling logger control
-
-    // Also update Diagnostics verbose mode (use debug or verbose level)
-    processing::Diagnostics::SetVerbose(level >= 5); // 5=debug, 6=verbose
-}
-
-void ConfigManager::markGlobalTranslationDirty()
-{
-    ++global_translation_version_;
-    if (global_translation_version_ == 0)
-    {
-        ++global_translation_version_;
-    }
-}
 
 ConfigManager* ConfigManager_Get() { return g_cfg_mgr; }
 

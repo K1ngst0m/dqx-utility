@@ -49,6 +49,8 @@ target_sources(dqxu_core
     ui/FontManager.hpp
     ui/GlobalSettingsPanel.cpp
     ui/GlobalSettingsPanel.hpp
+    ui/GlobalStateManager.cpp
+    ui/GlobalStateManager.hpp
     ui/Localization.cpp
     ui/Localization.hpp
     ui/MiniModeManager.cpp

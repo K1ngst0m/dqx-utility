@@ -5,7 +5,7 @@
 #include <memory>
 #include <toml++/toml.h>
 
-class BaseWindowState;
+struct BaseWindowState;
 class UIWindow;
 class WindowRegistry;
 enum class UIWindowType;

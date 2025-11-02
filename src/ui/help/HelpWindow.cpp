@@ -283,7 +283,7 @@ void HelpWindow::render()
             ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
             ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
         }
-        else if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        else if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
         {
             ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
         }
@@ -309,7 +309,7 @@ void HelpWindow::render()
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
     if (auto* cm = ConfigManager_Get())
     {
-        if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
         {
             flags |= ImGuiWindowFlags_NoMove;
         }

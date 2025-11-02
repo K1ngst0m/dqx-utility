@@ -262,9 +262,10 @@ void Application::initializeConfig()
         dqxc->lateInitialize();
     }
 
-    i18n::init(config_->getUILanguageCode());
+    auto& gs = config_->globalState();
+    i18n::init(gs.uiLanguage().c_str());
 
-    last_window_topmost_ = config_->getWindowAlwaysOnTop();
+    last_window_topmost_ = gs.windowAlwaysOnTop();
     context_->setWindowAlwaysOnTop(last_window_topmost_);
 
     config_->reconcileDefaultWindowStates();
@@ -272,9 +273,9 @@ void Application::initializeConfig()
     if (registry_->windowsByType(UIWindowType::Help).empty())
         registry_->createHelpWindow();
 
-    config_->setAppMode(ConfigManager::AppMode::Normal);
-    mode_manager_->ApplyModeSettings(ConfigManager::AppMode::Normal);
-    mode_manager_->SetCurrentMode(ConfigManager::AppMode::Normal);
+    gs.setAppMode(GlobalStateManager::AppMode::Normal);
+    mode_manager_->ApplyModeSettings(GlobalStateManager::AppMode::Normal);
+    mode_manager_->SetCurrentMode(GlobalStateManager::AppMode::Normal);
 
     if (updater_service_)
     {
@@ -324,13 +325,14 @@ void Application::mainLoop()
 
 void Application::handleModeChanges()
 {
-    auto current_mode = config_->getAppMode();
+    auto& gs = config_->globalState();
+    auto current_mode = gs.appMode();
     if (current_mode != mode_manager_->GetCurrentMode())
     {
         mode_manager_->HandleModeChange(mode_manager_->GetCurrentMode(), current_mode);
     }
 
-    bool desired_topmost = config_->getWindowAlwaysOnTop();
+    bool desired_topmost = gs.windowAlwaysOnTop();
     if (desired_topmost != last_window_topmost_)
     {
         context_->setWindowAlwaysOnTop(desired_topmost);
@@ -448,10 +450,10 @@ void Application::processEvents()
 
 void Application::setupMiniModeDockspace()
 {
-    auto current_mode = config_->getAppMode();
+    auto current_mode = config_->globalState().appMode();
     ImGuiID dockspace_id = 0;
 
-    if (current_mode == ConfigManager::AppMode::Mini)
+    if (current_mode == GlobalStateManager::AppMode::Mini)
     {
         dockspace_id = mini_manager_->SetupDockspace();
         DockState::SetDockspace(dockspace_id);

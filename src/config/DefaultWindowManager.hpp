@@ -7,7 +7,7 @@
 
 #include "WindowStateOperations.hpp"
 
-class BaseWindowState;
+struct BaseWindowState;
 class WindowRegistry;
 
 // Manages the default window state for a specific window type

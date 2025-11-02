@@ -125,16 +125,17 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
         {
             if (auto* cm = ConfigManager_Get())
             {
-                auto mode = cm->getAppMode();
+                auto& gs = cm->globalState();
+                auto mode = gs.appMode();
                 if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr,
-                                    mode == ConfigManager::AppMode::Normal))
-                    cm->setAppMode(ConfigManager::AppMode::Normal);
+                                    mode == GlobalStateManager::AppMode::Normal))
+                    gs.setAppMode(GlobalStateManager::AppMode::Normal);
                 if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr,
-                                    mode == ConfigManager::AppMode::Borderless))
-                    cm->setAppMode(ConfigManager::AppMode::Borderless);
+                                    mode == GlobalStateManager::AppMode::Borderless))
+                    gs.setAppMode(GlobalStateManager::AppMode::Borderless);
                 // Temporarily disable Mini mode due to unresolved issues
-                // if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, mode == ConfigManager::AppMode::Mini))
-                //     cm->setAppMode(ConfigManager::AppMode::Mini);
+                // if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, mode == GlobalStateManager::AppMode::Mini))
+                //     gs.setAppMode(GlobalStateManager::AppMode::Mini);
             }
             ImGui::EndMenu();
         }

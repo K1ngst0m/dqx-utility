@@ -155,7 +155,7 @@ void GlobalSettingsPanel::render(bool& open)
     }
     else if (auto* cm = ConfigManager_Get())
     {
-        if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
         {
             ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
         }
@@ -163,7 +163,7 @@ void GlobalSettingsPanel::render(bool& open)
 
     if (auto* cm = ConfigManager_Get())
     {
-        if (cm->getAppMode() != ConfigManager::AppMode::Mini && DockState::ShouldReDock())
+        if (cm->globalState().appMode() != GlobalStateManager::AppMode::Mini && DockState::ShouldReDock())
         {
             ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImVec2(800.0f, 400.0f), ImGuiCond_Always);
@@ -184,7 +184,7 @@ void GlobalSettingsPanel::render(bool& open)
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
     if (auto* cm2 = ConfigManager_Get())
     {
-        if (cm2->getAppMode() == ConfigManager::AppMode::Mini)
+        if (cm2->globalState().appMode() == GlobalStateManager::AppMode::Mini)
             flags |= ImGuiWindowFlags_NoMove;
     }
     if (ImGui::Begin((std::string(i18n::get("settings.title")) + "###global_settings").c_str(), &open, flags))
@@ -426,7 +426,7 @@ void GlobalSettingsPanel::renderDQXClaritySection()
     }
 
     // Display concise status only
-    ImGui::TextColored(status_color, "●");
+    ImGui::TextColored(status_color, "â—");
     ImGui::SameLine();
     ImGui::TextUnformatted(i18n::get("settings.dqxc.status_label"));
     ImGui::SameLine();
@@ -438,11 +438,11 @@ void GlobalSettingsPanel::renderDQXClaritySection()
     auto* config_mgr = ConfigManager_Get();
     if (config_mgr)
     {
-        bool compat_mode = config_mgr->getCompatibilityMode();
+        bool compat_mode = config_mgr->globalState().compatibilityMode();
 
         if (ImGui::Checkbox(i18n::get("settings.dqxc.compatibility_mode"), &compat_mode))
         {
-            config_mgr->setCompatibilityMode(compat_mode);
+            config_mgr->globalState().setCompatibilityMode(compat_mode);
             ConfigManager_SaveAll();
 
             // Reinitialize engine with new compatibility mode setting
@@ -721,7 +721,7 @@ void GlobalSettingsPanel::renderStatusSection()
             dqx_running ? i18n::get("settings.status.running") : i18n::get("settings.status.not_running");
 
         // DQX Game Status
-        ImGui::TextColored(game_status_color, "●");
+        ImGui::TextColored(game_status_color, "â—");
         ImGui::SameLine();
         ImGui::TextUnformatted(i18n::get("settings.status.game_label"));
         ImGui::SameLine();
@@ -752,7 +752,7 @@ void GlobalSettingsPanel::renderStatusSection()
                 break;
             }
 
-            ImGui::TextColored(locale_color, "●");
+            ImGui::TextColored(locale_color, "â—");
             ImGui::SameLine();
             ImGui::TextUnformatted(i18n::get("settings.status.locale_label"));
             ImGui::SameLine();
@@ -950,13 +950,13 @@ void GlobalSettingsPanel::renderAppearanceSection()
     {
         float ui_scale = 1.0f;
         if (auto* cm = ConfigManager_Get())
-            ui_scale = cm->getUIScale();
+            ui_scale = cm->globalState().uiScale();
         ImGui::TextUnformatted(i18n::get("settings.ui_scale"));
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::SliderFloat("##ui_scale_slider", &ui_scale, 0.75f, 2.0f, "%.2fx"))
         {
             if (auto* cm = ConfigManager_Get())
-                cm->setUIScale(ui_scale);
+                cm->globalState().applyUIScale(ui_scale);
         }
 
         // UI Language selector (proof of concept)
@@ -966,7 +966,7 @@ void GlobalSettingsPanel::renderAppearanceSection()
         int idx = 0;
         if (auto* cm = ConfigManager_Get())
         {
-            const char* code = cm->getUILanguageCode();
+            const char* code = cm->globalState().uiLanguage().c_str();
             if (code && std::string(code) == "zh-CN")
                 idx = 1;
         }
@@ -975,7 +975,7 @@ void GlobalSettingsPanel::renderAppearanceSection()
         {
             const char* new_code = (idx == 1) ? "zh-CN" : "en";
             if (auto* cm = ConfigManager_Get())
-                cm->setUILanguageCode(new_code);
+                cm->globalState().setUILanguage(new_code);
             i18n::set_language(new_code);
         }
 
@@ -985,20 +985,20 @@ void GlobalSettingsPanel::renderAppearanceSection()
                                     i18n::get("settings.app_mode.items.mini") };
         int app_mode_idx = 0;
         if (auto* cm = ConfigManager_Get())
-            app_mode_idx = static_cast<int>(cm->getAppMode());
+            app_mode_idx = static_cast<int>(cm->globalState().appMode());
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::Combo("##app_mode_combo", &app_mode_idx, app_modes, IM_ARRAYSIZE(app_modes)))
         {
             if (auto* cm = ConfigManager_Get())
-                cm->setAppMode(static_cast<ConfigManager::AppMode>(app_mode_idx));
+                cm->globalState().setAppMode(static_cast<GlobalStateManager::AppMode>(app_mode_idx));
         }
 
         if (auto* cm = ConfigManager_Get())
         {
-            bool always_on_top = cm->getWindowAlwaysOnTop();
+            bool always_on_top = cm->globalState().windowAlwaysOnTop();
             if (ImGui::Checkbox(i18n::get("settings.always_on_top"), &always_on_top))
             {
-                cm->setWindowAlwaysOnTop(always_on_top);
+                cm->globalState().setWindowAlwaysOnTop(always_on_top);
             }
         }
     }

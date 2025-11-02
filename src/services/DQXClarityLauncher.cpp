@@ -345,9 +345,10 @@ void DQXClarityLauncher::lateInitialize()
     cfg.enable_post_login_heuristics = true;
     if (auto* config_mgr = ConfigManager_Get())
     {
-        cfg.verbose = config_mgr->getVerbose();
-        cfg.compatibility_mode = config_mgr->getCompatibilityMode();
-        cfg.hook_wait_timeout_ms = config_mgr->getHookWaitTimeoutMs();
+        auto& gs = config_mgr->globalState();
+        cfg.verbose = gs.verbose();
+        cfg.compatibility_mode = gs.compatibilityMode();
+        cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();
     }
     pimpl_->engine_cfg = cfg;
     dqxclarity::Logger log{};
@@ -825,9 +826,10 @@ bool DQXClarityLauncher::reinitialize()
     cfg.enable_post_login_heuristics = true;
     if (auto* config_mgr = ConfigManager_Get())
     {
-        cfg.verbose = config_mgr->getVerbose();
-        cfg.compatibility_mode = config_mgr->getCompatibilityMode();
-        cfg.hook_wait_timeout_ms = config_mgr->getHookWaitTimeoutMs();
+        auto& gs = config_mgr->globalState();
+        cfg.verbose = gs.verbose();
+        cfg.compatibility_mode = gs.compatibilityMode();
+        cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();
     }
     pimpl_->engine_cfg = cfg;
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;

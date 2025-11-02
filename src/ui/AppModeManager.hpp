@@ -15,18 +15,18 @@ class AppModeManager
 public:
     AppModeManager(AppContext& app_context, WindowRegistry& registry, MiniModeManager& mini_manager);
 
-    void ApplyModeSettings(ConfigManager::AppMode mode);
-    void HandleModeChange(ConfigManager::AppMode old_mode, ConfigManager::AppMode new_mode);
+    void ApplyModeSettings(GlobalStateManager::AppMode mode);
+    void HandleModeChange(GlobalStateManager::AppMode old_mode, GlobalStateManager::AppMode new_mode);
 
-    ConfigManager::AppMode GetCurrentMode() const { return current_mode_; }
+    GlobalStateManager::AppMode GetCurrentMode() const { return current_mode_; }
 
-    void SetCurrentMode(ConfigManager::AppMode mode) { current_mode_ = mode; }
+    void SetCurrentMode(GlobalStateManager::AppMode mode) { current_mode_ = mode; }
 
 private:
     AppContext& app_context_;
     [[maybe_unused]] WindowRegistry& registry_;
     MiniModeManager& mini_manager_;
-    ConfigManager::AppMode current_mode_ = ConfigManager::AppMode::Normal;
+    GlobalStateManager::AppMode current_mode_ = GlobalStateManager::AppMode::Normal;
 };
 
 } // namespace ui

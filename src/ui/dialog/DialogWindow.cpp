@@ -642,7 +642,7 @@ void DialogWindow::renderDialog()
             ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
             ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
         }
-        else if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        else if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
         {
             // Lock dialog into the dockspace while in Mini mode
             ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
@@ -678,7 +678,7 @@ void DialogWindow::renderDialog()
 
     if (auto* cm = ConfigManager_Get())
     {
-        if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
         {
             dialog_flags |= ImGuiWindowFlags_NoMove;
         }
@@ -1153,16 +1153,17 @@ void DialogWindow::renderDialogContextMenu()
             {
                 if (auto* cm = ConfigManager_Get())
                 {
-                    auto mode = cm->getAppMode();
-                    bool sel_normal = (mode == ConfigManager::AppMode::Normal);
-                    bool sel_borderless = (mode == ConfigManager::AppMode::Borderless);
-                    // bool sel_mini = (mode == ConfigManager::AppMode::Mini);
+                    auto& gs = cm->globalState();
+                    auto mode = gs.appMode();
+                    bool sel_normal = (mode == GlobalStateManager::AppMode::Normal);
+                    bool sel_borderless = (mode == GlobalStateManager::AppMode::Borderless);
+                    // bool sel_mini = (mode == GlobalStateManager::AppMode::Mini);
                     if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal))
-                        cm->setAppMode(ConfigManager::AppMode::Normal);
+                        gs.setAppMode(GlobalStateManager::AppMode::Normal);
                     if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless))
-                        cm->setAppMode(ConfigManager::AppMode::Borderless);
+                        gs.setAppMode(GlobalStateManager::AppMode::Borderless);
                     // Temporarily disable Mini mode
-                    // if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, sel_mini)) cm->setAppMode(ConfigManager::AppMode::Mini);
+                    // if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, sel_mini)) gs.setAppMode(GlobalStateManager::AppMode::Mini);
                 }
                 ImGui::EndMenu();
             }
@@ -1196,7 +1197,7 @@ void DialogWindow::renderSettingsWindow()
             ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
             ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
         }
-        else if (cm->getAppMode() == ConfigManager::AppMode::Mini)
+        else if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
         {
             ImGuiCond cond = DockState::ShouldReDock() ? ImGuiCond_Always : ImGuiCond_Once;
             ImGui::SetNextWindowDockID(DockState::GetDockspace(), cond);

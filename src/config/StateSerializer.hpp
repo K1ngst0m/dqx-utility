@@ -3,7 +3,8 @@
 #include <toml++/toml.h>
 #include <string>
 
-class BaseWindowState;
+struct BaseWindowState;
+class GlobalStateManager;
 
 // Centralized TOML serialization for all window state types
 class StateSerializer
@@ -14,6 +15,12 @@ public:
     
     // Deserialize TOML into window state
     static bool deserialize(const toml::table& tbl, BaseWindowState& state, std::string& name);
+
+    // Serialize global state to TOML (includes [global], [global.translation], [app.debug])
+    static toml::table serializeGlobal(const GlobalStateManager& state);
+    
+    // Deserialize TOML into global state
+    static void deserializeGlobal(const toml::table& root, GlobalStateManager& state);
 
 private:
     // Helper to serialize common fields (UI + translation config)

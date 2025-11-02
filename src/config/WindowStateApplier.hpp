@@ -1,6 +1,6 @@
 #pragma once
 
-class BaseWindowState;
+struct BaseWindowState;
 class DialogWindow;
 class QuestWindow;
 class QuestHelperWindow;
