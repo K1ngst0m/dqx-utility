@@ -5,10 +5,10 @@
 #include <optional>
 #include <imgui.h>
 
-#include "../state/DialogStateManager.hpp"
-#include "../state/QuestStateManager.hpp"
-#include "../state/QuestHelperStateManager.hpp"
-#include "../state/TranslationConfig.hpp"
+#include "ui/dialog/DialogStateManager.hpp"
+#include "ui/quest/QuestStateManager.hpp"
+#include "ui/quest/QuestHelperStateManager.hpp"
+#include "translate/TranslationConfig.hpp"
 
 class WindowRegistry;
 

@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 #include "../WindowRegistry.hpp"
-#include "../../state/QuestStateManager.hpp"
+#include "QuestStateManager.hpp"
 #include "../../translate/TranslateSession.hpp"
 #include "../WindowAnimator.hpp"
 

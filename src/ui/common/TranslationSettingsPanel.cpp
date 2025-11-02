@@ -3,14 +3,14 @@
 #include <cstdio>
 #include <ctime>
 #include <imgui.h>
-#include "../../state/DialogStateManager.hpp"
+#include "ui/common/BaseWindowState.hpp"
 #include "../../translate/TranslateSession.hpp"
 #include "../../translate/ITranslator.hpp"
 #include "../Localization.hpp"
 #include "../UITheme.hpp"
 #include "../../config/ConfigManager.hpp"
 
-TranslationSettingsPanel::TranslationSettingsPanel(DialogStateManager& state, TranslateSession& session)
+TranslationSettingsPanel::TranslationSettingsPanel(BaseWindowState& state, TranslateSession& session)
     : state_(state)
     , session_(session)
 {

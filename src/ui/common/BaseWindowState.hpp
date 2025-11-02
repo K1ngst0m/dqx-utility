@@ -1,6 +1,6 @@
 #pragma once
 
-#include <array>
+#include "translate/TranslationConfig.hpp"
 #include <imgui.h>
 
 struct UIState
@@ -70,4 +70,28 @@ struct UIState
 
         font = nullptr;
     }
+};
+
+struct BaseWindowState
+{
+    UIState ui;
+    TranslationConfig translation;
+    bool use_global_translation = true;
+
+    UIState& ui_state() { return ui; }
+
+    const UIState& ui_state() const { return ui; }
+
+    TranslationConfig& translation_config() { return translation; }
+
+    const TranslationConfig& translation_config() const { return translation; }
+
+    virtual void applyDefaults()
+    {
+        ui.applyDefaults();
+        translation.applyDefaults();
+        use_global_translation = true;
+    }
+
+    virtual ~BaseWindowState() = default;
 };

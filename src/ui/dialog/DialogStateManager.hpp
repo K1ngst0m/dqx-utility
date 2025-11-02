@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/BaseWindowState.hpp"
+
 #include <array>
 #include <vector>
 #include <string>
@@ -24,5 +26,21 @@ struct ContentState
         append_buffer.fill('\0');
         editing_index = -1;
         edit_buffer.fill('\0');
+    }
+};
+
+
+struct DialogStateManager : BaseWindowState
+{
+    ContentState content;
+
+    ContentState& content_state() { return content; }
+
+    const ContentState& content_state() const { return content; }
+
+    void applyDefaults() override
+    {
+        BaseWindowState::applyDefaults();
+        content.applyDefaults();
     }
 };

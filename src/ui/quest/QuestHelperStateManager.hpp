@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DialogStateManager.hpp"
+#include "common/BaseWindowState.hpp"
 
 #include <cstdint>
 #include <string>
@@ -20,13 +20,13 @@ struct QuestHelperContentState
     }
 };
 
-struct QuestHelperStateManager : DialogStateManager
+struct QuestHelperStateManager : BaseWindowState
 {
     QuestHelperContentState quest_helper;
 
-    void applyDefaults()
+    void applyDefaults() override
     {
-        DialogStateManager::applyDefaults();
+        BaseWindowState::applyDefaults();
         quest_helper.applyDefaults();
     }
 };

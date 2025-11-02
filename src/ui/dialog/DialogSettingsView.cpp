@@ -3,7 +3,7 @@
 #include <imgui.h>
 #include "../UITheme.hpp"
 #include "../Localization.hpp"
-#include "../../state/DialogStateManager.hpp"
+#include "DialogStateManager.hpp"
 #include "../FontManager.hpp"
 #include "../../config/ConfigManager.hpp"
 #include "../../translate/ITranslator.hpp"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../state/DialogStateManager.hpp"
+#include "DialogStateManager.hpp"
 #include "../FontManager.hpp"
 #include "../WindowRegistry.hpp"
 #include "../../translate/TranslateSession.hpp"

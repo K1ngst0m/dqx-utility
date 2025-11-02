@@ -7,10 +7,10 @@
 #include <cstring>
 #include <cctype>
 
-#include "state/TranslationConfig.hpp"
-#include "translate/ITranslator.hpp"
-#include "translate/TranslationRequestBuilder.hpp"
-#include "../utils/ErrorReporter.hpp"
+#include "TranslationConfig.hpp"
+#include "ITranslator.hpp"
+#include "TranslationRequestBuilder.hpp"
+#include "utils/ErrorReporter.hpp"
 
 class TranslateSession
 {

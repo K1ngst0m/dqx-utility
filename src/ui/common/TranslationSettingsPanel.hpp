@@ -3,19 +3,19 @@
 #include <functional>
 #include <string>
 
-#include "../../state/TranslationConfig.hpp"
+#include "translate/TranslationConfig.hpp"
 
 namespace translate
 {
 class ITranslator;
 }
-struct DialogStateManager;
+struct BaseWindowState;
 class TranslateSession;
 
 class TranslationSettingsPanel
 {
 public:
-    TranslationSettingsPanel(DialogStateManager& state, TranslateSession& session);
+    TranslationSettingsPanel(BaseWindowState& state, TranslateSession& session);
 
     void render(translate::ITranslator* translator, std::string& applyHint, float& applyHintTimer,
                 bool& testingConnection, std::string& testResult, std::string& testTimestamp,
@@ -32,7 +32,7 @@ private:
     void renderStatusAndResults(translate::ITranslator* translator, const std::string& applyHint, float applyHintTimer,
                                 const std::string& testResult, const std::string& testTimestamp);
 
-    DialogStateManager& state_;
+    BaseWindowState& state_;
     [[maybe_unused]] TranslateSession& session_;
     TranslationConfig* active_config_ = nullptr;
     TranslationConfig* global_config_ = nullptr;

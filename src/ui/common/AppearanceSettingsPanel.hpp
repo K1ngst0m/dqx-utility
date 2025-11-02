@@ -1,6 +1,6 @@
 #pragma once
 
-struct DialogStateManager;
+struct BaseWindowState;
 
 class AppearanceSettingsPanel
 {
@@ -13,10 +13,10 @@ public:
         bool font_changed = false;
     };
 
-    explicit AppearanceSettingsPanel(DialogStateManager& state);
+    explicit AppearanceSettingsPanel(BaseWindowState& state);
 
     RenderResult render();
 
 private:
-    DialogStateManager& state_;
+    BaseWindowState& state_;
 };

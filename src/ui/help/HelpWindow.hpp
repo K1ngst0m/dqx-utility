@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../WindowRegistry.hpp"
-#include "../../state/DialogStateManager.hpp"
+#include "ui/dialog/DialogStateManager.hpp"
 
 #include <imgui.h>
 

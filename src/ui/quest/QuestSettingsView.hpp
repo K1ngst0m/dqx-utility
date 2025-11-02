@@ -3,8 +3,8 @@
 #include <functional>
 #include <string>
 
-#include "../dialog/AppearanceSettingsPanel.hpp"
-#include "../dialog/TranslationSettingsPanel.hpp"
+#include "../common/AppearanceSettingsPanel.hpp"
+#include "../common/TranslationSettingsPanel.hpp"
 
 class FontManager;
 

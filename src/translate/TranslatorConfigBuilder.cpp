@@ -1,5 +1,5 @@
 #include "ITranslator.hpp"
-#include "../state/TranslationConfig.hpp"
+#include "TranslationConfig.hpp"
 #include <algorithm>
 
 namespace translate

@@ -3,9 +3,9 @@
 #include <functional>
 #include <string>
 #include <memory>
-#include "state/QuestHelperStateManager.hpp"
-#include "../dialog/AppearanceSettingsPanel.hpp"
-#include "../dialog/TranslationSettingsPanel.hpp"
+#include "QuestHelperStateManager.hpp"
+#include "common/AppearanceSettingsPanel.hpp"
+#include "common/TranslationSettingsPanel.hpp"
 
 class FontManager;
 

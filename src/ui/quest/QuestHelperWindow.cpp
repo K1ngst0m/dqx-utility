@@ -11,7 +11,7 @@
 #include "services/DQXClarityService.hpp"
 #include "services/DQXClarityLauncher.hpp"
 #include "services/QuestManagerService.hpp"
-#include "state/UIState.hpp"
+#include "ui/common/BaseWindowState.hpp"
 #include "translate/ITranslator.hpp"
 #include "ui/FontManager.hpp"
 #include "ui/UIHelper.hpp"

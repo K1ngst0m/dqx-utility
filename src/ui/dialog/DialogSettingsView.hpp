@@ -2,8 +2,8 @@
 
 #include <functional>
 #include <string>
-#include "AppearanceSettingsPanel.hpp"
-#include "TranslationSettingsPanel.hpp"
+#include "../common/AppearanceSettingsPanel.hpp"
+#include "../common/TranslationSettingsPanel.hpp"
 #include "DebugSettingsPanel.hpp"
 
 class FontManager;

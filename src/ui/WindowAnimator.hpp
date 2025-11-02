@@ -1,7 +1,7 @@
 #pragma once
 
 #include <imgui.h>
-#include "../state/UIState.hpp"
+#include "ui/common/BaseWindowState.hpp"
 
 namespace ui
 {

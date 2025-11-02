@@ -62,16 +62,17 @@ target_sources(dqxu_core
     ui/WindowAnimator.hpp
     ui/WindowRegistry.cpp
     ui/WindowRegistry.hpp
-    ui/dialog/AppearanceSettingsPanel.cpp
-    ui/dialog/AppearanceSettingsPanel.hpp
+    ui/common/AppearanceSettingsPanel.cpp
+    ui/common/AppearanceSettingsPanel.hpp
+    ui/common/TranslationSettingsPanel.cpp
+    ui/common/TranslationSettingsPanel.hpp
+    ui/common/BaseWindowState.hpp
     ui/dialog/DebugSettingsPanel.cpp
     ui/dialog/DebugSettingsPanel.hpp
     ui/dialog/DialogSettingsView.cpp
     ui/dialog/DialogSettingsView.hpp
     ui/dialog/DialogWindow.cpp
     ui/dialog/DialogWindow.hpp
-    ui/dialog/TranslationSettingsPanel.cpp
-    ui/dialog/TranslationSettingsPanel.hpp
     ui/help/HelpWindow.cpp
     ui/help/HelpWindow.hpp
     ui/quest/QuestSettingsView.cpp
@@ -101,6 +102,7 @@ target_sources(dqxu_core
     translate/QwenMTTranslator.hpp
     translate/TranslationRequestBuilder.cpp
     translate/TranslationRequestBuilder.hpp
+    translate/TranslationConfig.hpp
     translate/TranslatorConfigBuilder.cpp
     translate/TranslatorFactory.cpp
     translate/YoudaoTranslator.cpp
@@ -174,11 +176,6 @@ target_sources(dqxu_core
     utils/ZipExtractor.cpp
     utils/ZipExtractor.hpp
     ${miniz_SOURCE_DIR}/miniz.c
-)
-
-target_sources(dqxu_core
-  PRIVATE
-    state/QuestStateManager.hpp
 )
 
 target_sources(dqxu_core

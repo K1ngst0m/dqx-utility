@@ -4,10 +4,10 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "ui/WindowRegistry.hpp"
-#include "state/QuestHelperStateManager.hpp"
+#include "QuestHelperStateManager.hpp"
 #include "translate/TranslateSession.hpp"
 #include "ui/WindowAnimator.hpp"
+#include "ui/WindowRegistry.hpp"
 
 class FontManager;
 class QuestManager;

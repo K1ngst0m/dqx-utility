@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DialogStateManager.hpp"
+#include "common/BaseWindowState.hpp"
 
 #include <cstdint>
 #include <string>
@@ -43,7 +43,7 @@ struct QuestTranslationState
     }
 };
 
-struct QuestStateManager : DialogStateManager
+struct QuestStateManager : BaseWindowState
 {
     QuestContentState quest;
     QuestTranslationState translated;
@@ -52,9 +52,9 @@ struct QuestStateManager : DialogStateManager
     bool translation_failed = false;
     std::string translation_error;
 
-    void applyDefaults()
+    void applyDefaults() override
     {
-        DialogStateManager::applyDefaults();
+        BaseWindowState::applyDefaults();
         quest.applyDefaults();
         translated.applyDefaults();
         original.applyDefaults();

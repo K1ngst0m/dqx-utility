@@ -1,6 +1,6 @@
 #pragma once
 
-#include "state/UIState.hpp"
+#include "ui/common/BaseWindowState.hpp"
 
 #include <vector>
 

@@ -5,7 +5,8 @@
 #include "../ui/quest/QuestWindow.hpp"
 #include "../ui/quest/QuestHelperWindow.hpp"
 #include "../ui/Localization.hpp"
-#include "../state/DialogStateManager.hpp"
+#include "../ui/common/BaseWindowState.hpp"
+#include "../ui/dialog/DialogStateManager.hpp"
 #include "../utils/ErrorReporter.hpp"
 #include "../processing/Diagnostics.hpp"
 #include "../utils/Profile.hpp"
@@ -63,7 +64,7 @@ struct ScopedFlagGuard
     }
 };
 
-void sanitizeDialogState(DialogStateManager& state)
+void sanitizeDialogState(BaseWindowState& state)
 {
     auto& ui = state.ui_state();
     ui.window_size = ImVec2(ui.width, ui.height);
@@ -108,7 +109,7 @@ void applyStoredState(QuestHelperWindow& window, const QuestHelperStateManager& 
 
 static ConfigManager* g_cfg_mgr = nullptr;
 
-static toml::table dialogStateToToml(const std::string& name, const DialogStateManager& state)
+static toml::table dialogStateToToml(const std::string& name, const BaseWindowState& state)
 {
     toml::table t;
     t.insert("name", name);
@@ -195,7 +196,7 @@ static toml::table dialogStateToToml(const std::string& name, const DialogStateM
     return t;
 }
 
-static bool tomlToDialogState(const toml::table& t, DialogStateManager& state, std::string& name)
+static bool tomlToDialogState(const toml::table& t, BaseWindowState& state, std::string& name)
 {
     auto name_val = t["name"].value<std::string>();
     if (!name_val)

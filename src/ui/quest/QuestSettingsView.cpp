@@ -4,7 +4,7 @@
 
 #include "../Localization.hpp"
 #include "../UITheme.hpp"
-#include "../../state/QuestStateManager.hpp"
+#include "QuestStateManager.hpp"
 #include "../FontManager.hpp"
 #include "../../config/ConfigManager.hpp"
 #include "../../translate/ITranslator.hpp"

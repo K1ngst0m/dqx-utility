@@ -2,7 +2,7 @@
 
 #include <cstring>
 #include <imgui.h>
-#include "../../state/DialogStateManager.hpp"
+#include "DialogStateManager.hpp"
 #include "../FontManager.hpp"
 #include "../../translate/TranslateSession.hpp"
 #include "../Localization.hpp"
