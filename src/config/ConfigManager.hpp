@@ -58,8 +58,3 @@ private:
     bool show_global_settings_requested_ = false;
     bool quit_requested_ = false;
 };
-
-// global accessors
-ConfigManager* ConfigManager_Get();
-void ConfigManager_Set(ConfigManager* mgr);
-bool ConfigManager_SaveAll();

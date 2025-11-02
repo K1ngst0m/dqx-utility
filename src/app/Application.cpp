@@ -220,13 +220,14 @@ void Application::setupManagers()
     registry_ = std::make_unique<WindowRegistry>(*font_manager_);
 
     config_ = std::make_unique<ConfigManager>(*registry_);
-    ConfigManager_Set(config_.get());
+    
+    registry_->setConfigManager(*config_);
 
-    event_handler_ = std::make_unique<ui::UIEventHandler>(*context_, *registry_);
+    event_handler_ = std::make_unique<ui::UIEventHandler>(*context_, *registry_, *config_);
     mini_manager_ = std::make_unique<ui::MiniModeManager>(*context_, *registry_);
     mode_manager_ = std::make_unique<ui::AppModeManager>(*context_, *registry_, *mini_manager_);
 
-    settings_panel_ = std::make_unique<GlobalSettingsPanel>(*registry_, [this]() {
+    settings_panel_ = std::make_unique<GlobalSettingsPanel>(*registry_, *config_, [this]() {
         requestExit();
     });
     error_dialog_ = std::make_unique<ErrorDialog>();
@@ -259,7 +260,7 @@ void Application::initializeConfig()
 
     if (auto* dqxc = DQXClarityService_Get())
     {
-        dqxc->lateInitialize();
+        dqxc->lateInitialize(*config_);
     }
 
     auto& gs = config_->globalState();
@@ -383,7 +384,7 @@ void Application::handleQuitRequests()
         UpdaterService_Set(nullptr);
     }
 
-    ConfigManager_SaveAll();
+    config_->saveAll();
     running_ = false;
 }
 
@@ -394,7 +395,7 @@ void Application::cleanup()
         updater_service_->shutdown();
         UpdaterService_Set(nullptr);
     }
-    ConfigManager_SaveAll();
+    config_->saveAll();
 }
 
 bool Application::checkSingleInstance()

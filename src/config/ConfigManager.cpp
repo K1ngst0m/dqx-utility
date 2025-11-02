@@ -41,9 +41,6 @@ inline void safe_strncpy(char* dest, const char* src, size_t dest_size)
 
 } // namespace
 
-static ConfigManager* g_cfg_mgr = nullptr;
-
-
 static long long file_mtime_ms(const fs::path& p)
 {
     std::error_code ec;
@@ -161,7 +158,7 @@ bool ConfigManager::loadAndApply()
             int level = global_state_.profilingLevel();
 #if DQX_PROFILING_LEVEL >= 1
             if (auto* prof_logger = plog::get<profiling::kProfilingLogInstance>())
-            {
+                {
                 if (level == 0)
                 {
                     prof_logger->setMaxSeverity(plog::none);
@@ -185,10 +182,10 @@ bool ConfigManager::loadAndApply()
             }
             
             if (auto* diag_logger = plog::get<processing::Diagnostics::kLogInstance>())
-            {
+                {
                 diag_logger->setMaxSeverity(severity);
-            }
-            
+        }
+
             processing::Diagnostics::SetVerbose(level >= 5);
         }
 
@@ -455,15 +452,3 @@ void ConfigManager::pollAndApply()
     }
 }
 
-ConfigManager* ConfigManager_Get() { return g_cfg_mgr; }
-
-void ConfigManager_Set(ConfigManager* mgr) { g_cfg_mgr = mgr; }
-
-bool ConfigManager_SaveAll()
-{
-    if (auto* cm = ConfigManager_Get())
-    {
-        return cm->saveAll();
-    }
-    return false;
-}

@@ -19,6 +19,8 @@
 #include <unordered_set>
 #include <functional>
 
+class ConfigManager;
+
 namespace translate
 {
 class ITranslator;
@@ -34,7 +36,7 @@ class TextPipeline;
 class DialogWindow : public UIWindow
 {
 public:
-    DialogWindow(FontManager& font_manager, WindowRegistry& registry, int instance_id, const std::string& name, bool is_default = false);
+    DialogWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, int instance_id, const std::string& name, bool is_default = false);
     ~DialogWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Dialog; }
@@ -101,6 +103,7 @@ private:
     void resetTranslatorState();
 
     FontManager& font_manager_;
+    ConfigManager& config_;
     DialogStateManager state_{};
     std::string name_;
     std::string window_label_;

@@ -2,18 +2,17 @@
 
 #include <imgui.h>
 
-// Forward declarations
 class AppContext;
 class WindowRegistry;
+class ConfigManager;
 
 namespace ui
 {
 
-/// Handles UI-related event processing and interactions
 class UIEventHandler
 {
 public:
-    UIEventHandler(AppContext& app_context, WindowRegistry& registry);
+    UIEventHandler(AppContext& app_context, WindowRegistry& registry, ConfigManager& config);
 
     /// Check if mouse is currently outside all dialog windows
     bool IsMouseOutsideDialogs() const;
@@ -27,6 +26,7 @@ public:
 private:
     AppContext& app_context_;
     WindowRegistry& registry_;
+    ConfigManager& config_;
 };
 
 } // namespace ui

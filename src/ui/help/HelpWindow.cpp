@@ -50,8 +50,9 @@ std::string trimWhitespace(std::string text)
 
 } // namespace
 
-HelpWindow::HelpWindow(FontManager& font_manager, const std::string& name)
+HelpWindow::HelpWindow(FontManager& font_manager, ConfigManager& config, const std::string& name)
     : font_manager_(font_manager)
+    , config_(config)
     , name_(name)
 {
     static int counter = 0;
@@ -276,17 +277,14 @@ void HelpWindow::render()
 
     ImGui::SetNextWindowSizeConstraints(ImVec2(min_width, min_height), ImVec2(io.DisplaySize.x, io.DisplaySize.y));
 
-    if (auto* cm = ConfigManager_Get())
+    if (DockState::IsScattering())
     {
-        if (DockState::IsScattering())
-        {
-            ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
-            ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
-        }
-        else if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
-        {
-            ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
-        }
+        ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
+    }
+    else if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    {
+        ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
     }
 
     StatusInfo status = evaluateStatus();
@@ -307,12 +305,9 @@ void HelpWindow::render()
 
     ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-    if (auto* cm = ConfigManager_Get())
+    if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
     {
-        if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
-        {
-            flags |= ImGuiWindowFlags_NoMove;
-        }
+        flags |= ImGuiWindowFlags_NoMove;
     }
 
     if (ImGui::Begin(window_label_.c_str(), nullptr, flags))

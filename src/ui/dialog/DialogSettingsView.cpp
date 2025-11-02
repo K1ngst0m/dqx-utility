@@ -10,12 +10,13 @@
 #include "../../translate/ITranslator.hpp"
 #include "../../translate/TranslateSession.hpp"
 
-DialogSettingsView::DialogSettingsView(DialogStateManager& state, FontManager& fontManager, TranslateSession& session)
+DialogSettingsView::DialogSettingsView(DialogStateManager& state, FontManager& fontManager, TranslateSession& session, ConfigManager& config)
     : state_(state)
     , fontManager_(fontManager)
     , session_(session)
+    , config_(config)
     , appearancePanel_(state)
-    , translationPanel_(state, session)
+    , translationPanel_(state, session, config)
     , debugPanel_(state, fontManager, session)
 {
 }
@@ -30,7 +31,7 @@ void DialogSettingsView::render(translate::ITranslator* translator, std::string&
 
     if (ImGui::Button(i18n::get("dialog.settings.save_config")))
     {
-        ConfigManager_SaveAll();
+        config_.saveAll();
     }
     ImGui::Spacing();
 
@@ -46,11 +47,7 @@ void DialogSettingsView::render(translate::ITranslator* translator, std::string&
     if (ImGui::CollapsingHeader(i18n::get("dialog.translate.title"), ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::Indent();
-        TranslationConfig* global_config = nullptr;
-        if (auto* cm = ConfigManager_Get())
-        {
-            global_config = &cm->globalTranslationConfig();
-        }
+        TranslationConfig* global_config = &config_.globalTranslationConfig();
         translationPanel_.render(translator, applyHint, applyHintTimer, testingConnection, testResult, testTimestamp,
                                  initTranslatorIfEnabledFn, currentTranslatorFn, global_config);
         ImGui::Unindent();

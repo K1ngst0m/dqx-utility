@@ -339,17 +339,14 @@ DQXClarityLauncher::DQXClarityLauncher()
     utils::CrashHandler::RegisterFatalCleanup(CrashCleanupThunk);
 }
 
-void DQXClarityLauncher::lateInitialize()
+void DQXClarityLauncher::lateInitialize(ConfigManager& config)
 {
     dqxclarity::Config cfg{};
     cfg.enable_post_login_heuristics = true;
-    if (auto* config_mgr = ConfigManager_Get())
-    {
-        auto& gs = config_mgr->globalState();
-        cfg.verbose = gs.verbose();
-        cfg.compatibility_mode = gs.compatibilityMode();
-        cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();
-    }
+    auto& gs = config.globalState();
+    cfg.verbose = gs.verbose();
+    cfg.compatibility_mode = gs.compatibilityMode();
+    cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();
     pimpl_->engine_cfg = cfg;
     dqxclarity::Logger log{};
     log.info = [](const std::string& m)
@@ -794,7 +791,7 @@ bool DQXClarityLauncher::stop()
     return ok;
 }
 
-bool DQXClarityLauncher::reinitialize()
+bool DQXClarityLauncher::reinitialize(ConfigManager& config)
 {
     PLOG_INFO << "Reinitialize requested - reconfiguring with new compatibility mode";
 
@@ -824,13 +821,10 @@ bool DQXClarityLauncher::reinitialize()
     // Re-read config and re-initialize engine with new settings
     dqxclarity::Config cfg{};
     cfg.enable_post_login_heuristics = true;
-    if (auto* config_mgr = ConfigManager_Get())
-    {
-        auto& gs = config_mgr->globalState();
-        cfg.verbose = gs.verbose();
-        cfg.compatibility_mode = gs.compatibilityMode();
-        cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();
-    }
+    auto& gs = config.globalState();
+    cfg.verbose = gs.verbose();
+    cfg.compatibility_mode = gs.compatibilityMode();
+    cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();
     pimpl_->engine_cfg = cfg;
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
 

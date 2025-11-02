@@ -11,12 +11,13 @@
 #include "../../translate/ITranslator.hpp"
 #include "../../translate/TranslateSession.hpp"
 
-QuestSettingsView::QuestSettingsView(QuestStateManager& state, FontManager& font_manager, TranslateSession& session)
+QuestSettingsView::QuestSettingsView(QuestStateManager& state, FontManager& font_manager, TranslateSession& session, ConfigManager& config)
     : state_(state)
     , font_manager_(font_manager)
     , session_(session)
+    , config_(config)
     , appearance_panel_(state)
-    , translation_panel_(state, session)
+    , translation_panel_(state, session, config)
 {
 }
 
@@ -31,7 +32,7 @@ void QuestSettingsView::render(translate::ITranslator* translator, std::string& 
 
     if (ImGui::Button(i18n::get("dialog.settings.save_config")))
     {
-        ConfigManager_SaveAll();
+        config_.saveAll();
     }
     ImGui::Spacing();
 
@@ -47,11 +48,7 @@ void QuestSettingsView::render(translate::ITranslator* translator, std::string& 
     if (ImGui::CollapsingHeader(i18n::get("dialog.translate.title"), ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::Indent();
-        TranslationConfig* global_config = nullptr;
-        if (auto* cm = ConfigManager_Get())
-        {
-            global_config = &cm->globalTranslationConfig();
-        }
+        TranslationConfig* global_config = &config_.globalTranslationConfig();
         translation_panel_.render(translator, apply_hint, apply_hint_timer, testing_connection, test_result,
                                   test_timestamp, initTranslatorIfEnabledFn, currentTranslatorFn, global_config);
         ImGui::Unindent();

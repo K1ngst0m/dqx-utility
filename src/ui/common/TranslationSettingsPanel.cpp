@@ -10,9 +10,10 @@
 #include "../UITheme.hpp"
 #include "../../config/ConfigManager.hpp"
 
-TranslationSettingsPanel::TranslationSettingsPanel(BaseWindowState& state, TranslateSession& session)
+TranslationSettingsPanel::TranslationSettingsPanel(BaseWindowState& state, TranslateSession& session, ConfigManager& config)
     : state_(state)
     , session_(session)
+    , config_(config)
 {
 }
 
@@ -134,10 +135,7 @@ void TranslationSettingsPanel::render(translate::ITranslator* translator, std::s
 
         if (using_global_config_ && config_dirty_pending_ && !use_global_toggled)
         {
-            if (auto* cm = ConfigManager_Get())
-            {
-                cm->markGlobalTranslationDirty();
-            }
+            config_.markGlobalTranslationDirty();
             config_dirty_pending_ = false;
         }
     }

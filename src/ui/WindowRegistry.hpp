@@ -17,12 +17,12 @@ class QuestWindow;
 class HelpWindow;
 class QuestHelperWindow;
 class FontManager;
+class ConfigManager;
 class GlobalStateManager;
 struct DialogStateManager;
 struct QuestStateManager;
 struct QuestHelperStateManager;
 
-// UIWindow defines the minimal interface for renderable ImGui windows.
 class UIWindow
 {
 public:
@@ -35,12 +35,13 @@ public:
     virtual void renderSettings() = 0;
 };
 
-// WindowRegistry tracks all UI windows and their creation helpers.
 class WindowRegistry
 {
 public:
     WindowRegistry(FontManager& font_manager);
     ~WindowRegistry();
+    
+    void setConfigManager(ConfigManager& config) { config_ = &config; }
 
     DialogWindow& createDialogWindow(bool mark_default = false);
     QuestWindow& createQuestWindow(bool mark_default = false);
@@ -75,6 +76,7 @@ private:
     std::string makeQuestHelperName();
 
     FontManager& font_manager_;
+    ConfigManager* config_ = nullptr;
     std::vector<std::unique_ptr<UIWindow>> windows_;
     int dialog_counter_ = 0;
     int quest_counter_ = 0;

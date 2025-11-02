@@ -26,7 +26,7 @@ WindowRegistry::~WindowRegistry() = default;
 // Registers and returns a new dialog window instance.
 DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 {
-    auto dialog = std::make_unique<DialogWindow>(font_manager_, *this, dialog_counter_, makeDialogName(), mark_default);
+    auto dialog = std::make_unique<DialogWindow>(font_manager_, *this, *config_, dialog_counter_, makeDialogName(), mark_default);
     DialogWindow& ref = *dialog;
     windows_.push_back(std::move(dialog));
     ++dialog_counter_;
@@ -37,7 +37,7 @@ DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 
 QuestWindow& WindowRegistry::createQuestWindow(bool mark_default)
 {
-    auto quest = std::make_unique<QuestWindow>(font_manager_, *this, makeQuestName(), mark_default);
+    auto quest = std::make_unique<QuestWindow>(font_manager_, *this, *config_, makeQuestName(), mark_default);
     QuestWindow& ref = *quest;
     windows_.push_back(std::move(quest));
     ++quest_counter_;
@@ -48,7 +48,7 @@ QuestWindow& WindowRegistry::createQuestWindow(bool mark_default)
 
 HelpWindow& WindowRegistry::createHelpWindow()
 {
-    auto help = std::make_unique<HelpWindow>(font_manager_, makeHelpName());
+    auto help = std::make_unique<HelpWindow>(font_manager_, *config_, makeHelpName());
     HelpWindow& ref = *help;
     windows_.push_back(std::move(help));
     ++help_counter_;
@@ -57,7 +57,7 @@ HelpWindow& WindowRegistry::createHelpWindow()
 
 QuestHelperWindow& WindowRegistry::createQuestHelperWindow(bool mark_default)
 {
-    auto quest_helper = std::make_unique<QuestHelperWindow>(font_manager_, *this, makeQuestHelperName());
+    auto quest_helper = std::make_unique<QuestHelperWindow>(font_manager_, *this, *config_, makeQuestHelperName());
     QuestHelperWindow& ref = *quest_helper;
     windows_.push_back(std::move(quest_helper));
     ++quest_helper_counter_;

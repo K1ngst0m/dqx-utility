@@ -486,8 +486,9 @@ bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string
 
 } // namespace
 
-QuestWindow::QuestWindow(FontManager& font_manager, WindowRegistry& registry, const std::string& name, bool is_default)
+QuestWindow::QuestWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, const std::string& name, bool is_default)
     : font_manager_(font_manager)
+    , config_(config)
     , name_(name)
     , registry_(registry)
 {
@@ -509,7 +510,7 @@ QuestWindow::QuestWindow(FontManager& font_manager, WindowRegistry& registry, co
     session_.setCapacity(5000);
     session_.enableCache(true);
 
-    settings_view_ = std::make_unique<QuestSettingsView>(state_, font_manager_, session_);
+    settings_view_ = std::make_unique<QuestSettingsView>(state_, font_manager_, session_, config_);
 
     font_manager_.registerDialog(state_.ui_state());
     refreshFontBinding();
@@ -597,15 +598,12 @@ void QuestWindow::render()
     bool using_global = usingGlobalTranslation();
     if (using_global)
     {
-        if (auto* cm = ConfigManager_Get())
+        std::uint64_t version = config_.globalTranslationVersion();
+        if (version != observed_global_translation_version_)
         {
-            std::uint64_t version = cm->globalTranslationVersion();
-            if (version != observed_global_translation_version_)
-            {
-                observed_global_translation_version_ = version;
-                resetTranslatorState();
-                requeue_translation = true;
-            }
+            observed_global_translation_version_ = version;
+            resetTranslatorState();
+            requeue_translation = true;
         }
     }
     else
@@ -677,17 +675,14 @@ void QuestWindow::render()
 
     ImGui::SetNextWindowSizeConstraints(ImVec2(380.0f, 320.0f), ImVec2(io.DisplaySize.x, io.DisplaySize.y));
 
-    if (auto* cm = ConfigManager_Get())
+    if (DockState::IsScattering())
     {
-        if (DockState::IsScattering())
-        {
-            ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
-            ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
-        }
-        else if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
-        {
-            ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
-        }
+        ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
+    }
+    else if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    {
+        ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
     }
 
     const float fade_alpha = state_.ui_state().current_alpha_multiplier;
@@ -699,12 +694,9 @@ void QuestWindow::render()
 
     ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-    if (auto* cm = ConfigManager_Get())
+    if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
     {
-        if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
-        {
-            flags |= ImGuiWindowFlags_NoMove;
-        }
+        flags |= ImGuiWindowFlags_NoMove;
     }
 
     if (ImGui::Begin(window_label_.c_str(), nullptr, flags))
@@ -1101,37 +1093,28 @@ void QuestWindow::renderContextMenu()
 
             if (ImGui::MenuItem(i18n::get("menu.global_settings")))
             {
-                if (auto* cm = ConfigManager_Get())
-                {
-                    cm->requestShowGlobalSettings();
-                }
+                config_.requestShowGlobalSettings();
             }
 
             if (ImGui::BeginMenu(i18n::get("menu.app_mode")))
             {
-                if (auto* cm = ConfigManager_Get())
-                {
-                    auto& gs = cm->globalState();
-                    auto mode = gs.appMode();
-                    bool sel_normal = (mode == GlobalStateManager::AppMode::Normal);
-                    bool sel_borderless = (mode == GlobalStateManager::AppMode::Borderless);
-                    bool sel_mini = (mode == GlobalStateManager::AppMode::Mini);
-                    if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal))
-                        gs.setAppMode(GlobalStateManager::AppMode::Normal);
-                    if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless))
-                        gs.setAppMode(GlobalStateManager::AppMode::Borderless);
-                    if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, sel_mini))
-                        gs.setAppMode(GlobalStateManager::AppMode::Mini);
-                }
+                auto& gs = config_.globalState();
+                auto mode = gs.appMode();
+                bool sel_normal = (mode == GlobalStateManager::AppMode::Normal);
+                bool sel_borderless = (mode == GlobalStateManager::AppMode::Borderless);
+                bool sel_mini = (mode == GlobalStateManager::AppMode::Mini);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal))
+                    gs.setAppMode(GlobalStateManager::AppMode::Normal);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless))
+                    gs.setAppMode(GlobalStateManager::AppMode::Borderless);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, sel_mini))
+                    gs.setAppMode(GlobalStateManager::AppMode::Mini);
                 ImGui::EndMenu();
             }
 
             if (ImGui::MenuItem(i18n::get("menu.quit")))
             {
-                if (auto* cm = ConfigManager_Get())
-                {
-                    cm->requestQuit();
-                }
+                config_.requestQuit();
             }
         }
 
@@ -1559,17 +1542,14 @@ const TranslationConfig& QuestWindow::activeTranslationConfig() const
 {
     if (state_.use_global_translation)
     {
-        if (auto* cm = ConfigManager_Get())
-        {
-            return cm->globalTranslationConfig();
-        }
+        return config_.globalTranslationConfig();
     }
     return state_.translation_config();
 }
 
 bool QuestWindow::usingGlobalTranslation() const
 {
-    return state_.use_global_translation && ConfigManager_Get() != nullptr;
+    return state_.use_global_translation;
 }
 
 void QuestWindow::resetTranslatorState()

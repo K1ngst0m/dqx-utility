@@ -21,8 +21,9 @@
 
 using json = nlohmann::json;
 
-QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, WindowRegistry& registry, const std::string& name)
+QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, const std::string& name)
     : font_manager_(font_manager)
+    , config_(config)
     , name_(name)
     , registry_(registry)
 {
@@ -48,7 +49,7 @@ QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, WindowRegistry& 
     session_.setCapacity(5000);
     session_.enableCache(true);
 
-    settings_view_ = std::make_unique<QuestHelperSettingsView>(state_, font_manager_, session_);
+    settings_view_ = std::make_unique<QuestHelperSettingsView>(state_, font_manager_, session_, config_);
 
     font_manager_.registerDialog(state_.ui);
     refreshFontBinding();
@@ -634,10 +635,7 @@ const TranslationConfig& QuestHelperWindow::activeTranslationConfig() const
 {
     if (state_.use_global_translation)
     {
-        if (auto* cm = ConfigManager_Get())
-        {
-            return cm->globalTranslationConfig();
-        }
+        return config_.globalTranslationConfig();
     }
     return state_.translation_config();
 }

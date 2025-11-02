@@ -7,6 +7,7 @@
 #include "DebugSettingsPanel.hpp"
 
 class FontManager;
+class ConfigManager;
 
 namespace translate
 {
@@ -18,7 +19,7 @@ struct DialogStateManager;
 class DialogSettingsView
 {
 public:
-    DialogSettingsView(DialogStateManager& state, FontManager& fontManager, TranslateSession& session);
+    DialogSettingsView(DialogStateManager& state, FontManager& fontManager, TranslateSession& session, ConfigManager& config);
 
     void render(translate::ITranslator* translator, std::string& applyHint, float& applyHintTimer,
                 bool& testingConnection, std::string& testResult, std::string& testTimestamp,
@@ -31,6 +32,7 @@ private:
     DialogStateManager& state_;
     [[maybe_unused]] FontManager& fontManager_;
     [[maybe_unused]] TranslateSession& session_;
+    ConfigManager& config_;
     AppearanceSettingsPanel appearancePanel_;
     TranslationSettingsPanel translationPanel_;
     DebugSettingsPanel debugPanel_;

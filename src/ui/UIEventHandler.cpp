@@ -15,9 +15,10 @@
 namespace ui
 {
 
-UIEventHandler::UIEventHandler(AppContext& app_context, WindowRegistry& registry)
+UIEventHandler::UIEventHandler(AppContext& app_context, WindowRegistry& registry, ConfigManager& config)
     : app_context_(app_context)
     , registry_(registry)
+    , config_(config)
 {
 }
 
@@ -124,58 +125,49 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
 
         if (ImGui::BeginMenu(i18n::get("menu.app_mode")))
         {
-            if (auto* cm = ConfigManager_Get())
-            {
-                auto& gs = cm->globalState();
-                auto mode = gs.appMode();
+            auto& gs = config_.globalState();
+            auto mode = gs.appMode();
                 if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr,
-                                    mode == GlobalStateManager::AppMode::Normal))
-                    gs.setAppMode(GlobalStateManager::AppMode::Normal);
+                                mode == GlobalStateManager::AppMode::Normal))
+                gs.setAppMode(GlobalStateManager::AppMode::Normal);
                 if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr,
-                                    mode == GlobalStateManager::AppMode::Borderless))
-                    gs.setAppMode(GlobalStateManager::AppMode::Borderless);
-                // Temporarily disable Mini mode due to unresolved issues
-                // if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, mode == GlobalStateManager::AppMode::Mini))
-                //     gs.setAppMode(GlobalStateManager::AppMode::Mini);
-            }
+                                mode == GlobalStateManager::AppMode::Borderless))
+                gs.setAppMode(GlobalStateManager::AppMode::Borderless);
             ImGui::EndMenu();
         }
 
-        if (auto* cm = ConfigManager_Get())
-        {
             std::string defaults_menu_label = ui::LocalizedOrFallback("menu.default_windows", "Default windows");
             if (ImGui::BeginMenu(defaults_menu_label.c_str()))
             {
-                auto& gs = cm->globalState();
-                bool dialog_enabled = gs.defaultDialogEnabled();
+            auto& gs = config_.globalState();
+            bool dialog_enabled = gs.defaultDialogEnabled();
                 std::string dialog_label = ui::LocalizedOrFallback("menu.default_dialog", "Default dialog window");
                 if (ImGui::MenuItem(dialog_label.c_str(), nullptr, dialog_enabled))
                 {
-                    gs.setDefaultDialogEnabled(!dialog_enabled);
-                    registry_.setDefaultDialogEnabled(!dialog_enabled);
-                    ConfigManager_SaveAll();
+                gs.setDefaultDialogEnabled(!dialog_enabled);
+                registry_.setDefaultDialogEnabled(!dialog_enabled);
+                config_.saveAll();
                 }
 
-                bool quest_enabled = gs.defaultQuestEnabled();
+            bool quest_enabled = gs.defaultQuestEnabled();
                 std::string quest_label = ui::LocalizedOrFallback("menu.default_quest", "Default quest window");
                 if (ImGui::MenuItem(quest_label.c_str(), nullptr, quest_enabled))
                 {
-                    gs.setDefaultQuestEnabled(!quest_enabled);
-                    registry_.setDefaultQuestEnabled(!quest_enabled);
-                    ConfigManager_SaveAll();
+                gs.setDefaultQuestEnabled(!quest_enabled);
+                registry_.setDefaultQuestEnabled(!quest_enabled);
+                config_.saveAll();
                 }
 
-                bool quest_helper_enabled = gs.defaultQuestHelperEnabled();
+            bool quest_helper_enabled = gs.defaultQuestHelperEnabled();
                 std::string quest_helper_label = ui::LocalizedOrFallback("menu.default_quest_helper", "Default quest helper window");
                 if (ImGui::MenuItem(quest_helper_label.c_str(), nullptr, quest_helper_enabled))
                 {
-                    gs.setDefaultQuestHelperEnabled(!quest_helper_enabled);
-                    registry_.setDefaultQuestHelperEnabled(!quest_helper_enabled);
-                    ConfigManager_SaveAll();
+                gs.setDefaultQuestHelperEnabled(!quest_helper_enabled);
+                registry_.setDefaultQuestHelperEnabled(!quest_helper_enabled);
+                config_.saveAll();
                 }
 
                 ImGui::EndMenu();
-            }
         }
 
         ImGui::Separator();

@@ -305,10 +305,11 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
     return static_cast<int>(state_.content_state().segments.size()) - 1;
 }
 
-DialogWindow::DialogWindow(FontManager& font_manager, WindowRegistry& registry, int instance_id, const std::string& name, bool is_default)
+DialogWindow::DialogWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
+    , config_(config)
     , cached_backend_(translate::Backend::OpenAI)
-    , settings_view_(state_, font_manager_, session_)
+    , settings_view_(state_, font_manager_, session_, config)
     , registry_(registry)
 {
 
@@ -490,14 +491,11 @@ void DialogWindow::render()
     bool using_global = usingGlobalTranslation();
     if (using_global)
     {
-        if (auto* cm = ConfigManager_Get())
+        std::uint64_t version = config_.globalTranslationVersion();
+        if (version != observed_global_translation_version_)
         {
-            std::uint64_t version = cm->globalTranslationVersion();
-            if (version != observed_global_translation_version_)
-            {
-                observed_global_translation_version_ = version;
-                resetTranslatorState();
-            }
+            observed_global_translation_version_ = version;
+            resetTranslatorState();
         }
     }
     else
@@ -587,12 +585,9 @@ void DialogWindow::render()
 void DialogWindow::renderSettings()
 {
     // If config manager recently reported a parse error from manual edits, surface it here
-    if (auto* cm = ConfigManager_Get())
+    if (const char* err = config_.lastError(); err && err[0])
     {
-        if (const char* err = cm->lastError(); err && err[0])
-        {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "%s", err);
-        }
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "%s", err);
     }
     renderSettingsPanel();
 }
@@ -636,18 +631,14 @@ void DialogWindow::renderDialog()
         }
     }
 
-    if (auto* cm = ConfigManager_Get())
+    if (DockState::IsScattering())
     {
-        if (DockState::IsScattering())
-        {
-            ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
-            ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
-        }
-        else if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
-        {
-            // Lock dialog into the dockspace while in Mini mode
-            ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
-        }
+        ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
+    }
+    else if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    {
+        ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
     }
 
     if (state_.ui_state().pending_reposition)
@@ -677,12 +668,9 @@ void DialogWindow::renderDialog()
     ImGuiWindowFlags dialog_flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse;
 
-    if (auto* cm = ConfigManager_Get())
+    if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
     {
-        if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
-        {
-            dialog_flags |= ImGuiWindowFlags_NoMove;
-        }
+        dialog_flags |= ImGuiWindowFlags_NoMove;
     }
 
     if (ImGui::Begin(window_label_.c_str(), nullptr, dialog_flags))
@@ -1034,17 +1022,14 @@ const TranslationConfig& DialogWindow::activeTranslationConfig() const
 {
     if (state_.use_global_translation)
     {
-        if (auto* cm = ConfigManager_Get())
-        {
-            return cm->globalTranslationConfig();
-        }
+        return config_.globalTranslationConfig();
     }
     return state_.translation_config();
 }
 
 bool DialogWindow::usingGlobalTranslation() const
 {
-    return state_.use_global_translation && ConfigManager_Get() != nullptr;
+    return state_.use_global_translation;
 }
 
 void DialogWindow::resetTranslatorState()
@@ -1137,38 +1122,26 @@ void DialogWindow::renderDialogContextMenu()
 
             if (ImGui::MenuItem(i18n::get("menu.global_settings")))
             {
-                if (auto* cm = ConfigManager_Get())
-                {
-                    cm->requestShowGlobalSettings();
-                }
+                config_.requestShowGlobalSettings();
             }
 
             if (ImGui::BeginMenu(i18n::get("menu.app_mode")))
             {
-                if (auto* cm = ConfigManager_Get())
-                {
-                    auto& gs = cm->globalState();
-                    auto mode = gs.appMode();
-                    bool sel_normal = (mode == GlobalStateManager::AppMode::Normal);
-                    bool sel_borderless = (mode == GlobalStateManager::AppMode::Borderless);
-                    // bool sel_mini = (mode == GlobalStateManager::AppMode::Mini);
-                    if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal))
-                        gs.setAppMode(GlobalStateManager::AppMode::Normal);
-                    if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless))
-                        gs.setAppMode(GlobalStateManager::AppMode::Borderless);
-                    // Temporarily disable Mini mode
-                    // if (ImGui::MenuItem(i18n::get("settings.app_mode.items.mini"), nullptr, sel_mini)) gs.setAppMode(GlobalStateManager::AppMode::Mini);
-                }
+                auto& gs = config_.globalState();
+                auto mode = gs.appMode();
+                bool sel_normal = (mode == GlobalStateManager::AppMode::Normal);
+                bool sel_borderless = (mode == GlobalStateManager::AppMode::Borderless);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr, sel_normal))
+                    gs.setAppMode(GlobalStateManager::AppMode::Normal);
+                if (ImGui::MenuItem(i18n::get("settings.app_mode.items.borderless"), nullptr, sel_borderless))
+                    gs.setAppMode(GlobalStateManager::AppMode::Borderless);
                 ImGui::EndMenu();
             }
 
             ImGui::Separator();
             if (ImGui::MenuItem(i18n::get("menu.quit")))
             {
-                if (auto* cm = ConfigManager_Get())
-                {
-                    cm->requestQuit();
-                }
+                config_.requestQuit();
             }
         }
 
@@ -1184,18 +1157,15 @@ void DialogWindow::renderSettingsWindow()
     ImGui::SetNextWindowSize(ImVec2(480.0f, 560.0f), ImGuiCond_FirstUseEver);
     std::string settings_title =
         name_ + " " + std::string(i18n::get("dialog.settings.window_suffix")) + "###" + settings_id_suffix_;
-    if (auto* cm = ConfigManager_Get())
+    if (DockState::IsScattering())
     {
-        if (DockState::IsScattering())
-        {
-            ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
-            ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
-        }
-        else if (cm->globalState().appMode() == GlobalStateManager::AppMode::Mini)
-        {
-            ImGuiCond cond = DockState::ShouldReDock() ? ImGuiCond_Always : ImGuiCond_Once;
-            ImGui::SetNextWindowDockID(DockState::GetDockspace(), cond);
-        }
+        ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
+    }
+    else if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    {
+        ImGuiCond cond = DockState::ShouldReDock() ? ImGuiCond_Always : ImGuiCond_Once;
+        ImGui::SetNextWindowDockID(DockState::GetDockspace(), cond);
     }
 
     if (ImGui::Begin(settings_title.c_str(), &show_settings_window_))

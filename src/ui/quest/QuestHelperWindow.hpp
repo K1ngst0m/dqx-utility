@@ -10,6 +10,7 @@
 #include "ui/WindowRegistry.hpp"
 
 class FontManager;
+class ConfigManager;
 class QuestManager;
 class QuestHelperSettingsView;
 
@@ -21,7 +22,7 @@ class ITranslator;
 class QuestHelperWindow : public UIWindow
 {
 public:
-    QuestHelperWindow(FontManager& font_manager, WindowRegistry& registry, const std::string& name);
+    QuestHelperWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, const std::string& name);
     ~QuestHelperWindow() override;
 
     UIWindowType type() const override { return UIWindowType::QuestHelper; }
@@ -104,6 +105,7 @@ private:
     void checkAndUpdateWindowHeight(float current_window_width);
 
     FontManager& font_manager_;
+    ConfigManager& config_;
     QuestHelperStateManager state_{};
     std::unique_ptr<QuestHelperSettingsView> settings_view_;
 

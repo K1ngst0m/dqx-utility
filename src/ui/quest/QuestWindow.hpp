@@ -15,12 +15,13 @@ namespace translate
 class ITranslator;
 }
 class FontManager;
+class ConfigManager;
 class QuestSettingsView;
 
 class QuestWindow : public UIWindow
 {
 public:
-    QuestWindow(FontManager& font_manager, WindowRegistry& registry, const std::string& name, bool is_default = false);
+    QuestWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, const std::string& name, bool is_default = false);
     ~QuestWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Quest; }
@@ -88,6 +89,7 @@ private:
     void resetTranslatorState();
 
     FontManager& font_manager_;
+    ConfigManager& config_;
     QuestStateManager state_{};
     std::unique_ptr<QuestSettingsView> settings_view_;
 

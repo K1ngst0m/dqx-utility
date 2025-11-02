@@ -8,6 +8,7 @@
 #include "common/TranslationSettingsPanel.hpp"
 
 class FontManager;
+class ConfigManager;
 
 namespace translate
 {
@@ -18,7 +19,7 @@ class TranslateSession;
 class QuestHelperSettingsView
 {
 public:
-    explicit QuestHelperSettingsView(QuestHelperStateManager& state, FontManager& font_manager, TranslateSession& session);
+    explicit QuestHelperSettingsView(QuestHelperStateManager& state, FontManager& font_manager, TranslateSession& session, ConfigManager& config);
 
     void render(translate::ITranslator* translator, std::string& apply_hint, float& apply_hint_timer,
                 bool& testing_connection, std::string& test_result, std::string& test_timestamp,
@@ -31,6 +32,7 @@ private:
     QuestHelperStateManager& state_;
     [[maybe_unused]] FontManager& font_manager_;
     [[maybe_unused]] TranslateSession& session_;
+    ConfigManager& config_;
     AppearanceSettingsPanel appearance_panel_;
     TranslationSettingsPanel translation_panel_;
 };
