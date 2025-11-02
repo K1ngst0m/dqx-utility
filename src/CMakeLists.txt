@@ -159,6 +159,14 @@ target_sources(dqxu_core
   PRIVATE
     config/ConfigManager.cpp
     config/ConfigManager.hpp
+    config/DefaultWindowManager.cpp
+    config/DefaultWindowManager.hpp
+    config/WindowStateOperations.cpp
+    config/WindowStateOperations.hpp
+    config/StateSerializer.cpp
+    config/StateSerializer.hpp
+    config/WindowStateApplier.cpp
+    config/WindowStateApplier.hpp
 )
 
 target_sources(dqxu_core

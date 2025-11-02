@@ -2,15 +2,13 @@
 
 #include <string>
 #include <cstdint>
-#include <optional>
+#include <memory>
 #include <imgui.h>
 
-#include "ui/dialog/DialogStateManager.hpp"
-#include "ui/quest/QuestStateManager.hpp"
-#include "ui/quest/QuestHelperStateManager.hpp"
 #include "translate/TranslationConfig.hpp"
 
 class WindowRegistry;
+class DefaultWindowManager;
 
 // Manages application configuration including UI scale and dialog window settings
 // Automatically loads config.toml at startup and saves on exit
@@ -121,10 +119,6 @@ public:
 
 private:
     bool loadAndApply();
-    bool applyDialogs(const struct DialogsSnapshot& snap); // fwd declen't exist, will implement inline
-    void enforceDefaultDialogState();
-    void enforceDefaultQuestState();
-    void enforceDefaultQuestHelperState();
     void enforceDefaultWindowStates();
 
     std::string config_path_;
@@ -147,16 +141,16 @@ private:
     bool compatibility_mode_ = false; // Auto mode (false) vs compatibility mode (true) for dialog capture
     int hook_wait_timeout_ms_ = 200; // How long to wait for hook to upgrade memory reader captures (ms)
 
+    // Default window managers (generic, type-agnostic)
+    std::unique_ptr<DefaultWindowManager> default_dialog_mgr_;
+    std::unique_ptr<DefaultWindowManager> default_quest_mgr_;
+    std::unique_ptr<DefaultWindowManager> default_quest_helper_mgr_;
+    bool suppress_default_window_updates_ = false;
+    
+    // Default window enabled flags
     bool default_dialog_enabled_ = true;
     bool default_quest_enabled_ = true;
     bool default_quest_helper_enabled_ = true;
-    std::string default_dialog_name_;
-    std::string default_quest_name_;
-    std::string default_quest_helper_name_;
-    std::optional<DialogStateManager> default_dialog_state_;
-    std::optional<QuestStateManager> default_quest_state_;
-    std::optional<QuestHelperStateManager> default_quest_helper_state_;
-    bool suppress_default_window_updates_ = false;
 
     struct ImGuiStyleBackup
     {

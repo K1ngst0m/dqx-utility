@@ -1,5 +1,9 @@
 #include "ConfigManager.hpp"
 
+#include "DefaultWindowManager.hpp"
+#include "WindowStateOperations.hpp"
+#include "StateSerializer.hpp"
+#include "WindowStateApplier.hpp"
 #include "../ui/WindowRegistry.hpp"
 #include "../ui/dialog/DialogWindow.hpp"
 #include "../ui/quest/QuestWindow.hpp"
@@ -7,6 +11,8 @@
 #include "../ui/Localization.hpp"
 #include "../ui/common/BaseWindowState.hpp"
 #include "../ui/dialog/DialogStateManager.hpp"
+#include "../ui/quest/QuestStateManager.hpp"
+#include "../ui/quest/QuestHelperStateManager.hpp"
 #include "../utils/ErrorReporter.hpp"
 #include "../processing/Diagnostics.hpp"
 #include "../utils/Profile.hpp"
@@ -63,391 +69,10 @@ struct ScopedFlagGuard
         active = false;
     }
 };
-
-void sanitizeDialogState(BaseWindowState& state)
-{
-    auto& ui = state.ui_state();
-    ui.window_size = ImVec2(ui.width, ui.height);
-    ui.pending_resize = true;
-    ui.pending_reposition = true;
-    ui.font = nullptr;
-    ui.font_base_size = 0.0f;
-}
-
-void applyStoredState(DialogWindow& window, const DialogStateManager& stored)
-{
-    window.state() = stored;
-    window.reinitializePlaceholder();
-    sanitizeDialogState(window.state());
-    window.refreshFontBinding();
-    window.initTranslatorIfEnabled();
-}
-
-void applyStoredState(QuestWindow& window, const QuestStateManager& stored)
-{
-    window.state() = stored;
-    window.state().quest.applyDefaults();
-    window.state().translated.applyDefaults();
-    window.state().original.applyDefaults();
-    window.state().translation_valid = false;
-    window.state().translation_failed = false;
-    window.state().translation_error.clear();
-    sanitizeDialogState(window.state());
-    window.refreshFontBinding();
-    window.initTranslatorIfEnabled();
-}
-
-void applyStoredState(QuestHelperWindow& window, const QuestHelperStateManager& stored)
-{
-    window.state() = stored;
-    window.state().quest_helper.applyDefaults();
-    sanitizeDialogState(window.state());
-    window.refreshFontBinding();
-    window.initTranslatorIfEnabled();
-}
 } // namespace
 
 static ConfigManager* g_cfg_mgr = nullptr;
 
-static toml::table dialogStateToToml(const std::string& name, const BaseWindowState& state)
-{
-    toml::table t;
-    t.insert("name", name);
-    toml::table behavior;
-    behavior.insert("auto_scroll_to_new", state.ui_state().auto_scroll_to_new);
-    t.insert("behavior", std::move(behavior));
-
-    toml::table translation;
-    translation.insert("use_global_translation", state.use_global_translation);
-    translation.insert("translate_enabled", state.translation_config().translate_enabled);
-    translation.insert("auto_apply_changes", state.translation_config().auto_apply_changes);
-    translation.insert("include_dialog_stream", state.translation_config().include_dialog_stream);
-    translation.insert("include_corner_stream", state.translation_config().include_corner_stream);
-    translation.insert("glossary_enabled", state.translation_config().glossary_enabled);
-    translation.insert("translation_backend", static_cast<int>(state.translation_config().translation_backend));
-
-    std::string target_lang;
-    switch (state.translation_config().target_lang_enum)
-    {
-    case TranslationConfig::TargetLang::EN_US:
-        target_lang = "en-us";
-        break;
-    case TranslationConfig::TargetLang::ZH_CN:
-        target_lang = "zh-cn";
-        break;
-    case TranslationConfig::TargetLang::ZH_TW:
-        target_lang = "zh-tw";
-        break;
-    }
-    translation.insert("target_lang", target_lang);
-    translation.insert("custom_prompt", std::string(state.translation_config().custom_prompt.data()));
-
-    toml::table openai;
-    openai.insert("api_key", std::string(state.translation_config().openai_api_key.data()));
-    openai.insert("base_url", std::string(state.translation_config().openai_base_url.data()));
-    openai.insert("model", std::string(state.translation_config().openai_model.data()));
-    translation.insert("openai", std::move(openai));
-
-    toml::table google;
-    google.insert("api_key", std::string(state.translation_config().google_api_key.data()));
-    translation.insert("google", std::move(google));
-
-    toml::table qwen;
-    qwen.insert("api_key", std::string(state.translation_config().qwen_api_key.data()));
-    qwen.insert("model", std::string(state.translation_config().qwen_model.data()));
-    translation.insert("qwen", std::move(qwen));
-
-    toml::table niutrans;
-    niutrans.insert("api_key", std::string(state.translation_config().niutrans_api_key.data()));
-    translation.insert("niutrans", std::move(niutrans));
-
-    toml::table zhipu;
-    zhipu.insert("api_key", std::string(state.translation_config().zhipu_api_key.data()));
-    zhipu.insert("base_url", std::string(state.translation_config().zhipu_base_url.data()));
-    zhipu.insert("model", std::string(state.translation_config().zhipu_model.data()));
-    translation.insert("zhipu", std::move(zhipu));
-
-    toml::table youdao;
-    youdao.insert("app_key", std::string(state.translation_config().youdao_app_key.data()));
-    youdao.insert("app_secret", std::string(state.translation_config().youdao_app_secret.data()));
-    youdao.insert("mode", static_cast<int>(state.translation_config().youdao_mode));
-    translation.insert("youdao", std::move(youdao));
-
-    t.insert("translation", std::move(translation));
-
-    toml::table appearance;
-    appearance.insert("width", state.ui_state().width);
-    appearance.insert("height", state.ui_state().height);
-    appearance.insert("pos_x", state.ui_state().window_pos.x);
-    appearance.insert("pos_y", state.ui_state().window_pos.y);
-    appearance.insert("padding_x", state.ui_state().padding.x);
-    appearance.insert("padding_y", state.ui_state().padding.y);
-    appearance.insert("rounding", state.ui_state().rounding);
-    appearance.insert("border_thickness", state.ui_state().border_thickness);
-    appearance.insert("border_enabled", state.ui_state().border_enabled);
-    appearance.insert("background_alpha", state.ui_state().background_alpha);
-    appearance.insert("font_size", state.ui_state().font_size);
-    appearance.insert("vignette_thickness", state.ui_state().vignette_thickness);
-    appearance.insert("font_path", std::string(state.ui_state().font_path.data()));
-    appearance.insert("fade_enabled", state.ui_state().fade_enabled);
-    appearance.insert("fade_timeout", state.ui_state().fade_timeout);
-    t.insert("appearance", std::move(appearance));
-
-    return t;
-}
-
-static bool tomlToDialogState(const toml::table& t, BaseWindowState& state, std::string& name)
-{
-    auto name_val = t["name"].value<std::string>();
-    if (!name_val)
-        return false;
-    name = *name_val;
-
-    if (auto* behavior = t["behavior"].as_table())
-    {
-        if (auto v = (*behavior)["auto_scroll_to_new"].value<bool>())
-            state.ui_state().auto_scroll_to_new = *v;
-    }
-
-    if (auto* translation_tbl = t["translation"].as_table())
-    {
-        if (auto v = (*translation_tbl)["use_global_translation"].value<bool>())
-            state.use_global_translation = *v;
-        if (auto v = (*translation_tbl)["translate_enabled"].value<bool>())
-            state.translation_config().translate_enabled = *v;
-        if (auto v = (*translation_tbl)["auto_apply_changes"].value<bool>())
-            state.translation_config().auto_apply_changes = *v;
-        if (auto v = (*translation_tbl)["include_dialog_stream"].value<bool>())
-            state.translation_config().include_dialog_stream = *v;
-        if (auto v = (*translation_tbl)["include_corner_stream"].value<bool>())
-            state.translation_config().include_corner_stream = *v;
-        if (auto v = (*translation_tbl)["glossary_enabled"].value<bool>())
-            state.translation_config().glossary_enabled = *v;
-        if (auto v = (*translation_tbl)["translation_backend"].value<int>())
-            state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
-        if (auto v = (*translation_tbl)["target_lang"].value<std::string>())
-        {
-            if (*v == "en-us")
-                state.translation_config().target_lang_enum = TranslationConfig::TargetLang::EN_US;
-            else if (*v == "zh-cn")
-                state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
-            else if (*v == "zh-tw")
-                state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
-        }
-        if (auto v = (*translation_tbl)["custom_prompt"].value<std::string>())
-            safe_strncpy(state.translation_config().custom_prompt.data(), v->c_str(),
-                         state.translation_config().custom_prompt.size());
-
-        if (auto* openai_tbl = (*translation_tbl)["openai"].as_table())
-        {
-            if (auto v = (*openai_tbl)["base_url"].value<std::string>())
-                safe_strncpy(state.translation_config().openai_base_url.data(), v->c_str(),
-                             state.translation_config().openai_base_url.size());
-            if (auto v = (*openai_tbl)["model"].value<std::string>())
-                safe_strncpy(state.translation_config().openai_model.data(), v->c_str(),
-                             state.translation_config().openai_model.size());
-            if (auto v = (*openai_tbl)["api_key"].value<std::string>())
-                safe_strncpy(state.translation_config().openai_api_key.data(), v->c_str(),
-                             state.translation_config().openai_api_key.size());
-        }
-
-        if (auto* google_tbl = (*translation_tbl)["google"].as_table())
-        {
-            if (auto v = (*google_tbl)["api_key"].value<std::string>())
-                safe_strncpy(state.translation_config().google_api_key.data(), v->c_str(),
-                             state.translation_config().google_api_key.size());
-        }
-
-        if (auto* qwen_tbl = (*translation_tbl)["qwen"].as_table())
-        {
-            if (auto v = (*qwen_tbl)["api_key"].value<std::string>())
-                safe_strncpy(state.translation_config().qwen_api_key.data(), v->c_str(),
-                             state.translation_config().qwen_api_key.size());
-            if (auto v = (*qwen_tbl)["model"].value<std::string>())
-                safe_strncpy(state.translation_config().qwen_model.data(), v->c_str(),
-                             state.translation_config().qwen_model.size());
-        }
-
-        if (auto* niutrans_tbl = (*translation_tbl)["niutrans"].as_table())
-        {
-            if (auto v = (*niutrans_tbl)["api_key"].value<std::string>())
-                safe_strncpy(state.translation_config().niutrans_api_key.data(), v->c_str(),
-                             state.translation_config().niutrans_api_key.size());
-        }
-
-        if (auto* zhipu_tbl = (*translation_tbl)["zhipu"].as_table())
-        {
-            if (auto v = (*zhipu_tbl)["base_url"].value<std::string>())
-                safe_strncpy(state.translation_config().zhipu_base_url.data(), v->c_str(),
-                             state.translation_config().zhipu_base_url.size());
-            if (auto v = (*zhipu_tbl)["model"].value<std::string>())
-                safe_strncpy(state.translation_config().zhipu_model.data(), v->c_str(),
-                             state.translation_config().zhipu_model.size());
-            if (auto v = (*zhipu_tbl)["api_key"].value<std::string>())
-                safe_strncpy(state.translation_config().zhipu_api_key.data(), v->c_str(),
-                             state.translation_config().zhipu_api_key.size());
-        }
-
-        if (auto* youdao_tbl = (*translation_tbl)["youdao"].as_table())
-        {
-            if (auto v = (*youdao_tbl)["app_key"].value<std::string>())
-                safe_strncpy(state.translation_config().youdao_app_key.data(), v->c_str(),
-                             state.translation_config().youdao_app_key.size());
-            if (auto v = (*youdao_tbl)["app_secret"].value<std::string>())
-                safe_strncpy(state.translation_config().youdao_app_secret.data(), v->c_str(),
-                             state.translation_config().youdao_app_secret.size());
-            if (auto v = (*youdao_tbl)["mode"].value<int>())
-            {
-                if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
-                    state.translation_config().youdao_mode = TranslationConfig::YoudaoMode::LargeModel;
-                else
-                    state.translation_config().youdao_mode = TranslationConfig::YoudaoMode::Text;
-            }
-        }
-    }
-
-    if (auto* appearance = t["appearance"].as_table())
-    {
-        if (auto v = (*appearance)["width"].value<double>())
-            state.ui_state().width = static_cast<float>(*v);
-        if (auto v = (*appearance)["height"].value<double>())
-            state.ui_state().height = static_cast<float>(*v);
-        if (auto v = (*appearance)["pos_x"].value<double>())
-            state.ui_state().window_pos.x = static_cast<float>(*v);
-        if (auto v = (*appearance)["pos_y"].value<double>())
-            state.ui_state().window_pos.y = static_cast<float>(*v);
-        if (auto v = (*appearance)["padding_x"].value<double>())
-            state.ui_state().padding.x = static_cast<float>(*v);
-        if (auto v = (*appearance)["padding_y"].value<double>())
-            state.ui_state().padding.y = static_cast<float>(*v);
-        if (auto v = (*appearance)["rounding"].value<double>())
-            state.ui_state().rounding = static_cast<float>(*v);
-        if (auto v = (*appearance)["border_thickness"].value<double>())
-            state.ui_state().border_thickness = static_cast<float>(*v);
-        if (auto v = (*appearance)["border_enabled"].value<bool>())
-            state.ui_state().border_enabled = *v;
-        if (auto v = (*appearance)["background_alpha"].value<double>())
-            state.ui_state().background_alpha = static_cast<float>(*v);
-        if (auto v = (*appearance)["font_size"].value<double>())
-            state.ui_state().font_size = static_cast<float>(*v);
-        if (auto v = (*appearance)["vignette_thickness"].value<double>())
-            state.ui_state().vignette_thickness = static_cast<float>(*v);
-        if (auto v = (*appearance)["font_path"].value<std::string>())
-            safe_strncpy(state.ui_state().font_path.data(), v->c_str(), state.ui_state().font_path.size());
-        if (auto v = (*appearance)["fade_enabled"].value<bool>())
-            state.ui_state().fade_enabled = *v;
-        if (auto v = (*appearance)["fade_timeout"].value<double>())
-            state.ui_state().fade_timeout = static_cast<float>(*v);
-    }
-
-    if (auto v = t["auto_scroll_to_new"].value<bool>())
-        state.ui_state().auto_scroll_to_new = *v;
-    if (auto v = t["use_global_translation"].value<bool>())
-        state.use_global_translation = *v;
-    if (auto v = t["translate_enabled"].value<bool>())
-        state.translation_config().translate_enabled = *v;
-    if (auto v = t["auto_apply_changes"].value<bool>())
-        state.translation_config().auto_apply_changes = *v;
-    if (auto v = t["include_dialog_stream"].value<bool>())
-        state.translation_config().include_dialog_stream = *v;
-    if (auto v = t["include_corner_stream"].value<bool>())
-        state.translation_config().include_corner_stream = *v;
-    if (auto v = t["glossary_enabled"].value<bool>())
-        state.translation_config().glossary_enabled = *v;
-    if (auto v = t["translation_backend"].value<int>())
-        state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
-
-    if (auto v = t["target_lang"].value<std::string>())
-    {
-        if (*v == "en-us")
-            state.translation_config().target_lang_enum = TranslationConfig::TargetLang::EN_US;
-        else if (*v == "zh-cn")
-            state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_CN;
-        else if (*v == "zh-tw")
-            state.translation_config().target_lang_enum = TranslationConfig::TargetLang::ZH_TW;
-    }
-    if (auto v = t["custom_prompt"].value<std::string>())
-        safe_strncpy(state.translation_config().custom_prompt.data(), v->c_str(),
-                     state.translation_config().custom_prompt.size());
-
-    if (auto v = t["openai_base_url"].value<std::string>())
-        safe_strncpy(state.translation_config().openai_base_url.data(), v->c_str(),
-                     state.translation_config().openai_base_url.size());
-    if (auto v = t["openai_model"].value<std::string>())
-        safe_strncpy(state.translation_config().openai_model.data(), v->c_str(),
-                     state.translation_config().openai_model.size());
-    if (auto v = t["openai_api_key"].value<std::string>())
-        safe_strncpy(state.translation_config().openai_api_key.data(), v->c_str(),
-                     state.translation_config().openai_api_key.size());
-    if (auto v = t["google_api_key"].value<std::string>())
-        safe_strncpy(state.translation_config().google_api_key.data(), v->c_str(),
-                     state.translation_config().google_api_key.size());
-    if (auto v = t["qwen_api_key"].value<std::string>())
-        safe_strncpy(state.translation_config().qwen_api_key.data(), v->c_str(),
-                     state.translation_config().qwen_api_key.size());
-    if (auto v = t["qwen_model"].value<std::string>())
-        safe_strncpy(state.translation_config().qwen_model.data(), v->c_str(),
-                     state.translation_config().qwen_model.size());
-    if (auto v = t["niutrans_api_key"].value<std::string>())
-        safe_strncpy(state.translation_config().niutrans_api_key.data(), v->c_str(),
-                     state.translation_config().niutrans_api_key.size());
-    if (auto v = t["zhipu_base_url"].value<std::string>())
-        safe_strncpy(state.translation_config().zhipu_base_url.data(), v->c_str(),
-                     state.translation_config().zhipu_base_url.size());
-    if (auto v = t["zhipu_model"].value<std::string>())
-        safe_strncpy(state.translation_config().zhipu_model.data(), v->c_str(),
-                     state.translation_config().zhipu_model.size());
-    if (auto v = t["zhipu_api_key"].value<std::string>())
-        safe_strncpy(state.translation_config().zhipu_api_key.data(), v->c_str(),
-                     state.translation_config().zhipu_api_key.size());
-    if (auto v = t["youdao_app_key"].value<std::string>())
-        safe_strncpy(state.translation_config().youdao_app_key.data(), v->c_str(),
-                     state.translation_config().youdao_app_key.size());
-    if (auto v = t["youdao_app_secret"].value<std::string>())
-        safe_strncpy(state.translation_config().youdao_app_secret.data(), v->c_str(),
-                     state.translation_config().youdao_app_secret.size());
-    if (auto v = t["youdao_mode"].value<int>())
-    {
-        if (*v == static_cast<int>(TranslationConfig::YoudaoMode::LargeModel))
-            state.translation_config().youdao_mode = TranslationConfig::YoudaoMode::LargeModel;
-        else
-            state.translation_config().youdao_mode = TranslationConfig::YoudaoMode::Text;
-    }
-
-    // GUI properties
-    if (auto v = t["width"].value<double>())
-        state.ui_state().width = static_cast<float>(*v);
-    if (auto v = t["height"].value<double>())
-        state.ui_state().height = static_cast<float>(*v);
-    if (auto v = t["pos_x"].value<double>())
-        state.ui_state().window_pos.x = static_cast<float>(*v);
-    if (auto v = t["pos_y"].value<double>())
-        state.ui_state().window_pos.y = static_cast<float>(*v);
-    if (auto v = t["padding_x"].value<double>())
-        state.ui_state().padding.x = static_cast<float>(*v);
-    if (auto v = t["padding_y"].value<double>())
-        state.ui_state().padding.y = static_cast<float>(*v);
-    if (auto v = t["rounding"].value<double>())
-        state.ui_state().rounding = static_cast<float>(*v);
-    if (auto v = t["border_thickness"].value<double>())
-        state.ui_state().border_thickness = static_cast<float>(*v);
-    if (auto v = t["background_alpha"].value<double>())
-        state.ui_state().background_alpha = static_cast<float>(*v);
-    if (auto v = t["font_size"].value<double>())
-        state.ui_state().font_size = static_cast<float>(*v);
-    if (auto v = t["vignette_thickness"].value<double>())
-        state.ui_state().vignette_thickness = static_cast<float>(*v);
-    if (auto v = t["font_path"].value<std::string>())
-        safe_strncpy(state.ui_state().font_path.data(), v->c_str(), state.ui_state().font_path.size());
-
-    // Fade settings
-    if (auto v = t["fade_enabled"].value<bool>())
-        state.ui_state().fade_enabled = *v;
-    if (auto v = t["fade_timeout"].value<double>())
-        state.ui_state().fade_timeout = static_cast<float>(*v);
-
-    return true;
-}
 
 static long long file_mtime_ms(const fs::path& p)
 {
@@ -465,6 +90,10 @@ ConfigManager::ConfigManager()
     config_path_ = "config.toml";
     last_mtime_ = file_mtime_ms(config_path_);
     global_translation_config_.applyDefaults();
+    
+    // Initialize window managers (will be configured when registry is set)
+    // Note: These are initialized without operations yet - will be set in setRegistry()
+    
     // Logging level will be applied when config is loaded via setLoggingLevel()
 }
 
@@ -474,228 +103,66 @@ void ConfigManager::setDefaultDialogEnabled(bool enabled)
 {
     if (default_dialog_enabled_ == enabled)
         return;
-    if (!enabled && registry_)
-    {
-        if (auto* current_default = registry_->defaultDialogWindow())
-        {
-            default_dialog_name_ = current_default->displayName();
-            default_dialog_state_ = current_default->state();
-            sanitizeDialogState(*default_dialog_state_);
-        }
-    }
+    
     default_dialog_enabled_ = enabled;
-    if (suppress_default_window_updates_)
-        return;
-
-    enforceDefaultDialogState();
-
-    if (registry_)
-        saveAll();
+    
+    if (default_dialog_mgr_)
+    {
+        default_dialog_mgr_->setEnabled(enabled, suppress_default_window_updates_, registry_);
+        
+        if (!suppress_default_window_updates_ && registry_)
+            saveAll();
+    }
 }
 
 void ConfigManager::setDefaultQuestEnabled(bool enabled)
 {
     if (default_quest_enabled_ == enabled)
         return;
-    if (!enabled && registry_)
-    {
-        if (auto* current_default = registry_->defaultQuestWindow())
-        {
-            default_quest_name_ = current_default->displayName();
-            default_quest_state_ = current_default->state();
-            sanitizeDialogState(*default_quest_state_);
-        }
-    }
+    
     default_quest_enabled_ = enabled;
-    if (suppress_default_window_updates_)
-        return;
-
-    enforceDefaultQuestState();
-
-    if (registry_)
-        saveAll();
+    
+    if (default_quest_mgr_)
+    {
+        default_quest_mgr_->setEnabled(enabled, suppress_default_window_updates_, registry_);
+        
+        if (!suppress_default_window_updates_ && registry_)
+            saveAll();
+    }
 }
 
 void ConfigManager::setDefaultQuestHelperEnabled(bool enabled)
 {
     if (default_quest_helper_enabled_ == enabled)
         return;
-    if (!enabled && registry_)
-    {
-        if (auto* current_default = registry_->defaultQuestHelperWindow())
-        {
-            default_quest_helper_name_ = current_default->displayName();
-            default_quest_helper_state_ = current_default->state();
-            sanitizeDialogState(*default_quest_helper_state_);
-        }
-    }
+    
     default_quest_helper_enabled_ = enabled;
-    if (suppress_default_window_updates_)
-        return;
-
-    enforceDefaultQuestHelperState();
-
-    if (registry_)
-        saveAll();
+    
+    if (default_quest_helper_mgr_)
+    {
+        default_quest_helper_mgr_->setEnabled(enabled, suppress_default_window_updates_, registry_);
+        
+        if (!suppress_default_window_updates_ && registry_)
+            saveAll();
+    }
 }
 
-void ConfigManager::reconcileDefaultWindowStates() { enforceDefaultWindowStates(); }
-
-void ConfigManager::enforceDefaultDialogState()
+void ConfigManager::reconcileDefaultWindowStates()
 {
-    if (!registry_)
-        return;
-
-    auto* current_default = registry_->defaultDialogWindow();
-    if (default_dialog_enabled_)
-    {
-        if (!current_default)
-        {
-            auto& dialog = registry_->createDialogWindow(true);
-            if (!default_dialog_name_.empty())
-            {
-                dialog.rename(default_dialog_name_.c_str());
-            }
-            else
-            {
-                default_dialog_name_ = dialog.displayName();
-            }
-            registry_->markDialogAsDefault(dialog);
-            if (default_dialog_state_)
-            {
-                applyStoredState(dialog, *default_dialog_state_);
-            }
-            else
-            {
-                sanitizeDialogState(dialog.state());
-            }
-            current_default = &dialog;
-        }
-        else
-        {
-            default_dialog_name_ = current_default->displayName();
-        }
-
-        if (current_default)
-        {
-            default_dialog_state_ = current_default->state();
-            sanitizeDialogState(*default_dialog_state_);
-        }
-    }
-    else if (current_default)
-    {
-        default_dialog_name_ = current_default->displayName();
-        default_dialog_state_ = current_default->state();
-        sanitizeDialogState(*default_dialog_state_);
-        registry_->removeWindow(current_default);
-    }
+    enforceDefaultWindowStates();
 }
 
-void ConfigManager::enforceDefaultQuestState()
-{
-    if (!registry_)
-        return;
 
-    auto* current_default = registry_->defaultQuestWindow();
-    if (default_quest_enabled_)
-    {
-        if (!current_default)
-        {
-            auto& quest = registry_->createQuestWindow(true);
-            if (!default_quest_name_.empty())
-            {
-                quest.rename(default_quest_name_.c_str());
-            }
-            else
-            {
-                default_quest_name_ = quest.displayName();
-            }
-            registry_->markQuestAsDefault(quest);
-            if (default_quest_state_)
-            {
-                applyStoredState(quest, *default_quest_state_);
-            }
-            else
-            {
-                sanitizeDialogState(quest.state());
-            }
-            current_default = &quest;
-        }
-        else
-        {
-            default_quest_name_ = current_default->displayName();
-        }
 
-        if (current_default)
-        {
-            default_quest_state_ = current_default->state();
-            sanitizeDialogState(*default_quest_state_);
-        }
-    }
-    else if (current_default)
-    {
-        default_quest_name_ = current_default->displayName();
-        default_quest_state_ = current_default->state();
-        sanitizeDialogState(*default_quest_state_);
-        registry_->removeWindow(current_default);
-    }
-}
-
-void ConfigManager::enforceDefaultQuestHelperState()
-{
-    if (!registry_)
-        return;
-
-    auto* current_default = registry_->defaultQuestHelperWindow();
-    if (default_quest_helper_enabled_)
-    {
-        if (!current_default)
-        {
-            auto& quest_helper = registry_->createQuestHelperWindow(true);
-            if (!default_quest_helper_name_.empty())
-            {
-                quest_helper.rename(default_quest_helper_name_.c_str());
-            }
-            else
-            {
-                default_quest_helper_name_ = quest_helper.displayName();
-            }
-            registry_->markQuestHelperAsDefault(quest_helper);
-            if (default_quest_helper_state_)
-            {
-                applyStoredState(quest_helper, *default_quest_helper_state_);
-            }
-            else
-            {
-                sanitizeDialogState(quest_helper.state());
-            }
-            current_default = &quest_helper;
-        }
-        else
-        {
-            default_quest_helper_name_ = current_default->displayName();
-        }
-
-        if (current_default)
-        {
-            default_quest_helper_state_ = current_default->state();
-            sanitizeDialogState(*default_quest_helper_state_);
-        }
-    }
-    else if (current_default)
-    {
-        default_quest_helper_name_ = current_default->displayName();
-        default_quest_helper_state_ = current_default->state();
-        sanitizeDialogState(*default_quest_helper_state_);
-        registry_->removeWindow(current_default);
-    }
-}
 
 void ConfigManager::enforceDefaultWindowStates()
 {
-    enforceDefaultDialogState();
-    enforceDefaultQuestState();
-    enforceDefaultQuestHelperState();
+    if (default_dialog_mgr_)
+        default_dialog_mgr_->enforceState(registry_);
+    if (default_quest_mgr_)
+        default_quest_mgr_->enforceState(registry_);
+    if (default_quest_helper_mgr_)
+        default_quest_helper_mgr_->enforceState(registry_);
 }
 
 void ConfigManager::setUIScale(float scale)
@@ -715,7 +182,37 @@ void ConfigManager::setUIScale(float scale)
     ImGui::GetIO().FontGlobalScale = ui_scale_;
 }
 
-void ConfigManager::setRegistry(WindowRegistry* reg) { registry_ = reg; }
+void ConfigManager::setRegistry(WindowRegistry* reg)
+{
+    registry_ = reg;
+    
+    if (registry_)
+    {
+        // Initialize window managers with their operations
+        auto dialog_ops = std::make_unique<WindowStateOperations<DialogWindow, DialogStateManager>>(registry_, UIWindowType::Dialog);
+        default_dialog_mgr_ = std::make_unique<DefaultWindowManager>(std::move(dialog_ops), "dialogs");
+        
+        auto quest_ops = std::make_unique<WindowStateOperations<QuestWindow, QuestStateManager>>(registry_, UIWindowType::Quest);
+        default_quest_mgr_ = std::make_unique<DefaultWindowManager>(std::move(quest_ops), "quests");
+        
+        auto quest_helper_ops = std::make_unique<WindowStateOperations<QuestHelperWindow, QuestHelperStateManager>>(registry_, UIWindowType::QuestHelper);
+        default_quest_helper_mgr_ = std::make_unique<DefaultWindowManager>(std::move(quest_helper_ops), "quest_helpers");
+        
+        // Sync enabled states to newly created managers
+        if (default_dialog_mgr_)
+        {
+            default_dialog_mgr_->setEnabled(default_dialog_enabled_, true, registry_);
+        }
+        if (default_quest_mgr_)
+        {
+            default_quest_mgr_->setEnabled(default_quest_enabled_, true, registry_);
+        }
+        if (default_quest_helper_mgr_)
+        {
+            default_quest_helper_mgr_->setEnabled(default_quest_helper_enabled_, true, registry_);
+        }
+    }
+}
 
 bool ConfigManager::saveAll()
 {
@@ -807,73 +304,40 @@ bool ConfigManager::saveAll()
     app.insert("debug", std::move(debug));
     root.insert("app", std::move(app));
 
-    if (auto* current_default_dialog = registry_->defaultDialogWindow())
-    {
-        default_dialog_name_ = current_default_dialog->displayName();
-        default_dialog_state_ = current_default_dialog->state();
-        sanitizeDialogState(*default_dialog_state_);
-    }
-
     auto windows = registry_->windowsByType(UIWindowType::Dialog);
     toml::array arr;
-    if (!default_dialog_enabled_ && default_dialog_state_ && !default_dialog_name_.empty())
-    {
-        arr.push_back(dialogStateToToml(default_dialog_name_, *default_dialog_state_));
-    }
     for (auto* w : windows)
     {
         auto* dw = dynamic_cast<DialogWindow*>(w);
         if (!dw)
             continue;
-        auto t = dialogStateToToml(dw->displayName(), dw->state());
+        auto t = StateSerializer::serialize(dw->displayName(), dw->state());
         arr.push_back(std::move(t));
     }
     root.insert("dialogs", std::move(arr));
 
-    if (auto* current_default_quest = registry_->defaultQuestWindow())
-    {
-        default_quest_name_ = current_default_quest->displayName();
-        default_quest_state_ = current_default_quest->state();
-        sanitizeDialogState(*default_quest_state_);
-    }
-
     auto quest_windows = registry_->windowsByType(UIWindowType::Quest);
     toml::array quests_arr;
-    if (!default_quest_enabled_ && default_quest_state_ && !default_quest_name_.empty())
-    {
-        quests_arr.push_back(dialogStateToToml(default_quest_name_, *default_quest_state_));
-    }
     for (auto* w : quest_windows)
     {
         auto* qw = dynamic_cast<QuestWindow*>(w);
         if (!qw)
             continue;
-        quests_arr.push_back(dialogStateToToml(qw->displayName(), qw->state()));
+        quests_arr.push_back(StateSerializer::serialize(qw->displayName(), qw->state()));
     }
     if (!quests_arr.empty())
     {
         root.insert("quests", std::move(quests_arr));
     }
 
-    if (auto* current_default_quest_helper = registry_->defaultQuestHelperWindow())
-    {
-        default_quest_helper_name_ = current_default_quest_helper->displayName();
-        default_quest_helper_state_ = current_default_quest_helper->state();
-        sanitizeDialogState(*default_quest_helper_state_);
-    }
-
     auto quest_helper_windows = registry_->windowsByType(UIWindowType::QuestHelper);
     toml::array quest_helpers_arr;
-    if (!default_quest_helper_enabled_ && default_quest_helper_state_ && !default_quest_helper_name_.empty())
-    {
-        quest_helpers_arr.push_back(dialogStateToToml(default_quest_helper_name_, *default_quest_helper_state_));
-    }
     for (auto* w : quest_helper_windows)
     {
         auto* qhw = dynamic_cast<QuestHelperWindow*>(w);
         if (!qhw)
             continue;
-        quest_helpers_arr.push_back(dialogStateToToml(qhw->displayName(), qhw->state()));
+        quest_helpers_arr.push_back(StateSerializer::serialize(qhw->displayName(), qhw->state()));
     }
     if (!quest_helpers_arr.empty())
     {
@@ -1099,7 +563,6 @@ bool ConfigManager::loadAndApply()
                 setHookWaitTimeoutMs(*v);
         }
 
-        default_dialog_state_.reset();
         if (auto* arr = root["dialogs"].as_array())
         {
             std::vector<std::pair<std::string, DialogStateManager>> dialog_configs;
@@ -1117,7 +580,7 @@ bool ConfigManager::loadAndApply()
                                  state.translation_config().custom_prompt.size());
                 }
                 std::string name;
-                if (tomlToDialogState(tbl, state, name)) // Overlay config values
+                if (StateSerializer::deserialize(tbl, state, name))
                 {
                     dialog_configs.emplace_back(std::move(name), std::move(state));
                 }
@@ -1131,10 +594,6 @@ bool ConfigManager::loadAndApply()
 
             if (!dialog_configs.empty())
             {
-                default_dialog_name_ = dialog_configs.front().first;
-                default_dialog_state_ = dialog_configs.front().second;
-                sanitizeDialogState(*default_dialog_state_);
-
                 auto windows = registry_->windowsByType(UIWindowType::Dialog);
                 int have = static_cast<int>(windows.size());
                 int want = static_cast<int>(dialog_configs.size());
@@ -1181,13 +640,10 @@ bool ConfigManager::loadAndApply()
                     if (default_dialog_enabled_ && i == 0)
                     {
                         registry_->markDialogAsDefault(*dw);
-                        default_dialog_name_ = dw->displayName();
                     }
                 }
             }
         }
-
-        default_quest_state_.reset();
 
         auto applyQuestConfig =
             [&](QuestWindow& quest_window, QuestStateManager& quest_state, const std::string& quest_name)
@@ -1223,19 +679,12 @@ bool ConfigManager::loadAndApply()
                              quest_state.translation_config().custom_prompt.size());
             }
             std::string quest_name;
-            if (!tomlToDialogState(quest_tbl, quest_state, quest_name))
+            if (!StateSerializer::deserialize(quest_tbl, quest_state, quest_name))
             {
                 utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
                                                     "Skipped invalid quest window in configuration",
                                                     "Missing name for quest entry in config file.");
                 return;
-            }
-
-            if (index == 0)
-            {
-                default_quest_name_ = quest_name;
-                default_quest_state_ = quest_state;
-                sanitizeDialogState(*default_quest_state_);
             }
 
             auto quests = registry_->windowsByType(UIWindowType::Quest);
@@ -1256,7 +705,6 @@ bool ConfigManager::loadAndApply()
                 if (default_quest_enabled_ && index == 0)
                 {
                     registry_->markQuestAsDefault(*quest_window);
-                    default_quest_name_ = quest_window->displayName();
                 }
             }
         };
@@ -1298,17 +746,14 @@ bool ConfigManager::loadAndApply()
             }
             std::string name;
             QuestHelperStateManager quest_helper_state;
-            if (tomlToDialogState(tbl, quest_helper_state, name))
+            if (StateSerializer::deserialize(tbl, quest_helper_state, name))
             {
                 qh_window->rename(name.c_str());
-                applyStoredState(*qh_window, quest_helper_state);
+                WindowStateApplier::apply(*qh_window, quest_helper_state);
                 qh_window->setDefaultInstance(false);
                 if (default_quest_helper_enabled_ && index == 0)
                 {
                     registry_->markQuestHelperAsDefault(*qh_window);
-                    default_quest_helper_name_ = qh_window->displayName();
-                    default_quest_helper_state_ = qh_window->state();
-                    sanitizeDialogState(*default_quest_helper_state_);
                 }
             }
         };
