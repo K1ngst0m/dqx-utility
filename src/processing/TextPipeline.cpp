@@ -1,7 +1,7 @@
 #include "TextPipeline.hpp"
 #include "LabelProcessor.hpp"
 #include "StageRunner.hpp"
-#include "TextNormalizer.hpp"
+#include "NFKCTextNormalizer.hpp"
 #include "JapaneseTextDetector.hpp"
 #include "Diagnostics.hpp"
 #include "GlossaryManager.hpp"
@@ -100,12 +100,14 @@ struct TextPipeline::Impl
 {
     explicit Impl(UnknownLabelRepository* repo)
         : label_processor(repo)
+        , normalizer(std::make_unique<NFKCTextNormalizer>())
     {
         glossary_manager.initialize();
     }
 
     LabelProcessor label_processor;
     GlossaryManager glossary_manager;
+    std::unique_ptr<ITextNormalizer> normalizer;
 };
 
 TextPipeline::TextPipeline(UnknownLabelRepository* repo)
@@ -153,8 +155,7 @@ std::string TextPipeline::process(const std::string& input, const std::string& t
     auto norm_stage = run_stage<std::string>("normalizer",
                                              [&]()
                                              {
-                                                 std::string s = processing::normalize_line_endings(input);
-                                                 return processing::collapse_newlines(s);
+                                                 return impl_->normalizer->normalize(input);
                                              });
     logStageResult(norm_stage, "normalizer");
     if (!norm_stage.succeeded)
@@ -181,7 +182,7 @@ std::string TextPipeline::process(const std::string& input, const std::string& t
     auto final_stage = run_stage<std::string>("final_collapse",
                                               [&]()
                                               {
-                                                  return processing::collapse_newlines(label_stage.result);
+                                                  return impl_->normalizer->collapseNewlines(label_stage.result);
                                               });
     logStageResult(final_stage, "final_collapse", &label_stage.result);
     if (!final_stage.succeeded)

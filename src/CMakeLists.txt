@@ -119,18 +119,19 @@ target_sources(dqxu_core
     processing/Diagnostics.hpp
     processing/GlossaryManager.cpp
     processing/GlossaryManager.hpp
+    processing/ITextNormalizer.hpp
     processing/JapaneseTextDetector.cpp
     processing/JapaneseTextDetector.hpp
     processing/LabelProcessor.cpp
     processing/LabelProcessor.hpp
     processing/LabelRegistry.cpp
     processing/LabelRegistry.hpp
-    processing/TextNormalizer.cpp
-    processing/TextNormalizer.hpp
     processing/TextPipeline.cpp
     processing/TextPipeline.hpp
     processing/UnknownLabelRepository.cpp
     processing/UnknownLabelRepository.hpp
+    processing/NFKCTextNormalizer.cpp
+    processing/NFKCTextNormalizer.hpp
 )
 
 target_sources(dqxu_core
@@ -235,6 +236,7 @@ target_link_libraries(dqxu_core
     cpr::cpr
     cpptrace::cpptrace
     nlohmann_json::nlohmann_json
+    utf8proc
   PRIVATE
     project_options
     project_warnings

@@ -17,7 +17,7 @@
 
 #include "../../translate/ITranslator.hpp"
 #include "../../processing/TextPipeline.hpp"
-#include "../../processing/TextNormalizer.hpp"
+#include "../../processing/NFKCTextNormalizer.hpp"
 #include "../../config/ConfigManager.hpp"
 #include "../UITheme.hpp"
 #include "../../services/DQXClarityService.hpp"
@@ -279,7 +279,7 @@ void DialogWindow::refreshPlaceholderStatus()
 
 int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::string& text)
 {
-    std::string collapsed_text = processing::collapse_newlines(text);
+    std::string collapsed_text = text_normalizer_->collapseNewlines(text);
     if (placeholder_active_)
     {
         ensurePlaceholderEntry();
@@ -321,6 +321,7 @@ DialogWindow::DialogWindow(FontManager& font_manager, WindowRegistry& registry, 
     is_default_instance_ = is_default;
 
     text_pipeline_ = std::make_unique<processing::TextPipeline>();
+    text_normalizer_ = std::make_unique<processing::NFKCTextNormalizer>();
 
     state_.applyDefaults();
 
@@ -537,7 +538,7 @@ void DialogWindow::render()
                         }
                         else
                         {
-                            std::string collapsed_text = processing::collapse_newlines(ev.text);
+                            std::string collapsed_text = text_normalizer_->collapseNewlines(ev.text);
                             safe_copy_utf8(state_.content_state().segments[idx].data(),
                                            state_.content_state().segments[idx].size(), collapsed_text);
                             failed_segments_.erase(idx);
@@ -566,7 +567,7 @@ void DialogWindow::render()
                     }
                     else
                     {
-                        std::string collapsed_text = processing::collapse_newlines(ev.text);
+                        std::string collapsed_text = text_normalizer_->collapseNewlines(ev.text);
                         safe_copy_utf8(state_.content_state().segments.back().data(),
                                        state_.content_state().segments.back().size(), collapsed_text);
                         activity_monitor_.markActive();

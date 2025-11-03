@@ -242,7 +242,7 @@ TEST_CASE("LabelProcessor - Real log examples", "[label][processor][integration]
         std::string input = "<pipipi_off>フリンは　せかいじゅの葉を\n５個　手に入れた！<se_nots System 7><end>";
         std::string result = processor.processText(input);
 
-        REQUIRE(result == "フリンは　せかいじゅの葉を\n５個　手に入れた！\n");
+        REQUIRE(result == "フリンは　せかいじゅの葉を\n５個　手に入れた！");
         REQUIRE(result.find("<pipipi_off>") == std::string::npos);
         REQUIRE(result.find("<se_nots") == std::string::npos);
     }

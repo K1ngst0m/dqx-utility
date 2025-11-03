@@ -31,6 +31,7 @@ enum class Backend;
 namespace processing
 {
 class TextPipeline;
+class ITextNormalizer;
 }
 
 class DialogWindow : public UIWindow
@@ -144,6 +145,7 @@ private:
     std::unique_ptr<translate::ITranslator> translator_;
     std::uint64_t last_job_id_ = 0;
     std::unique_ptr<processing::TextPipeline> text_pipeline_;
+    std::unique_ptr<processing::ITextNormalizer> text_normalizer_;
 
     TranslateSession session_;
     translate::BackendConfig cached_translator_config_{};

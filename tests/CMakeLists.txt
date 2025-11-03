@@ -3,6 +3,8 @@ enable_testing()
 add_executable(dqxu_tests
   test_main.cpp
   test_text_processing.cpp
+  test_nfkc_normalizer.cpp
+  test_label_registry.cpp
   dqxclarity/test_memory.cpp
   dqxclarity/test_pattern_scanner.cpp
   dqxclarity/test_process_finder.cpp
@@ -25,6 +27,7 @@ target_link_libraries(dqxu_tests
     Catch2::Catch2WithMain
     dqxu_core
     dqxclarity::dqxclarity
+    utf8proc
 )
 
 if(WIN32)

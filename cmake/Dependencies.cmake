@@ -203,6 +203,15 @@ else()
   set(libmem_ADDED FALSE)
 endif()
 
+# utf8proc - Lightweight UTF-8 processing library
+CPMAddPackage(
+  NAME utf8proc
+  GITHUB_REPOSITORY JuliaStrings/utf8proc
+  GIT_TAG v2.11.0
+  OPTIONS
+    "UTF8PROC_ENABLE_TESTING OFF"
+)
+
 # Tracy - Real-time profiler (only for PROFILING_LEVEL >= 2)
 if(PROFILING_LEVEL GREATER_EQUAL 2)
   CPMAddPackage(
@@ -259,6 +268,10 @@ endif()
 
 if(NOT libmem_ADDED)
   message(FATAL_ERROR "Required dependency libmem was not acquired.")
+endif()
+
+if(NOT utf8proc_ADDED)
+  message(FATAL_ERROR "Required dependency utf8proc was not acquired.")
 endif()
 
 if(PROFILING_LEVEL GREATER_EQUAL 2)
