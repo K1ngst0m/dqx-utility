@@ -48,6 +48,8 @@ void StateSerializer::serializeCommonState(toml::table& t, const BaseWindowState
     translation.insert("include_dialog_stream", state.translation_config().include_dialog_stream);
     translation.insert("include_corner_stream", state.translation_config().include_corner_stream);
     translation.insert("glossary_enabled", state.translation_config().glossary_enabled);
+    translation.insert("fuzzy_glossary_enabled", state.translation_config().fuzzy_glossary_enabled);
+    translation.insert("fuzzy_glossary_threshold", state.translation_config().fuzzy_glossary_threshold);
     translation.insert("translation_backend", static_cast<int>(state.translation_config().translation_backend));
 
     std::string target_lang;
@@ -155,6 +157,10 @@ void StateSerializer::deserializeCommonState(const toml::table& t, BaseWindowSta
             state.translation_config().include_corner_stream = *v;
         if (auto v = (*translation_tbl)["glossary_enabled"].value<bool>())
             state.translation_config().glossary_enabled = *v;
+        if (auto v = (*translation_tbl)["fuzzy_glossary_enabled"].value<bool>())
+            state.translation_config().fuzzy_glossary_enabled = *v;
+        if (auto v = (*translation_tbl)["fuzzy_glossary_threshold"].value<double>())
+            state.translation_config().fuzzy_glossary_threshold = static_cast<float>(*v);
         if (auto v = (*translation_tbl)["translation_backend"].value<int>())
             state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
         if (auto v = (*translation_tbl)["target_lang"].value<std::string>())
@@ -288,6 +294,10 @@ void StateSerializer::deserializeCommonState(const toml::table& t, BaseWindowSta
         state.translation_config().include_corner_stream = *v;
     if (auto v = t["glossary_enabled"].value<bool>())
         state.translation_config().glossary_enabled = *v;
+    if (auto v = t["fuzzy_glossary_enabled"].value<bool>())
+        state.translation_config().fuzzy_glossary_enabled = *v;
+    if (auto v = t["fuzzy_glossary_threshold"].value<double>())
+        state.translation_config().fuzzy_glossary_threshold = static_cast<float>(*v);
     if (auto v = t["translation_backend"].value<int>())
         state.translation_config().translation_backend = static_cast<TranslationConfig::TranslationBackend>(*v);
 

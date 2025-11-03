@@ -35,6 +35,8 @@ struct BackendConfig
     double request_interval_seconds = 0.5;
     int max_retries = 3;
     bool glossary_enabled = true;
+    bool fuzzy_glossary_enabled = true;
+    double fuzzy_glossary_threshold = 0.8;
 
     static BackendConfig from(const ::TranslationConfig& cfg_ui);
 };

@@ -1,5 +1,7 @@
 #include "GlossaryManager.hpp"
 #include "Diagnostics.hpp"
+#include "JapaneseFuzzyMatcher.hpp"
+#include "IFuzzyMatcher.hpp"
 
 #include <plog/Log.h>
 #include <nlohmann/json.hpp>
@@ -7,12 +9,23 @@
 #include <fstream>
 #include <filesystem>
 #include <vector>
+#include <algorithm>
+#include <sstream>
+#include <iomanip>
+#include <set>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
 namespace processing
 {
+
+GlossaryManager::GlossaryManager()
+    : fuzzy_matcher_(std::make_unique<JapaneseFuzzyMatcher>()), fuzzy_matching_enabled_(true)
+{
+}
+
+GlossaryManager::~GlossaryManager() = default;
 
 void GlossaryManager::initialize()
 {
@@ -239,5 +252,199 @@ std::string GlossaryManager::mapToGlossaryLanguage(const std::string& target_lan
     // Default fallback
     return target_lang;
 }
+
+std::vector<std::tuple<std::string, std::string, double>>
+GlossaryManager::fuzzyLookup(const std::string& japanese_text, const std::string& target_lang, double threshold) const
+{
+    std::vector<std::tuple<std::string, std::string, double>> results;
+
+    if (!initialized_ || japanese_text.empty() || !fuzzy_matcher_)
+    {
+        return results;
+    }
+
+    std::string glossary_lang = mapToGlossaryLanguage(target_lang);
+    auto lang_it = glossaries_.find(glossary_lang);
+    if (lang_it == glossaries_.end())
+    {
+        return results;
+    }
+
+    const auto& glossary_map = lang_it->second;
+
+    // 1. Check for exact match first (highest priority)
+    auto exact_it = glossary_map.find(japanese_text);
+    if (exact_it != glossary_map.end())
+    {
+        results.emplace_back(exact_it->first, exact_it->second, 1.0);
+    }
+
+    // 2. If fuzzy matching is disabled, return only exact match
+    if (!fuzzy_matching_enabled_)
+    {
+        return results;
+    }
+
+    // 3. Perform fuzzy matching against all glossary keys
+    std::vector<std::string> candidates;
+    candidates.reserve(glossary_map.size());
+    for (const auto& entry : glossary_map)
+    {
+        candidates.push_back(entry.first);
+    }
+
+    // Find fuzzy matches
+    auto fuzzy_matches = fuzzy_matcher_->findMatches(japanese_text, candidates, threshold, MatchAlgorithm::Ratio);
+
+    // 4. Add fuzzy matches (avoid duplicates from exact match)
+    std::set<std::string> seen_translations;
+    if (!results.empty())
+    {
+        seen_translations.insert(std::get<1>(results[0])); // Mark exact match translation as seen
+    }
+
+    for (const auto& match : fuzzy_matches)
+    {
+        auto translation_it = glossary_map.find(match.matched);
+        if (translation_it != glossary_map.end())
+        {
+            const std::string& translation = translation_it->second;
+
+            // Skip if we already have this translation from exact match
+            if (seen_translations.find(translation) == seen_translations.end())
+            {
+                // Skip exact match score 1.0 since we already added it
+                if (match.score < 0.9999)
+                {
+                    results.emplace_back(match.matched, translation, match.score);
+                    seen_translations.insert(translation);
+                }
+            }
+        }
+    }
+
+    // Results are already sorted by score (descending) from fuzzy matcher
+    return results;
+}
+
+std::string GlossaryManager::buildFuzzyGlossarySnippet(const std::string& text, const std::string& target_lang,
+                                                        double threshold, std::size_t max_entries) const
+{
+    if (!initialized_ || text.empty() || max_entries == 0)
+    {
+        return {};
+    }
+
+    std::string glossary_lang = mapToGlossaryLanguage(target_lang);
+    auto lang_it = glossaries_.find(glossary_lang);
+    if (lang_it == glossaries_.end())
+    {
+        return {};
+    }
+
+    const auto& glossary_map = lang_it->second;
+
+    // Use character presence optimization for exact matches
+    std::array<bool, 256> present{};
+    for (unsigned char c : text)
+    {
+        present[c] = true;
+    }
+
+    // Collect all potential matches (exact + fuzzy)
+    std::vector<std::tuple<std::string, std::string, double>> all_matches;
+    std::set<std::string> matched_terms; // Track which Japanese terms we've already matched
+
+    // 1. Find exact substring matches first
+    for (const auto& entry : glossary_map)
+    {
+        const std::string& source = entry.first;
+        if (source.empty())
+            continue;
+        if (!present[static_cast<unsigned char>(source[0])])
+            continue;
+        if (text.find(source) == std::string::npos)
+            continue;
+
+        all_matches.emplace_back(source, entry.second, 1.0);
+        matched_terms.insert(source);
+
+        if (all_matches.size() >= max_entries)
+            break;
+    }
+
+    // 2. If fuzzy matching is enabled and we haven't reached max_entries, add fuzzy matches
+    if (fuzzy_matching_enabled_ && fuzzy_matcher_ && all_matches.size() < max_entries)
+    {
+        // Extract all glossary keys as candidates
+        std::vector<std::string> candidates;
+        candidates.reserve(glossary_map.size());
+        for (const auto& entry : glossary_map)
+        {
+            // Skip terms we already matched exactly
+            if (matched_terms.find(entry.first) == matched_terms.end())
+            {
+                candidates.push_back(entry.first);
+            }
+        }
+
+        // Perform fuzzy matching against the full text
+        if (!candidates.empty())
+        {
+            auto fuzzy_matches =
+                fuzzy_matcher_->findMatches(text, candidates, threshold, MatchAlgorithm::PartialRatio);
+
+            for (const auto& match : fuzzy_matches)
+            {
+                auto translation_it = glossary_map.find(match.matched);
+                if (translation_it != glossary_map.end())
+                {
+                    all_matches.emplace_back(match.matched, translation_it->second, match.score);
+
+                    if (all_matches.size() >= max_entries)
+                        break;
+                }
+            }
+        }
+    }
+
+    if (all_matches.empty())
+        return {};
+
+    // Sort by score descending
+    std::sort(all_matches.begin(), all_matches.end(),
+              [](const auto& a, const auto& b) { return std::get<2>(a) > std::get<2>(b); });
+
+    // Format snippet with scores
+    std::ostringstream snippet;
+    snippet << std::fixed << std::setprecision(2);
+
+    std::size_t count = 0;
+    for (const auto& [japanese, translation, score] : all_matches)
+    {
+        if (count >= max_entries)
+            break;
+
+        snippet << japanese << " → " << translation << " (" << score << ")";
+
+        if (count < all_matches.size() - 1 && count < max_entries - 1)
+        {
+            snippet << '\n';
+        }
+
+        ++count;
+    }
+
+    return snippet.str();
+}
+
+void GlossaryManager::setFuzzyMatchingEnabled(bool enabled)
+{
+    fuzzy_matching_enabled_ = enabled;
+    PLOG_INFO_(Diagnostics::kLogInstance)
+        << "[GlossaryManager] Fuzzy matching " << (enabled ? "enabled" : "disabled");
+}
+
+bool GlossaryManager::isFuzzyMatchingEnabled() const { return fuzzy_matching_enabled_; }
 
 } // namespace processing

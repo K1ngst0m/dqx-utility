@@ -21,5 +21,8 @@ unknown_labels.txt
 Testing/Temporary/**
 toolchains/*
 
+# Test artifacts
+test_temp_glossaries/
+
 # Generated API keys
 src/translate/ApiKeys.h

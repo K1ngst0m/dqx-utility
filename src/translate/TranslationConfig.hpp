@@ -41,6 +41,8 @@ struct TranslationConfig
     bool include_dialog_stream;
     bool include_corner_stream;
     bool glossary_enabled;
+    bool fuzzy_glossary_enabled;
+    float fuzzy_glossary_threshold;
     int max_concurrent_requests;
     float request_interval_seconds;
     int max_retries;
@@ -80,6 +82,8 @@ struct TranslationConfig
         include_dialog_stream = true;
         include_corner_stream = true;
         glossary_enabled = true;
+        fuzzy_glossary_enabled = true;
+        fuzzy_glossary_threshold = 0.8f;
         max_concurrent_requests = 3;
         request_interval_seconds = 0.5f;
         max_retries = 3;
@@ -123,6 +127,8 @@ struct TranslationConfig
         include_dialog_stream = other.include_dialog_stream;
         include_corner_stream = other.include_corner_stream;
         glossary_enabled = other.glossary_enabled;
+        fuzzy_glossary_enabled = other.fuzzy_glossary_enabled;
+        fuzzy_glossary_threshold = other.fuzzy_glossary_threshold;
         max_concurrent_requests = other.max_concurrent_requests;
         request_interval_seconds = other.request_interval_seconds;
         max_retries = other.max_retries;

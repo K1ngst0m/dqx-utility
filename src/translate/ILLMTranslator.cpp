@@ -332,8 +332,18 @@ std::string ILLMTranslator::buildGlossarySnippet(const Job& job, const std::stri
 {
     if (!cfg_.glossary_enabled)
         return {};
+
     const std::string effective_lang = target_lang.empty() ? cfg_.target_lang : target_lang;
     auto& manager = sharedGlossaryManager();
+
+    // Use fuzzy matching if enabled in config
+    if (cfg_.fuzzy_glossary_enabled)
+    {
+        return manager.buildFuzzyGlossarySnippet(job.text, effective_lang.empty() ? "zh-cn" : effective_lang,
+                                                  cfg_.fuzzy_glossary_threshold, 10);
+    }
+
+    // Fallback to exact matching
     return manager.buildGlossarySnippet(job.text, effective_lang.empty() ? "zh-cn" : effective_lang, 10);
 }
 

@@ -32,6 +32,8 @@ BackendConfig BackendConfig::from(const ::TranslationConfig& cfg_ui)
     out.target_lang = to_string_lang(cfg_ui.target_lang_enum);
     out.prompt = cfg_ui.custom_prompt.data();
     out.glossary_enabled = cfg_ui.glossary_enabled;
+    out.fuzzy_glossary_enabled = cfg_ui.fuzzy_glossary_enabled;
+    out.fuzzy_glossary_threshold = static_cast<double>(cfg_ui.fuzzy_glossary_threshold);
     out.max_concurrent_requests =
         cfg_ui.max_concurrent_requests <= 0 ? 1 : static_cast<std::size_t>(cfg_ui.max_concurrent_requests);
     out.request_interval_seconds =

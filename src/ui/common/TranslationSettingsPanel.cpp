@@ -161,7 +161,42 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
     bool include_corner_changed =
         ImGui::Checkbox(i18n::get("dialog.translate.include_corner"), &config.include_corner_stream);
     bool glossary_changed = ImGui::Checkbox(i18n::get("dialog.translate.use_glossary"), &config.glossary_enabled);
-    stream_filters_changed_ = include_dialog_changed || include_corner_changed || glossary_changed;
+    
+    // Fuzzy glossary controls (only for LLM backends)
+    bool fuzzy_glossary_changed = false;
+    bool fuzzy_threshold_changed = false;
+    if (config.translation_backend == TranslationConfig::TranslationBackend::OpenAI ||
+        config.translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM ||
+        config.translation_backend == TranslationConfig::TranslationBackend::FreeLLM)
+    {
+        if (config.glossary_enabled)
+        {
+            ImGui::Indent();
+            fuzzy_glossary_changed = ImGui::Checkbox("Enable Fuzzy Glossary Matching", &config.fuzzy_glossary_enabled);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::TextUnformatted("Include similarity-scored near-matches in glossary prompts");
+                ImGui::EndTooltip();
+            }
+            
+            if (config.fuzzy_glossary_enabled)
+            {
+                ImGui::SetNextItemWidth(200.0f);
+                fuzzy_threshold_changed = ImGui::SliderFloat("Similarity Threshold", &config.fuzzy_glossary_threshold, 0.5f, 1.0f, "%.2f");
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::BeginTooltip();
+                    ImGui::TextUnformatted("Minimum similarity (0.5-1.0) to include terms");
+                    ImGui::EndTooltip();
+                }
+            }
+            ImGui::Unindent();
+        }
+    }
+    
+    stream_filters_changed_ = include_dialog_changed || include_corner_changed || glossary_changed || 
+                              fuzzy_glossary_changed || fuzzy_threshold_changed;
     ImGui::Spacing();
 
     ImGui::TextUnformatted(i18n::get("dialog.translate.backend.label"));

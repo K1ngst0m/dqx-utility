@@ -4,6 +4,7 @@ add_executable(dqxu_tests
   test_nfkc_normalizer.cpp
   test_label_registry.cpp
   test_japanese_fuzzy_matcher.cpp
+  test_glossary_fuzzy_integration.cpp
   dqxclarity/test_memory.cpp
   dqxclarity/test_pattern_scanner.cpp
   dqxclarity/test_process_finder.cpp
