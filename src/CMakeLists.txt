@@ -119,7 +119,10 @@ target_sources(dqxu_core
     processing/Diagnostics.hpp
     processing/GlossaryManager.cpp
     processing/GlossaryManager.hpp
+    processing/IFuzzyMatcher.hpp
     processing/ITextNormalizer.hpp
+    processing/JapaneseFuzzyMatcher.cpp
+    processing/JapaneseFuzzyMatcher.hpp
     processing/JapaneseTextDetector.cpp
     processing/JapaneseTextDetector.hpp
     processing/LabelProcessor.cpp
@@ -237,6 +240,7 @@ target_link_libraries(dqxu_core
     cpptrace::cpptrace
     nlohmann_json::nlohmann_json
     utf8proc
+    rapidfuzz::rapidfuzz
   PRIVATE
     project_options
     project_warnings

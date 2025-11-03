@@ -3,6 +3,7 @@ add_executable(dqxu_tests
   test_text_processing.cpp
   test_nfkc_normalizer.cpp
   test_label_registry.cpp
+  test_japanese_fuzzy_matcher.cpp
   dqxclarity/test_memory.cpp
   dqxclarity/test_pattern_scanner.cpp
   dqxclarity/test_process_finder.cpp
@@ -26,6 +27,7 @@ target_link_libraries(dqxu_tests
     dqxu_core
     dqxclarity::dqxclarity
     utf8proc
+    rapidfuzz::rapidfuzz
 )
 
 if(WIN32)

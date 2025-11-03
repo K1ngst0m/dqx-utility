@@ -212,6 +212,15 @@ CPMAddPackage(
     "UTF8PROC_ENABLE_TESTING OFF"
 )
 
+# rapidfuzz - Fast fuzzy string matching library
+CPMAddPackage(
+  NAME rapidfuzz
+  URL https://github.com/rapidfuzz/rapidfuzz-cpp/archive/refs/tags/v3.3.3.zip
+  OPTIONS
+    "RAPIDFUZZ_INSTALL OFF"
+    "RAPIDFUZZ_BUILD_TESTING OFF"
+)
+
 # Tracy - Real-time profiler (only for PROFILING_LEVEL >= 2)
 if(PROFILING_LEVEL GREATER_EQUAL 2)
   CPMAddPackage(
@@ -272,6 +281,10 @@ endif()
 
 if(NOT utf8proc_ADDED)
   message(FATAL_ERROR "Required dependency utf8proc was not acquired.")
+endif()
+
+if(NOT rapidfuzz_ADDED)
+  message(FATAL_ERROR "Required dependency rapidfuzz was not acquired.")
 endif()
 
 if(PROFILING_LEVEL GREATER_EQUAL 2)
