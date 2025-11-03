@@ -10,6 +10,8 @@
 #include "QuestSettingsView.hpp"
 #include "../../services/DQXClarityLauncher.hpp"
 #include "../../services/DQXClarityService.hpp"
+#include "../../services/QuestManagerService.hpp"
+#include "../../quest/QuestManager.hpp"
 #include "../../config/ConfigManager.hpp"
 #include "../../translate/ITranslator.hpp"
 #include "../../translate/TranslateSession.hpp"
@@ -21,6 +23,7 @@
 #include <sstream>
 #include <vector>
 #include <plog/Log.h>
+#include <nlohmann/json.hpp>
 
 #include "../../utils/ErrorReporter.hpp"
 
@@ -549,6 +552,30 @@ void QuestWindow::applyQuestUpdate()
     if (msg.seq == 0 || msg.seq == last_applied_seq_)
         return;
 
+    // Look up quest ID from QuestManager using the game-extracted quest name
+    std::string quest_id;
+    if (!msg.quest_name.empty())
+    {
+        auto* quest_mgr = QuestManagerService_Get();
+        if (quest_mgr)
+        {
+            auto quest_data = quest_mgr->findQuestByName(msg.quest_name);
+            if (quest_data.has_value())
+            {
+                try
+                {
+                    nlohmann::json obj = nlohmann::json::parse(quest_data.value());
+                    quest_id = obj.value("id", "");
+                }
+                catch (const nlohmann::json::exception& e)
+                {
+                    PLOG_WARNING << "QuestWindow: Failed to parse quest JSON for ID extraction: " << e.what();
+                }
+            }
+        }
+    }
+
+    state_.quest.quest_id = quest_id;
     state_.quest.subquest_name = msg.subquest_name;
     state_.quest.quest_name = msg.quest_name;
     state_.quest.description = msg.description;
@@ -797,8 +824,26 @@ void QuestWindow::renderSettings() { show_settings_window_ = true; }
 void QuestWindow::renderQuestContent(float wrap_width)
 {
     const std::string title_text = displayStringFor(QuestField::Title);
-    const std::string quest_label =
-        title_text.empty() ? ui::LocalizedOrFallback("quest.title.empty", "(No Quest)") : title_text;
+    
+    // Build title with quest ID if available (use game-extracted quest name, not translated)
+    std::string quest_label;
+    if (title_text.empty())
+    {
+        quest_label = ui::LocalizedOrFallback("quest.title.empty", "(No Quest)");
+    }
+    else
+    {
+        // Format: 【ID】Quest Name (ID from database, name from game)
+        if (!state_.quest.quest_id.empty())
+        {
+            quest_label = "【" + state_.quest.quest_id + "】" + state_.original.quest_name;
+        }
+        else
+        {
+            // No ID found - just show the game-extracted quest name
+            quest_label = state_.original.quest_name;
+        }
+    }
 
     ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + wrap_width);
 

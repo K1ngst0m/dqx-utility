@@ -7,6 +7,7 @@
 
 struct QuestContentState
 {
+    std::string quest_id;          // Looked up from QuestManager
     std::string subquest_name;
     std::string quest_name;
     std::string description;
@@ -16,6 +17,7 @@ struct QuestContentState
 
     void applyDefaults()
     {
+        quest_id.clear();
         subquest_name.clear();
         quest_name.clear();
         description.clear();
