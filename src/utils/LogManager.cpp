@@ -31,13 +31,6 @@ bool LogManager::Initialize()
 
     PrepareLogDirectory();
 
-    if (!s_append_logs)
-    {
-        std::ofstream marker(".dqx_append_logs");
-        marker << "false";
-        marker.close();
-    }
-
     s_initialized = true;
     return true;
 }
