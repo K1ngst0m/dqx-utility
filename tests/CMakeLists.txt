@@ -1,5 +1,3 @@
-enable_testing()
-
 add_executable(dqxu_tests
   test_main.cpp
   test_text_processing.cpp
