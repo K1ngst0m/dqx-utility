@@ -52,6 +52,7 @@ apply = "应用"
 expand = "展开"
 collapse = "收起"
 open_guide = "打开指南"
+no_quest_guide = "任务指南为空"
 
 [settings.dqxc]
 debug_title = "DQXClarity 调试"
@@ -279,7 +280,7 @@ use_glossary = "使用术语表"
 
 [dialog.placeholder]
 waiting = "正在初始化对话系统……"
-ready = "对话系统已就绪。\n第一次使用请右键该窗口打开翻译界面配置API。"
+ready = "对话系统已就绪。"
 failed = "对话系统初始化失败。请检查 Hook 状态和日志。"
 
 [dialog.corner]

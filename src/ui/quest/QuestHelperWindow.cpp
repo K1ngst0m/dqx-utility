@@ -211,6 +211,20 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
 {
     (void)font_scale;
 
+    if (steps_.empty())
+    {
+        const char* no_guide_text = i18n::get("common.no_quest_guide");
+        ImVec2 text_size = ImGui::CalcTextSize(no_guide_text);
+        ImVec2 window_size = ImGui::GetWindowSize();
+        
+        float center_x = (window_size.x - text_size.x) * 0.5f;
+        float center_y = (window_size.y - text_size.y) * 0.5f;
+        
+        ImGui::SetCursorPos(ImVec2(center_x, center_y));
+        ImGui::TextDisabled("%s", no_guide_text);
+        return;
+    }
+
     // Only show title when not in drawer mode
     if (!is_drawer_mode_ && !quest_id_.empty() && !quest_name_.empty())
     {
