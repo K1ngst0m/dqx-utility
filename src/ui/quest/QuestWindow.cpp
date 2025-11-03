@@ -877,7 +877,7 @@ void QuestWindow::renderQuestContent(float wrap_width)
         // Format: 【ID】Quest Name (ID from database, name from game)
         if (!state_.quest.quest_id.empty())
         {
-            quest_label = "【" + state_.quest.quest_id + "】" + state_.original.quest_name;
+            quest_label = "【" + state_.quest.quest_id + "】" + state_.translated.quest_name;
         }
         else
         {
