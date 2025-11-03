@@ -16,6 +16,14 @@ Utility for Dragon Quest X.
 - Customizable Dialog and Quest translation window ui appearance
 - Global/individual translation for each component
 
+### Quest Guide System
+
+- **Step-by-step quest walkthroughs**: Automatically detects your current quest and displays detailed instructions
+- Over 800 quests included with comprehensive steps and helpful tips
+- Automatic translation of quest guides to your preferred language
+- Fuzzy matching to find quests even when names don't match exactly
+- Quick access via "Open Guide" button in quest windows
+
 ## Quick Start
 
 1. Download the latest release, Extract the archive
