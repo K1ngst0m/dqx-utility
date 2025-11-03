@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/BaseWindowState.hpp"
+#include "../common/BaseWindowState.hpp"
 
 #include <cstdint>
 #include <string>

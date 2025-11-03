@@ -5,9 +5,9 @@
 #include <vector>
 #include <unordered_map>
 #include "QuestHelperStateManager.hpp"
-#include "translate/TranslateSession.hpp"
-#include "ui/WindowAnimator.hpp"
-#include "ui/WindowRegistry.hpp"
+#include "../../translate/TranslateSession.hpp"
+#include "../WindowAnimator.hpp"
+#include "../WindowRegistry.hpp"
 
 class FontManager;
 class ConfigManager;
@@ -21,6 +21,7 @@ class ITranslator;
 
 class QuestHelperWindow : public UIWindow
 {
+    friend class QuestWindow;
 public:
     QuestHelperWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, const std::string& name);
     ~QuestHelperWindow() override;
@@ -36,6 +37,7 @@ public:
     bool shouldBeRemoved() const { return should_be_removed_; }
     bool isDefaultInstance() const { return is_default_instance_; }
     void setDefaultInstance(bool value) { is_default_instance_ = value; }
+    void openSettings() { show_settings_window_ = true; }
     
     QuestHelperStateManager& state() { return state_; }
 
@@ -88,21 +90,26 @@ private:
         bool hover_ = false;
     };
 
-    void updateQuestData();
     void parseQuestJson(const std::string& jsonl, const std::string& game_quest_name);
-    void renderQuestContent(float wrap_width, float font_scale);
-    void renderContextMenu();
-    void renderSettingsWindow();
-    const TranslationConfig& activeTranslationConfig() const;
     bool usingGlobalTranslation() const;
     void resetTranslatorState();
-    void processTranslatorEvents();
     void submitTranslationRequest();
     void submitStepTranslation(std::size_t step_index, const std::string& text, const TranslationConfig& config);
     void applyCachedTranslation(std::size_t step_index, const std::string& text);
     void handleTranslationFailure(std::size_t step_index, const std::string& message);
-    float calculateContentHeight(float wrap_width, float font_scale) const;
+
+    // Drawer mode control
+    void setDrawerMode(bool is_drawer) { is_drawer_mode_ = is_drawer; }
+    bool isDrawerMode() const { return is_drawer_mode_; }
+    
+    void updateQuestData();
+    void processTranslatorEvents();
+    void renderQuestContent(float wrap_width, float font_scale);
+    const TranslationConfig& activeTranslationConfig() const;
     void checkAndUpdateWindowHeight(float current_window_width);
+    float calculateContentHeight(float wrap_width, float font_scale) const;
+    void renderContextMenu();
+    void renderSettingsWindow();
 
     FontManager& font_manager_;
     ConfigManager& config_;
@@ -147,4 +154,6 @@ private:
     float last_font_size_ = 0.0f;
     std::size_t visible_step_count_ = 3;
     WindowRegistry& registry_;
+    
+    bool is_drawer_mode_ = false;
 };

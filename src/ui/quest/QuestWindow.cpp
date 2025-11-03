@@ -8,6 +8,7 @@
 #include "../DockState.hpp"
 #include "../FontManager.hpp"
 #include "QuestSettingsView.hpp"
+#include "QuestHelperWindow.hpp"
 #include "../../services/DQXClarityLauncher.hpp"
 #include "../../services/DQXClarityService.hpp"
 #include "../../services/QuestManagerService.hpp"
@@ -20,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <sstream>
 #include <vector>
 #include <plog/Log.h>
@@ -515,6 +517,12 @@ QuestWindow::QuestWindow(FontManager& font_manager, WindowRegistry& registry, Co
 
     settings_view_ = std::make_unique<QuestSettingsView>(state_, font_manager_, session_, config_);
 
+    std::string drawer_name = name_ + " Helper (Drawer)";
+    drawer_helper_ = std::make_unique<QuestHelperWindow>(font_manager_, registry_, config_, drawer_name);
+    drawer_helper_->setDefaultInstance(false);
+    drawer_helper_->setDrawerMode(true);
+    drawer_helper_->initTranslatorIfEnabled();
+
     font_manager_.registerDialog(state_.ui_state());
     refreshFontBinding();
 }
@@ -526,6 +534,10 @@ QuestWindow::~QuestWindow()
     {
         translator_->shutdown();
         translator_.reset();
+    }
+    if (drawer_helper_)
+    {
+        drawer_helper_.reset();
     }
 }
 
@@ -597,6 +609,12 @@ void QuestWindow::applyQuestUpdate()
     if (config.translate_enabled && !state_.quest.description.empty())
     {
         submitTranslationRequest();
+    }
+
+    // Auto-popup drawer if enabled
+    if (drawer_auto_popup_enabled_ && !drawer_open_)
+    {
+        toggleDrawer();
     }
 }
 
@@ -780,14 +798,19 @@ void QuestWindow::render()
         state_.ui_state().pending_reposition = false;
         state_.ui_state().pending_resize = false;
         state_.ui_state().is_docked = ImGui::IsWindowDocked();
+        
+        renderDrawerArrow(win_pos, win_size, fade_alpha);
     }
     ImGui::End();
 
     ImGui::PopStyleVar();
     UITheme::popDialogStyle();
 
+    renderDrawerHelper();
+
     renderContextMenu();
     renderSettingsWindow();
+    drawer_helper_->renderSettingsWindow();
 }
 
 void QuestWindow::renderSettingsWindow()
@@ -815,6 +838,24 @@ void QuestWindow::renderSettingsWindow()
             {
                 return translator_.get();
             });
+
+        // Drawer helper settings
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        if (ImGui::CollapsingHeader(ui::LocalizedOrFallback("quest.drawer.title", "Quest Helper Drawer").c_str()))
+        {
+            ImGui::Indent();
+            ImGui::Checkbox(ui::LocalizedOrFallback("quest.drawer.auto_popup", "Auto-popup on quest update").c_str(),
+                           &drawer_auto_popup_enabled_);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("%s", ui::LocalizedOrFallback("quest.drawer.auto_popup.tooltip",
+                                                                 "Automatically open the drawer when quest data updates")
+                                            .c_str());
+            }
+            ImGui::Unindent();
+        }
     }
     ImGui::End();
 }
@@ -915,11 +956,12 @@ void QuestWindow::renderQuestContent(float wrap_width)
     ImGui::Spacing();
     renderTranslationControls(wrap_width);
 
+    const float bottom_padding = 10.0f;
     float grid_height = estimateGridHeight(wrap_width);
     float available = ImGui::GetContentRegionAvail().y;
-    if (available > grid_height)
+    if (available > grid_height + bottom_padding)
     {
-        ImGui::Dummy(ImVec2(0.0f, available - grid_height));
+        ImGui::Dummy(ImVec2(0.0f, available - grid_height - bottom_padding));
     }
 
     renderRewardsRow(wrap_width);
@@ -1102,9 +1144,14 @@ void QuestWindow::renderContextMenu()
 
     if (ImGui::BeginPopup(popup_id.c_str()))
     {
-        if (ImGui::MenuItem(i18n::get("common.settings")))
+        if (ImGui::MenuItem(i18n::get("common.quest_window_settings")))
         {
             show_settings_window_ = !show_settings_window_;
+        }
+        
+        if (ImGui::MenuItem(i18n::get("common.quest_guide_settings")))
+        {
+            drawer_helper_->openSettings();
         }
 
         ImGui::Separator();
@@ -1616,4 +1663,190 @@ void QuestWindow::resetTranslatorState()
     state_.translation_failed = false;
     state_.translation_valid = false;
     state_.translation_error.clear();
+}
+
+void QuestWindow::toggleDrawer()
+{
+    drawer_open_ = !drawer_open_;
+
+    if (drawer_open_)
+    {
+        drawer_helper_->updateQuestData();
+        
+        float wrap_width = state_.ui_state().width - drawer_helper_->state().ui.padding.x * 2.0f;
+        float font_scale = 1.0f;
+        if (drawer_helper_->state().ui.font && drawer_helper_->state().ui.font_base_size > 0.0f)
+        {
+            font_scale = std::max(0.3f, drawer_helper_->state().ui.font_size / drawer_helper_->state().ui.font_base_size);
+        }
+        float content_height = drawer_helper_->calculateContentHeight(wrap_width, font_scale);
+        content_height = std::max(200.0f, std::min(content_height, 600.0f));
+        
+        drawer_helper_->state().ui.height = content_height;
+        drawer_helper_->state().ui.window_size.y = content_height;
+        drawer_helper_->state().ui.pending_reposition = false;
+        drawer_helper_->state().ui.pending_resize = false;
+    }
+}
+
+void QuestWindow::renderDrawerArrow(const ImVec2& win_pos, const ImVec2& win_size, float fade_alpha)
+{
+    const float bar_height = 32.0f;
+    ImVec2 bottom_edge_min(win_pos.x, win_pos.y + win_size.y - bar_height);
+    ImVec2 bottom_edge_max(win_pos.x + win_size.x, win_pos.y + win_size.y);
+    bool hovering_bottom_edge = ImGui::IsMouseHoveringRect(bottom_edge_min, bottom_edge_max, false);
+    
+    ImVec2 quest_window_min(win_pos.x, win_pos.y);
+    ImVec2 quest_window_max(win_pos.x + win_size.x, win_pos.y + win_size.y);
+    bool hovering_quest_window = ImGui::IsMouseHoveringRect(quest_window_min, quest_window_max, false);
+
+    if (hovering_quest_window || drawer_open_)
+    {
+        show_drawer_arrow_ = true;
+    }
+    else
+    {
+        show_drawer_arrow_ = false;
+    }
+
+    if (show_drawer_arrow_)
+    {
+        if (hovering_bottom_edge)
+        {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            {
+                toggleDrawer();
+            }
+        }
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        ImVec2 bar_min(win_pos.x, win_pos.y + win_size.y - bar_height);
+        ImVec2 bar_max(win_pos.x + win_size.x, win_pos.y + win_size.y);
+        
+        float bg_alpha = hovering_bottom_edge ? 0.5f : 0.3f;
+        ImU32 bar_color = ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 0.0f, 0.0f, bg_alpha * fade_alpha));
+        draw_list->AddRectFilled(bar_min, bar_max, bar_color);
+        
+        const char* arrow_icon = drawer_open_ ? "▲" : "▼";
+        const char* label_text = drawer_open_ ? i18n::get("common.collapse") : i18n::get("common.open_guide");
+        
+        ImVec2 arrow_size = ImGui::CalcTextSize(arrow_icon);
+        ImVec2 label_size = ImGui::CalcTextSize(label_text);
+        
+        float total_width = arrow_size.x + 4.0f + label_size.x;
+        float start_x = win_pos.x + (win_size.x - total_width) * 0.5f;
+        float center_y = win_pos.y + win_size.y - bar_height * 0.5f - arrow_size.y * 0.5f;
+        
+        ImVec2 arrow_pos(start_x, center_y);
+        ui::RenderOutlinedText(arrow_icon, arrow_pos, ImGui::GetFont(), ImGui::GetFontSize(), win_size.x);
+        
+        ImVec2 label_pos(start_x + arrow_size.x + 4.0f, center_y);
+        ui::RenderOutlinedText(label_text, label_pos, ImGui::GetFont(), ImGui::GetFontSize(), win_size.x);
+    }
+}
+
+void QuestWindow::renderDrawerHelper()
+{
+    if (!drawer_helper_ || !drawer_open_)
+        return;
+
+    ImVec2 quest_pos = state_.ui_state().window_pos;
+    ImVec2 quest_size = state_.ui_state().window_size;
+    ImVec2 drawer_pos(quest_pos.x, quest_pos.y + quest_size.y);
+    
+    drawer_helper_->state().ui.window_pos = drawer_pos;
+    drawer_helper_->state().ui.width = quest_size.x;
+    drawer_helper_->state().ui.window_size.x = quest_size.x;
+    drawer_helper_->state().ui.current_alpha_multiplier = state_.ui_state().current_alpha_multiplier;
+    drawer_helper_->state().ui.last_activity_time = state_.ui_state().last_activity_time;
+    
+    drawer_helper_->state().ui.padding = state_.ui_state().padding;
+    drawer_helper_->state().ui.rounding = state_.ui_state().rounding;
+    drawer_helper_->state().ui.border_thickness = state_.ui_state().border_thickness;
+    drawer_helper_->state().ui.border_enabled = state_.ui_state().border_enabled;
+    drawer_helper_->state().ui.background_alpha = state_.ui_state().background_alpha;
+    drawer_helper_->state().ui.vignette_thickness = state_.ui_state().vignette_thickness;
+    drawer_helper_->state().ui.fade_enabled = state_.ui_state().fade_enabled;
+    drawer_helper_->state().ui.font = state_.ui_state().font;
+    drawer_helper_->state().ui.font_size = state_.ui_state().font_size;
+    drawer_helper_->state().ui.font_base_size = state_.ui_state().font_base_size;
+    
+    ImGui::SetNextWindowPos(drawer_pos, ImGuiCond_Always);
+    
+    if (drawer_helper_->state().ui.pending_resize)
+    {
+        ImGui::SetNextWindowSize(ImVec2(quest_size.x, drawer_helper_->state().ui.height), ImGuiCond_Always);
+    }
+    else
+    {
+        ImGui::SetNextWindowSize(ImVec2(quest_size.x, drawer_helper_->state().ui.height), ImGuiCond_Once);
+    }
+    
+    ImGuiWindowFlags drawer_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | 
+                                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav |
+                                     ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    
+    const float fade_alpha = drawer_helper_->state().ui.current_alpha_multiplier;
+    float effective_alpha = drawer_helper_->state().ui.background_alpha * fade_alpha;
+    UITheme::pushDialogStyle(effective_alpha, drawer_helper_->state().ui.padding, drawer_helper_->state().ui.rounding,
+                             drawer_helper_->state().ui.border_thickness, drawer_helper_->state().ui.border_enabled);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, std::max(fade_alpha, 0.001f));
+    
+    std::string drawer_id = "###QuestHelperDrawer_" + id_suffix_;
+    bool window_open = ImGui::Begin(drawer_id.c_str(), nullptr, drawer_flags);
+    if (window_open)
+    {
+        ImVec2 win_size = ImGui::GetWindowSize();
+        drawer_helper_->state().ui.window_size = win_size;
+        
+        if (drawer_helper_->state().ui.pending_resize && 
+            std::abs(win_size.y - drawer_helper_->state().ui.height) < 2.0f)
+        {
+            drawer_helper_->state().ui.pending_resize = false;
+        }
+        
+        if (!drawer_helper_->state().ui.pending_resize)
+        {
+            drawer_helper_->state().ui.height = win_size.y;
+        }
+        
+        drawer_helper_->checkAndUpdateWindowHeight(win_size.x);
+        
+        ImFont* active_font = drawer_helper_->state().ui.font;
+        float font_scale = 1.0f;
+        if (active_font && drawer_helper_->state().ui.font_base_size > 0.0f)
+        {
+            font_scale = std::max(0.3f, drawer_helper_->state().ui.font_size / drawer_helper_->state().ui.font_base_size);
+        }
+        if (active_font)
+        {
+            ImGui::PushFont(active_font);
+            ImGui::SetWindowFontScale(font_scale);
+        }
+        
+        drawer_helper_->updateQuestData();
+        drawer_helper_->processTranslatorEvents();
+        
+        const float wrap_width = std::max(60.0f, win_size.x - drawer_helper_->state().ui.padding.x * 2.0f);
+        drawer_helper_->renderQuestContent(wrap_width, font_scale);
+        
+        if (active_font)
+        {
+            ImGui::PopFont();
+            ImGui::SetWindowFontScale(1.0f);
+        }
+        
+        bool drawer_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+        if (drawer_hovered)
+        {
+            state_.ui_state().last_activity_time = static_cast<float>(ImGui::GetTime());
+            drawer_helper_->state().ui.last_activity_time = state_.ui_state().last_activity_time;
+        }
+    }
+    ImGui::End();
+    
+    ImGui::PopStyleVar();
+    UITheme::popDialogStyle();
 }

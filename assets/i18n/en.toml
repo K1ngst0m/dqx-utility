@@ -45,9 +45,13 @@ warning = "Warning:"
 save = "Save"
 cancel = "Cancel"
 settings = "Settings"
+quest_window_settings = "Quest Window Settings"
+quest_guide_settings = "Guide Window Settings"
 remove = "Remove"
 apply = "Apply"
 expand = "Expand"
+collapse = "Collapse"
+open_guide = "Open Guide"
 
 [settings.dqxc]
 debug_title = "DQXClarity Debug"
@@ -344,6 +348,9 @@ error = "Translation failed"
 not_ready = "Translator not ready."
 queue_failed = "Unable to queue translation request."
 
+[quest.drawer]
+title = "Quest Guide"
+auto_popup = "Auto-popup on quest update"
 
 
 [error.category]

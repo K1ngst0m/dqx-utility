@@ -5,19 +5,19 @@
 #include <nlohmann/json.hpp>
 #include <plog/Log.h>
 
-#include "config/ConfigManager.hpp"
-#include "dqxclarity/api/quest_message.hpp"
-#include "quest/QuestManager.hpp"
-#include "services/DQXClarityService.hpp"
-#include "services/DQXClarityLauncher.hpp"
-#include "services/QuestManagerService.hpp"
-#include "ui/common/BaseWindowState.hpp"
-#include "translate/ITranslator.hpp"
-#include "ui/FontManager.hpp"
-#include "ui/UIHelper.hpp"
-#include "ui/UITheme.hpp"
-#include "ui/Localization.hpp"
-#include "ui/DockState.hpp"
+#include "../../config/ConfigManager.hpp"
+#include "../../dqxclarity/api/quest_message.hpp"
+#include "../../quest/QuestManager.hpp"
+#include "../../services/DQXClarityService.hpp"
+#include "../../services/DQXClarityLauncher.hpp"
+#include "../../services/QuestManagerService.hpp"
+#include "../common/BaseWindowState.hpp"
+#include "../../translate/ITranslator.hpp"
+#include "../FontManager.hpp"
+#include "../UIHelper.hpp"
+#include "../UITheme.hpp"
+#include "../Localization.hpp"
+#include "../DockState.hpp"
 
 using json = nlohmann::json;
 
@@ -211,7 +211,8 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
 {
     (void)font_scale;
 
-    if (!quest_id_.empty() && !quest_name_.empty())
+    // Only show title when not in drawer mode
+    if (!is_drawer_mode_ && !quest_id_.empty() && !quest_name_.empty())
     {
         std::string title = "【" + quest_id_ + "】" + quest_name_;
 
@@ -887,8 +888,8 @@ float QuestHelperWindow::calculateContentHeight(float wrap_width, float font_sca
     float total_height = 0.0f;
     const auto& config = activeTranslationConfig();
 
-    // Title height
-    if (!quest_id_.empty() && !quest_name_.empty())
+    // Title height (only when not in drawer mode)
+    if (!is_drawer_mode_ && !quest_id_.empty() && !quest_name_.empty())
     {
         const float title_font_scale = 1.5f;
         const float title_height = (ImGui::GetTextLineHeightWithSpacing() * font_scale) * title_font_scale;

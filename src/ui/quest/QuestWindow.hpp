@@ -17,6 +17,7 @@ class ITranslator;
 class FontManager;
 class ConfigManager;
 class QuestSettingsView;
+class QuestHelperWindow;
 
 class QuestWindow : public UIWindow
 {
@@ -143,4 +144,14 @@ private:
     ui::WindowAnimator animator_;
     bool is_default_instance_ = false;
     WindowRegistry& registry_;
+
+    // Drawer popup helper
+    std::unique_ptr<QuestHelperWindow> drawer_helper_;
+    bool drawer_open_ = false;
+    bool drawer_auto_popup_enabled_ = true;
+    bool show_drawer_arrow_ = false;
+
+    void toggleDrawer();
+    void renderDrawerArrow(const ImVec2& win_pos, const ImVec2& win_size, float fade_alpha);
+    void renderDrawerHelper();
 };

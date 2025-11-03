@@ -45,9 +45,13 @@ warning = "警告："
 save = "保存"
 cancel = "取消"
 settings = "设置"
+quest_window_settings = "任务窗口设置"
+quest_guide_settings = "指南窗口设置"
 remove = "移除"
 apply = "应用"
 expand = "展开"
+collapse = "收起"
+open_guide = "打开指南"
 
 [settings.dqxc]
 debug_title = "DQXClarity 调试"
@@ -282,7 +286,7 @@ failed = "对话系统初始化失败。请检查 Hook 状态和日志。"
 speaker = "随行人物对话"
 
 [dialog.translate.backend]
-label = "后端"
+label = "翻译服务"
 
 [dialog.translate.backend.items]
 openai_compat = "OpenAI 兼容"
@@ -342,6 +346,10 @@ pending = "正在翻译..."
 error = "翻译失败"
 not_ready = "翻译器尚未就绪。"
 queue_failed = "无法加入翻译请求队列。"
+
+[quest.drawer]
+title = "任务指南"
+auto_popup = "在任务更新时自动弹出"
 
 
 [error.category]
