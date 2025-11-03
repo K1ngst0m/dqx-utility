@@ -89,7 +89,7 @@ private:
     };
 
     void updateQuestData();
-    void parseQuestJson(const std::string& jsonl);
+    void parseQuestJson(const std::string& jsonl, const std::string& game_quest_name);
     void renderQuestContent(float wrap_width, float font_scale);
     void renderContextMenu();
     void renderSettingsWindow();

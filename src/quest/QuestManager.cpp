@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "dqxclarity/api/quest_message.hpp"
+#include "processing/JapaneseFuzzyMatcher.hpp"
 #include "services/DQXClarityService.hpp"
 #include "services/DQXClarityLauncher.hpp"
 
@@ -24,6 +25,9 @@ struct QuestManager::Impl
 
     // Flag indicating successful initialization
     bool initialized_ = false;
+
+    // Fuzzy matcher for fallback quest name matching
+    processing::JapaneseFuzzyMatcher fuzzy_matcher_;
 };
 
 QuestManager::QuestManager()
@@ -129,13 +133,13 @@ void QuestManager::update()
 
     impl_->last_seq_ = msg.seq;
 
-    // Perform exact name-based lookup
-    auto it = impl_->quests_by_name_.find(msg.quest_name);
+    // Perform name-based lookup (exact + fuzzy fallback)
+    auto quest_data = findQuestByName(msg.quest_name);
 
-    if (it != impl_->quests_by_name_.end())
+    if (quest_data.has_value())
     {
         // SUCCESS: Log the complete original JSONL entry with structured prefix
-        PLOG_INFO << "QUEST: " << it->second;
+        PLOG_INFO << "QUEST: " << quest_data.value();
     }
     else
     {
@@ -143,8 +147,8 @@ void QuestManager::update()
         // Do NOT output QUEST log if no match found
         if (!msg.quest_name.empty())
         {
-            PLOG_WARNING << "QuestManager: Quest name lookup failed. "
-                         << "Name not found in quests.jsonl: '" << msg.quest_name << "'";
+            PLOG_WARNING << "QuestManager: Quest name lookup failed (exact + fuzzy). "
+                         << "Name: '" << msg.quest_name << "'";
         }
     }
 }
@@ -159,8 +163,36 @@ std::optional<std::string> QuestManager::findQuestById(const std::string& id) co
 
 std::optional<std::string> QuestManager::findQuestByName(const std::string& name) const
 {
+    // Fast path: Try exact match first (O(1) hash lookup)
     auto it = impl_->quests_by_name_.find(name);
     if (it != impl_->quests_by_name_.end())
         return it->second;
+
+    // Fallback: Fuzzy matching with 0.85 threshold
+    // Build candidates list from all quest names
+    std::vector<std::string> candidates;
+    candidates.reserve(impl_->quests_by_name_.size());
+    for (const auto& [quest_name, _] : impl_->quests_by_name_)
+    {
+        candidates.push_back(quest_name);
+    }
+
+    // Find best fuzzy match
+    constexpr double threshold = 0.85;
+    auto match = impl_->fuzzy_matcher_.findBestMatch(name, candidates, threshold, processing::MatchAlgorithm::Ratio);
+
+    if (match.has_value())
+    {
+        // Found a fuzzy match - retrieve the JSONL data
+        auto match_it = impl_->quests_by_name_.find(match->matched);
+        if (match_it != impl_->quests_by_name_.end())
+        {
+            PLOG_INFO << "QuestManager: Fuzzy matched '" << name << "' to '" << match->matched 
+                      << "' (score: " << match->score << ")";
+            return match_it->second;
+        }
+    }
+
+    // No match found (exact or fuzzy)
     return std::nullopt;
 }

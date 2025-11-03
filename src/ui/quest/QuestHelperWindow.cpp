@@ -102,7 +102,7 @@ void QuestHelperWindow::updateQuestData()
     auto quest_data = quest_mgr->findQuestByName(current_quest_name_);
     if (quest_data.has_value())
     {
-        parseQuestJson(quest_data.value());
+        parseQuestJson(quest_data.value(), current_quest_name_);
         activity_monitor_.markActive();
         submitTranslationRequest();
     }
@@ -138,14 +138,15 @@ static std::pair<std::string, std::string> extractStepIndex(const std::string& t
     return {"", text};
 }
 
-void QuestHelperWindow::parseQuestJson(const std::string& jsonl)
+void QuestHelperWindow::parseQuestJson(const std::string& jsonl, const std::string& game_quest_name)
 {
     try
     {
         json obj = json::parse(jsonl);
 
         quest_id_ = obj.value("id", "");
-        quest_name_ = obj.value("name", "");
+        // Use the original quest name from the game, not the database entry
+        quest_name_ = game_quest_name;
 
         steps_.clear();
         visible_step_count_ = 3;
