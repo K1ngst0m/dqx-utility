@@ -25,7 +25,7 @@ void GlobalStateManager::applyDefaults()
 
     default_dialog_enabled_ = true;
     default_quest_enabled_ = true;
-    default_quest_helper_enabled_ = true;
+    default_quest_helper_enabled_ = false;
 
     translation_config_.applyDefaults();
     translation_version_ = 1;

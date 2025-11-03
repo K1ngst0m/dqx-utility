@@ -104,7 +104,7 @@ private:
     // Default window flags
     bool default_dialog_enabled_ = true;
     bool default_quest_enabled_ = true;
-    bool default_quest_helper_enabled_ = true;
+    bool default_quest_helper_enabled_ = false;
 
     // Translation configuration
     TranslationConfig translation_config_;
