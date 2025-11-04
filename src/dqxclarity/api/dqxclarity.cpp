@@ -10,6 +10,7 @@
 #include "../hooking/PlayerHook.hpp"
 #include "../hooking/QuestHook.hpp"
 #include "../hooking/HookCreateInfo.hpp"
+#include "../hooking/HookManager.hpp"
 #include "../hooking/IntegrityDetour.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
 #include "../hooking/HookRegistry.hpp"
@@ -49,13 +50,11 @@ struct Engine::Impl
     Config cfg{};
     Logger log{};
     std::shared_ptr<IProcessMemory> memory;
-    std::unique_ptr<DialogHook> hook;
     std::unique_ptr<DialogMemoryReader> memory_reader; // Alternative non-invasive dialog reader
-    std::unique_ptr<QuestHook> quest_hook;
-    std::unique_ptr<NetworkTextHook> network_hook;
-    std::unique_ptr<CornerTextHook> corner_hook;
-    std::unique_ptr<PlayerHook> player_hook;
     std::unique_ptr<class IntegrityDetour> integrity;
+    
+    // Centralized hook lifecycle manager
+    HookManager hook_manager;
 
     SpscRing<DialogMessage, 1024> ring;
     std::atomic<std::uint64_t> seq{ 0 };
@@ -180,6 +179,15 @@ bool Engine::start_hook(StartPolicy policy)
         cached_regions = MemoryRegionParser::ParseMaps(impl_->memory->GetAttachedPid());
     }
 
+    // Build common HookCreateInfo for all hooks
+    HookCreateInfo base_hook_info;
+    base_hook_info.memory = impl_->memory;
+    base_hook_info.logger = impl_->log;
+    base_hook_info.verbose = impl_->cfg.verbose;
+    base_hook_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
+    base_hook_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
+    base_hook_info.cached_regions = cached_regions;
+
     // Initialize dialog capture based on mode
     bool hook_installed = false;
 
@@ -209,79 +217,15 @@ bool Engine::start_hook(StartPolicy policy)
         if (impl_->log.info)
             impl_->log.info("Auto mode: initializing hook + memory reader for maximum coverage");
 
-        // Try to install hook (non-fatal if it fails)
+        // Try to install dialog hook (non-fatal if it fails)
+        // Note: Integrity callbacks will be wired after integrity is created
         {
             PROFILE_SCOPE_CUSTOM("Engine.InstallDialogHook");
-            HookCreateInfo hook_info;
-            hook_info.memory = impl_->memory;
-            hook_info.logger = impl_->log;
-            hook_info.verbose = impl_->cfg.verbose;
-            hook_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
-            hook_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
-            hook_info.cached_regions = cached_regions;
-            hook_info.on_original_bytes_changed = [this](uintptr_t addr, const std::vector<uint8_t>& bytes)
-            {
-                if (impl_->integrity)
-                {
-                    impl_->integrity->UpdateRestoreTarget(addr, bytes);
-                }
-                if (impl_->monitor)
-                {
-                    impl_->monitor->UpdateRestoreTarget(addr, bytes);
-                }
-            };
-            hook_info.on_hook_site_changed = [this](uintptr_t old_addr, uintptr_t new_addr, const std::vector<uint8_t>& bytes)
-            {
-                if (impl_->integrity)
-                {
-                    impl_->integrity->MoveRestoreTarget(old_addr, new_addr, bytes);
-                }
-                if (impl_->monitor)
-                {
-                    impl_->monitor->MoveRestoreTarget(old_addr, new_addr, bytes);
-                }
-            };
-
-            impl_->hook = std::make_unique<dqxclarity::DialogHook>(hook_info);
-            if (impl_->hook->InstallHook(/*enable_patch=*/false))
-            {
-                hook_installed = true;
-                if (impl_->log.info)
-                    impl_->log.info("Dialog hook installed successfully");
-
-                // Register immediately for crash recovery
-                if (impl_->hook->GetHookAddress() != 0)
-                {
-                    try
-                    {
-                        persistence::HookRecord record;
-                        record.type = persistence::HookType::Dialog;
-                        record.process_id = impl_->memory->GetAttachedPid();
-                        record.hook_address = impl_->hook->GetHookAddress();
-                        record.detour_address = impl_->hook->GetDetourAddress();
-                        record.detour_size = 4096;
-                        record.backup_address = impl_->hook->GetBackupAddress();
-                        record.backup_size = 256;
-                        record.original_bytes = impl_->hook->GetOriginalBytes();
-                        record.installed_time = std::chrono::system_clock::now();
-                        record.hook_checksum = persistence::HookRegistry::ComputeCRC32(
-                            record.original_bytes.data(), record.original_bytes.size());
-                        record.detour_checksum = 0;
-                        persistence::HookRegistry::RegisterHook(record);
-                    }
-                    catch (const std::exception& e)
-                    {
-                        if (impl_->log.warn)
-                            impl_->log.warn(std::string("Failed to register dialog hook: ") + e.what());
-                    }
-                }
-            }
-            else
-            {
-                if (impl_->log.warn)
-                    impl_->log.warn("Failed to install dialog hook; continuing with memory reader only");
-                impl_->hook.reset();
-            }
+            hook_installed = impl_->hook_manager.RegisterHook(
+                persistence::HookType::Dialog,
+                base_hook_info,
+                nullptr,  // Integrity will be wired after integrity detour is installed
+                nullptr);
         }
 
         // Always initialize memory reader in auto mode (catches cutscenes/story dialogs)
@@ -317,150 +261,32 @@ bool Engine::start_hook(StartPolicy policy)
 
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallQuestHook");
-        HookCreateInfo quest_info;
-        quest_info.memory = impl_->memory;
-        quest_info.logger = impl_->log;
-        quest_info.verbose = impl_->cfg.verbose;
-        quest_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
-        quest_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
-        quest_info.cached_regions = cached_regions;
-
-        impl_->quest_hook = std::make_unique<dqxclarity::QuestHook>(quest_info);
-        if (impl_->quest_hook && !impl_->quest_hook->InstallHook(/*enable_patch=*/false))
-        {
-            if (impl_->log.warn)
-                impl_->log.warn("Failed to prepare quest hook; continuing without quest capture");
-            impl_->quest_hook.reset();
-        }
-        else if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0)
-        {
-            // Register immediately for crash recovery
-            try
-            {
-                persistence::HookRecord record;
-                record.type = persistence::HookType::Quest;
-                record.process_id = impl_->memory->GetAttachedPid();
-                record.hook_address = impl_->quest_hook->GetHookAddress();
-                record.detour_address = impl_->quest_hook->GetDetourAddress();
-                record.detour_size = 4096;
-                record.backup_address = impl_->quest_hook->GetBackupAddress();
-                record.backup_size = 256;
-                record.original_bytes = impl_->quest_hook->GetOriginalBytes();
-                record.installed_time = std::chrono::system_clock::now();
-                record.hook_checksum =
-                    persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
-                record.detour_checksum = 0;
-                persistence::HookRegistry::RegisterHook(record);
-            }
-            catch (const std::exception& e)
-            {
-                if (impl_->log.warn)
-                    impl_->log.warn(std::string("Failed to register quest hook: ") + e.what());
-            }
-        }
+        impl_->hook_manager.RegisterHook(
+            persistence::HookType::Quest,
+            base_hook_info,
+            nullptr,  // Integrity will be wired after integrity detour is installed
+            nullptr);
     }
 
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallPlayerHook");
-        HookCreateInfo player_info;
-        player_info.memory = impl_->memory;
-        player_info.logger = impl_->log;
-        player_info.verbose = impl_->cfg.verbose;
-        player_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
-        player_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
-        player_info.cached_regions = cached_regions;
-
-        impl_->player_hook = std::make_unique<dqxclarity::PlayerHook>(player_info);
-        if (impl_->player_hook && !impl_->player_hook->InstallHook(/*enable_patch=*/false))
-        {
-            if (impl_->log.warn)
-                impl_->log.warn("Failed to prepare player hook; continuing without player capture");
-            impl_->player_hook.reset();
-        }
-        else if (impl_->player_hook && impl_->player_hook->GetHookAddress() != 0)
-        {
-            // Register immediately for crash recovery
-            try
-            {
-                persistence::HookRecord record;
-                record.type = persistence::HookType::Player;
-                record.process_id = impl_->memory->GetAttachedPid();
-                record.hook_address = impl_->player_hook->GetHookAddress();
-                record.detour_address = impl_->player_hook->GetDetourAddress();
-                record.detour_size = 4096;
-                record.backup_address = impl_->player_hook->GetBackupAddress();
-                record.backup_size = 256;
-                record.original_bytes = impl_->player_hook->GetOriginalBytes();
-                record.installed_time = std::chrono::system_clock::now();
-                record.hook_checksum =
-                    persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
-                record.detour_checksum = 0;
-                persistence::HookRegistry::RegisterHook(record);
-            }
-            catch (const std::exception& e)
-            {
-                if (impl_->log.warn)
-                    impl_->log.warn(std::string("Failed to register player hook: ") + e.what());
-            }
-        }
+        impl_->hook_manager.RegisterHook(
+            persistence::HookType::Player,
+            base_hook_info,
+            nullptr,  // Integrity will be wired after integrity detour is installed
+            nullptr);
     }
 
-    // temporarily disabled due to unused
-#if 0
-  impl_->network_hook = std::make_unique<dqxclarity::NetworkTextHook>(impl_->memory);
-  impl_->network_hook->SetVerbose(impl_->cfg.verbose);
-  impl_->network_hook->SetLogger(impl_->log);
-  impl_->network_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
-  impl_->network_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-  if (impl_->network_hook && !impl_->network_hook->InstallHook(/*enable_patch=*/false)) {
-    if (impl_->log.warn) impl_->log.warn("Failed to prepare network text hook; continuing without capture");
-    impl_->network_hook.reset();
-  }
-#endif
+    // Network hook is temporarily disabled
+    // Note: If enabled, register via HookManager::RegisterHook(persistence::HookType::Network, ...)
 
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallCornerTextHook");
-        HookCreateInfo corner_info;
-        corner_info.memory = impl_->memory;
-        corner_info.logger = impl_->log;
-        corner_info.verbose = impl_->cfg.verbose;
-        corner_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
-        corner_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
-        corner_info.cached_regions = cached_regions;
-
-        impl_->corner_hook = std::make_unique<dqxclarity::CornerTextHook>(corner_info);
-        if (impl_->corner_hook && !impl_->corner_hook->InstallHook(/*enable_patch=*/false))
-        {
-            if (impl_->log.warn)
-                impl_->log.warn("Failed to prepare corner text hook; continuing without capture");
-            impl_->corner_hook.reset();
-        }
-        else if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0)
-        {
-            // Register immediately for crash recovery
-            try
-            {
-                persistence::HookRecord record;
-                record.type = persistence::HookType::Corner;
-                record.process_id = impl_->memory->GetAttachedPid();
-                record.hook_address = impl_->corner_hook->GetHookAddress();
-                record.detour_address = impl_->corner_hook->GetDetourAddress();
-                record.detour_size = 4096;
-                record.backup_address = impl_->corner_hook->GetBackupAddress();
-                record.backup_size = 256;
-                record.original_bytes = impl_->corner_hook->GetOriginalBytes();
-                record.installed_time = std::chrono::system_clock::now();
-                record.hook_checksum =
-                    persistence::HookRegistry::ComputeCRC32(record.original_bytes.data(), record.original_bytes.size());
-                record.detour_checksum = 0;
-                persistence::HookRegistry::RegisterHook(record);
-            }
-            catch (const std::exception& e)
-            {
-                if (impl_->log.warn)
-                    impl_->log.warn(std::string("Failed to register corner hook: ") + e.what());
-            }
-        }
+        impl_->hook_manager.RegisterHook(
+            persistence::HookType::Corner,
+            base_hook_info,
+            nullptr,  // Integrity will be wired after integrity detour is installed
+            nullptr);
     }
 
     // Install integrity detour and configure it to restore dialog hook bytes during checks
@@ -470,31 +296,10 @@ bool Engine::start_hook(StartPolicy policy)
         impl_->integrity->SetLogger(impl_->log);
         impl_->integrity->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
         impl_->integrity->SetCachedRegions(cached_regions);
-        // Provide restoration info so integrity trampoline can unhook temporarily
-        if (impl_->hook && impl_->hook->GetHookAddress() != 0)
-        {
-            impl_->integrity->AddRestoreTarget(impl_->hook->GetHookAddress(), impl_->hook->GetOriginalBytes());
-        }
-        if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0)
-        {
-            impl_->integrity->AddRestoreTarget(impl_->quest_hook->GetHookAddress(),
-                                               impl_->quest_hook->GetOriginalBytes());
-        }
-        if (impl_->player_hook && impl_->player_hook->GetHookAddress() != 0)
-        {
-            impl_->integrity->AddRestoreTarget(impl_->player_hook->GetHookAddress(),
-                                               impl_->player_hook->GetOriginalBytes());
-        }
-        if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0)
-        {
-            impl_->integrity->AddRestoreTarget(impl_->network_hook->GetHookAddress(),
-                                               impl_->network_hook->GetOriginalBytes());
-        }
-        if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0)
-        {
-            impl_->integrity->AddRestoreTarget(impl_->corner_hook->GetHookAddress(),
-                                               impl_->corner_hook->GetOriginalBytes());
-        }
+        
+        // Wire all hooks to integrity system for restoration during anti-cheat checks
+        impl_->hook_manager.WireIntegrityCallbacks(impl_->integrity.get(), nullptr);
+        
         bool integrity_installed = impl_->integrity->Install();
 
         // Register IntegrityDetour in hook registry for crash recovery
@@ -534,123 +339,28 @@ bool Engine::start_hook(StartPolicy policy)
             if (impl_->log.error)
                 impl_->log.error("Failed to install integrity detour");
             impl_->integrity.reset();
-            if (impl_->quest_hook)
-            {
-                impl_->quest_hook->RemoveHook();
-                impl_->quest_hook.reset();
-            }
-            if (impl_->player_hook)
-            {
-                impl_->player_hook->RemoveHook();
-                impl_->player_hook.reset();
-            }
-            if (impl_->network_hook)
-            {
-                impl_->network_hook->RemoveHook();
-                impl_->network_hook.reset();
-            }
-            if (impl_->corner_hook)
-            {
-                impl_->corner_hook->RemoveHook();
-                impl_->corner_hook.reset();
-            }
-            impl_->hook.reset();
+            impl_->hook_manager.RemoveAllHooks();
             impl_->memory.reset();
             status_ = Status::Error;
             return false;
         }
     }
 
-    // Optionally enable the dialog hook immediately (will be restored during integrity)
+    // Optionally enable hooks immediately based on policy
     const bool enable_patch_now = (policy == StartPolicy::EnableImmediately);
     if (enable_patch_now)
     {
-        if (impl_->hook)
-            (void)impl_->hook->EnablePatch();
-        if (impl_->quest_hook)
-            (void)impl_->quest_hook->EnablePatch();
-        if (impl_->player_hook)
-            (void)impl_->player_hook->EnablePatch();
-        if (impl_->network_hook)
-            (void)impl_->network_hook->EnablePatch();
-        if (impl_->corner_hook)
-            (void)impl_->corner_hook->EnablePatch();
-    }
-
-    // Proactive verification after immediate enable
-    if (enable_patch_now && impl_->cfg.proactive_verify_after_enable_ms > 0)
-    {
-        auto delay = std::chrono::milliseconds(impl_->cfg.proactive_verify_after_enable_ms);
-        std::thread(
-            [this, delay]
-            {
+        impl_->hook_manager.EnableAllPatches(impl_->log);
+        
+        // Proactive verification after immediate enable
+        if (impl_->cfg.proactive_verify_after_enable_ms > 0)
+        {
+            auto delay = std::chrono::milliseconds(impl_->cfg.proactive_verify_after_enable_ms);
+            std::thread([this, delay] {
                 std::this_thread::sleep_for(delay);
-                if (impl_->hook)
-                {
-                    if (!impl_->hook->IsPatched())
-                    {
-                        if (impl_->log.warn)
-                            impl_->log.warn("Post-enable verify: dialog hook not present; reapplying once");
-                        (void)impl_->hook->ReapplyPatch();
-                    }
-                    else
-                    {
-                        if (impl_->log.info)
-                            impl_->log.info("Post-enable verify: dialog hook present");
-                    }
-                }
-                if (impl_->quest_hook)
-                {
-                    if (!impl_->quest_hook->IsPatched())
-                    {
-                        if (impl_->log.warn)
-                            impl_->log.warn("Post-enable verify: quest hook not present; reapplying once");
-                        (void)impl_->quest_hook->ReapplyPatch();
-                    }
-                }
-                if (impl_->player_hook)
-                {
-                    if (!impl_->player_hook->IsPatched())
-                    {
-                        if (impl_->log.warn)
-                            impl_->log.warn("Post-enable verify: player hook not present; reapplying once");
-                        (void)impl_->player_hook->ReapplyPatch();
-                    }
-                    else if (impl_->cfg.verbose && impl_->log.info)
-                    {
-                        impl_->log.info("Post-enable verify: player hook present");
-                    }
-                }
-                if (impl_->network_hook)
-                {
-                    if (!impl_->network_hook->IsPatched())
-                    {
-                        if (impl_->log.warn)
-                            impl_->log.warn("Post-enable verify: network text hook not present; reapplying once");
-                        (void)impl_->network_hook->ReapplyPatch();
-                    }
-                    else
-                    {
-                        if (impl_->log.info)
-                            impl_->log.info("Post-enable verify: network text hook present");
-                    }
-                }
-                if (impl_->corner_hook)
-                {
-                    if (!impl_->corner_hook->IsPatched())
-                    {
-                        if (impl_->log.warn)
-                            impl_->log.warn("Post-enable verify: corner text hook not present; reapplying once");
-                        (void)impl_->corner_hook->ReapplyPatch();
-                    }
-                    else
-                    {
-                        if (impl_->log.info)
-                            impl_->log.info("Post-enable verify: corner text hook present");
-                    }
-                }
-            })
-            .detach();
+                impl_->hook_manager.VerifyAllPatches(impl_->log, impl_->cfg.verbose);
+            }).detach();
+        }
     }
 
     // Start integrity monitor to enable/reapply dialog hook
@@ -667,97 +377,14 @@ bool Engine::start_hook(StartPolicy policy)
             [this](bool first)
             {
                 if (first)
-                {
-                    if (impl_->hook)
-                    {
-                        (void)impl_->hook->EnablePatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Dialog hook enabled after first integrity run");
-                    }
-                    if (impl_->quest_hook)
-                    {
-                        (void)impl_->quest_hook->EnablePatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Quest hook enabled after first integrity run");
-                    }
-                    if (impl_->player_hook)
-                    {
-                        (void)impl_->player_hook->EnablePatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Player hook enabled after first integrity run");
-                    }
-                    if (impl_->network_hook)
-                    {
-                        (void)impl_->network_hook->EnablePatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Network text hook enabled after first integrity run");
-                    }
-                    if (impl_->corner_hook)
-                    {
-                        (void)impl_->corner_hook->EnablePatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Corner text hook enabled after first integrity run");
-                    }
-                }
+                    impl_->hook_manager.EnableAllPatches(impl_->log);
                 else
-                {
-                    if (impl_->hook)
-                    {
-                        (void)impl_->hook->ReapplyPatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Dialog hook re-applied after integrity");
-                    }
-                    if (impl_->quest_hook)
-                    {
-                        (void)impl_->quest_hook->ReapplyPatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Quest hook re-applied after integrity");
-                    }
-                    if (impl_->player_hook)
-                    {
-                        (void)impl_->player_hook->ReapplyPatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Player hook re-applied after integrity");
-                    }
-                    if (impl_->network_hook)
-                    {
-                        (void)impl_->network_hook->ReapplyPatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Network text hook re-applied after integrity");
-                    }
-                    if (impl_->corner_hook)
-                    {
-                        (void)impl_->corner_hook->ReapplyPatch();
-                        if (impl_->log.info)
-                            impl_->log.info("Corner text hook re-applied after integrity");
-                    }
-                }
+                    impl_->hook_manager.ReapplyAllPatches(impl_->log);
             });
-        // Provide restore targets (dialog hook site and original bytes) to monitor for out-of-process restore
-        if (impl_->hook && impl_->hook->GetHookAddress() != 0)
-        {
-            impl_->monitor->AddRestoreTarget(impl_->hook->GetHookAddress(), impl_->hook->GetOriginalBytes());
-        }
-        if (impl_->quest_hook && impl_->quest_hook->GetHookAddress() != 0)
-        {
-            impl_->monitor->AddRestoreTarget(impl_->quest_hook->GetHookAddress(),
-                                             impl_->quest_hook->GetOriginalBytes());
-        }
-        if (impl_->player_hook && impl_->player_hook->GetHookAddress() != 0)
-        {
-            impl_->monitor->AddRestoreTarget(impl_->player_hook->GetHookAddress(),
-                                             impl_->player_hook->GetOriginalBytes());
-        }
-        if (impl_->network_hook && impl_->network_hook->GetHookAddress() != 0)
-        {
-            impl_->monitor->AddRestoreTarget(impl_->network_hook->GetHookAddress(),
-                                             impl_->network_hook->GetOriginalBytes());
-        }
-        if (impl_->corner_hook && impl_->corner_hook->GetHookAddress() != 0)
-        {
-            impl_->monitor->AddRestoreTarget(impl_->corner_hook->GetHookAddress(),
-                                             impl_->corner_hook->GetOriginalBytes());
-        }
+        
+        // Wire all hooks to integrity monitor for out-of-process restoration
+        impl_->hook_manager.WireIntegrityCallbacks(nullptr, impl_->monitor.get());
+        
         (void)impl_->monitor->start();
     }
 
@@ -779,7 +406,7 @@ bool Engine::start_hook(StartPolicy policy)
                     // Phase 1: Capture from both sources to pending queue (no immediate publish)
 
                     // Hook-based capture (safe pointer capture to avoid TOCTOU race)
-                    auto hook_ptr = impl_->hook.get();
+                    auto hook_ptr = dynamic_cast<DialogHook*>(impl_->hook_manager.GetHook(persistence::HookType::Dialog));
                     if (hook_ptr && hook_ptr->PollDialogData())
                     {
                         std::string text = hook_ptr->GetLastDialogText();
@@ -1013,7 +640,7 @@ bool Engine::start_hook(StartPolicy policy)
                         }
                     }
                     // Quest hook polling (safe pointer capture to avoid TOCTOU race)
-                    auto quest_hook_ptr = impl_->quest_hook.get();
+                    auto quest_hook_ptr = dynamic_cast<QuestHook*>(impl_->hook_manager.GetHook(persistence::HookType::Quest));
                     if (quest_hook_ptr && quest_hook_ptr->PollQuestData())
                     {
                         QuestMessage snapshot;
@@ -1032,20 +659,20 @@ bool Engine::start_hook(StartPolicy policy)
                         }
                     }
                     // Player hook polling (captures player data)
-                    auto player_hook_ptr = impl_->player_hook.get();
+                    auto player_hook_ptr = dynamic_cast<PlayerHook*>(impl_->hook_manager.GetHook(persistence::HookType::Player));
                     if (player_hook_ptr && player_hook_ptr->PollPlayerData())
                     {
                         PlayerInfo info = player_hook_ptr->GetLastPlayer();
                         update_player_info(std::move(info));
                     }
                     // Network hook polling (safe pointer capture to avoid TOCTOU race)
-                    auto network_hook_ptr = impl_->network_hook.get();
+                    auto network_hook_ptr = dynamic_cast<NetworkTextHook*>(impl_->hook_manager.GetHook(persistence::HookType::Network));
                     if (network_hook_ptr)
                     {
                         (void)network_hook_ptr->PollNetworkText();
                     }
                     // Corner hook polling (safe pointer capture to avoid TOCTOU race)
-                    auto corner_hook_ptr = impl_->corner_hook.get();
+                    auto corner_hook_ptr = dynamic_cast<CornerTextHook*>(impl_->hook_manager.GetHook(persistence::HookType::Corner));
                     if (corner_hook_ptr && corner_hook_ptr->PollCornerText())
                     {
                         const std::string& captured = corner_hook_ptr->GetLastText();
@@ -1110,31 +737,10 @@ bool Engine::stop_hook()
             impl_->monitor->stop();
             impl_->monitor.reset();
         }
-        if (impl_->quest_hook)
-        {
-            impl_->quest_hook->RemoveHook();
-            impl_->quest_hook.reset();
-        }
-        if (impl_->player_hook)
-        {
-            impl_->player_hook->RemoveHook();
-            impl_->player_hook.reset();
-        }
-        if (impl_->network_hook)
-        {
-            impl_->network_hook->RemoveHook();
-            impl_->network_hook.reset();
-        }
-        if (impl_->corner_hook)
-        {
-            impl_->corner_hook->RemoveHook();
-            impl_->corner_hook.reset();
-        }
-        if (impl_->hook)
-        {
-            impl_->hook->RemoveHook();
-            impl_->hook.reset();
-        }
+        
+        // Remove all hooks via HookManager (handles cleanup and persistence unregistration)
+        impl_->hook_manager.RemoveAllHooks();
+        
         if (impl_->integrity)
         {
             impl_->integrity->Remove();
