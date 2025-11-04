@@ -25,7 +25,7 @@ public:
     GlossaryManager(GlossaryManager&&) = delete;
     GlossaryManager& operator=(GlossaryManager&&) = delete;
 
-    void initialize();
+    void initialize(const std::string& glossary_dir = "assets/glossaries");
 
     std::optional<std::string> lookup(const std::string& japanese_text, const std::string& target_lang) const;
 

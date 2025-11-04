@@ -50,7 +50,7 @@ TEST_CASE("GlossaryManager - Fuzzy Lookup Basic", "[glossary][fuzzy][integration
     })");
 
     GlossaryManager manager;
-    manager.initialize();
+    manager.initialize("test_temp_glossaries");
 
     SECTION("Exact match returns score 1.0")
     {
@@ -101,7 +101,7 @@ TEST_CASE("GlossaryManager - Fuzzy Snippet Building", "[glossary][fuzzy][integra
     })");
 
     GlossaryManager manager;
-    manager.initialize();
+    manager.initialize("test_temp_glossaries");
 
     SECTION("Exact match in text returns score 1.00")
     {
@@ -148,7 +148,7 @@ TEST_CASE("GlossaryManager - Fuzzy Toggle", "[glossary][fuzzy][integration]")
     })");
 
     GlossaryManager manager;
-    manager.initialize();
+    manager.initialize("test_temp_glossaries");
 
     SECTION("Default state is enabled")
     {
@@ -196,7 +196,7 @@ TEST_CASE("GlossaryManager - Snippet Format Validation", "[glossary][fuzzy][inte
     })");
 
     GlossaryManager manager;
-    manager.initialize();
+    manager.initialize("test_temp_glossaries");
 
     SECTION("Snippet contains arrow separator")
     {
@@ -238,7 +238,7 @@ TEST_CASE("GlossaryManager - Language Mapping", "[glossary][fuzzy][integration]"
     TempGlossary glossary_hant("zh-Hant", R"({"主人公": "主角"})");
 
     GlossaryManager manager;
-    manager.initialize();
+    manager.initialize("test_temp_glossaries");
 
     SECTION("zh-CN maps to zh-Hans")
     {
@@ -269,7 +269,7 @@ TEST_CASE("GlossaryManager - Edge Cases", "[glossary][fuzzy][integration]")
     })");
 
     GlossaryManager manager;
-    manager.initialize();
+    manager.initialize("test_temp_glossaries");
 
     SECTION("Empty query returns empty results")
     {
@@ -309,7 +309,7 @@ TEST_CASE("GlossaryManager - Half/Full Width Matching", "[glossary][fuzzy][integ
     })");
 
     GlossaryManager manager;
-    manager.initialize();
+    manager.initialize("test_temp_glossaries");
 
     SECTION("Half-width katakana matches full-width")
     {

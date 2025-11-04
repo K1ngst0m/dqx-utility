@@ -106,7 +106,7 @@ TEST_CASE("NFKCTextNormalizer - normalize handles compatibility characters", "[i
     REQUIRE(result == "パーセント");
 }
 
-TEST_CASE("NFKCTextNormalizer - normalize handles ㍻ (Heisei era)", "[icu_normalizer]")
+TEST_CASE("NFKCTextNormalizer - normalize handles Heisei era character", "[icu_normalizer]")
 {
     processing::NFKCTextNormalizer normalizer;
     std::string input = "㍻";

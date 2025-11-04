@@ -27,7 +27,7 @@ GlossaryManager::GlossaryManager()
 
 GlossaryManager::~GlossaryManager() = default;
 
-void GlossaryManager::initialize()
+void GlossaryManager::initialize(const std::string& glossary_dir_path)
 {
     if (initialized_)
     {
@@ -35,7 +35,7 @@ void GlossaryManager::initialize()
         return;
     }
 
-    PLOG_INFO_(Diagnostics::kLogInstance) << "[GlossaryManager] Initializing glossaries...";
+    PLOG_INFO_(Diagnostics::kLogInstance) << "[GlossaryManager] Initializing glossaries from: " << glossary_dir_path;
 
     // Define glossary files to load
     struct GlossaryFile
@@ -50,7 +50,7 @@ void GlossaryManager::initialize()
         { "en-US.json",   "en-US"   }
     };
 
-    fs::path glossary_dir = "assets/glossaries";
+    fs::path glossary_dir = glossary_dir_path;
     std::size_t total_loaded = 0;
     std::size_t total_entries = 0;
 
@@ -298,7 +298,8 @@ GlossaryManager::fuzzyLookup(const std::string& japanese_text, const std::string
 
     // 4. Add fuzzy matches (avoid duplicates from exact match)
     std::set<std::string> seen_translations;
-    if (!results.empty())
+    bool had_exact_match = !results.empty();
+    if (had_exact_match)
     {
         seen_translations.insert(std::get<1>(results[0])); // Mark exact match translation as seen
     }
@@ -313,8 +314,8 @@ GlossaryManager::fuzzyLookup(const std::string& japanese_text, const std::string
             // Skip if we already have this translation from exact match
             if (seen_translations.find(translation) == seen_translations.end())
             {
-                // Skip exact match score 1.0 since we already added it
-                if (match.score < 0.9999)
+                // Skip exact match score 1.0 only if we already added an exact match
+                if (!had_exact_match || match.score < 0.9999)
                 {
                     results.emplace_back(match.matched, translation, match.score);
                     seen_translations.insert(translation);
