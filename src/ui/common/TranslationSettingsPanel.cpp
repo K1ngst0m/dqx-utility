@@ -162,9 +162,11 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
         ImGui::Checkbox(i18n::get("dialog.translate.include_corner"), &config.include_corner_stream);
     bool glossary_changed = ImGui::Checkbox(i18n::get("dialog.translate.use_glossary"), &config.glossary_enabled);
     
+
     // Fuzzy glossary controls (only for LLM backends)
     bool fuzzy_glossary_changed = false;
     bool fuzzy_threshold_changed = false;
+    #if 0
     if (config.translation_backend == TranslationConfig::TranslationBackend::OpenAI ||
         config.translation_backend == TranslationConfig::TranslationBackend::ZhipuGLM ||
         config.translation_backend == TranslationConfig::TranslationBackend::FreeLLM)
@@ -172,7 +174,7 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
         if (config.glossary_enabled)
         {
             ImGui::Indent();
-            fuzzy_glossary_changed = ImGui::Checkbox("Enable Fuzzy Glossary Matching", &config.fuzzy_glossary_enabled);
+            fuzzy_glossary_changed = ImGui::Checkbox(i18n::get("dialog.translate.fuzzy_glossary"),, &config.fuzzy_glossary_enabled);
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
@@ -183,7 +185,7 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
             if (config.fuzzy_glossary_enabled)
             {
                 ImGui::SetNextItemWidth(200.0f);
-                fuzzy_threshold_changed = ImGui::SliderFloat("Similarity Threshold", &config.fuzzy_glossary_threshold, 0.5f, 1.0f, "%.2f");
+                fuzzy_threshold_changed = ImGui::SliderFloat(i18n::get("dialog.translate.similarity_threshold"), &config.fuzzy_glossary_threshold, 0.5f, 1.0f, "%.2f");
                 if (ImGui::IsItemHovered())
                 {
                     ImGui::BeginTooltip();
@@ -194,6 +196,7 @@ bool TranslationSettingsPanel::renderBackendSelector(TranslationConfig& config)
             ImGui::Unindent();
         }
     }
+    #endif
     
     stream_filters_changed_ = include_dialog_changed || include_corner_changed || glossary_changed || 
                               fuzzy_glossary_changed || fuzzy_threshold_changed;
