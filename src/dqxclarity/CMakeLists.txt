@@ -27,6 +27,7 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/signatures/Signatures.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/process/ProcessFinder.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/Codegen.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hooking/HookBase.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/DialogHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/CornerTextHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/NetworkTextHook.cpp

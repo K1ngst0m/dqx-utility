@@ -1,19 +1,17 @@
 #pragma once
 
-#include "Codegen.hpp"
-#include "../memory/IProcessMemory.hpp"
-#include "../memory/MemoryPatch.hpp"
-#include "../api/dqxclarity.hpp"
+#include "HookBase.hpp"
+#include "HookCreateInfo.hpp"
 
-#include <cstdint>
-#include <memory>
 #include <string>
-#include <vector>
 
 namespace dqxclarity
 {
 
-class NetworkTextHook
+/**
+ * @brief Hook for capturing network text packets
+ */
+class NetworkTextHook : public HookBase
 {
 public:
     struct Capture
@@ -28,68 +26,29 @@ public:
         std::string text_strategy;
     };
 
-    explicit NetworkTextHook(std::shared_ptr<IProcessMemory> memory);
-    ~NetworkTextHook();
+    explicit NetworkTextHook(const HookCreateInfo& create_info);
+    ~NetworkTextHook() = default;
 
-    bool InstallHook(bool enable_patch = true);
-    bool EnablePatch();
-    bool RemoveHook();
-    bool ReapplyPatch();
-    bool IsPatched() const;
-
-    void SetLogger(const dqxclarity::Logger& log) { m_logger = log; }
-
-    void SetVerbose(bool enabled) { m_verbose = enabled; }
-
-    void SetInstructionSafeSteal(bool enabled) { m_instr_safe = enabled; }
-
-    void SetReadbackBytes(size_t n) { m_readback_n = n; }
-
+    // Hook-specific polling
     bool PollNetworkText();
 
-    const Capture& GetLastCapture() const { return m_last_capture; }
+    const Capture& GetLastCapture() const { return last_capture_; }
 
-    uintptr_t GetHookAddress() const { return m_hook_address; }
-
-    const std::vector<uint8_t>& GetOriginalBytes() const { return m_original_bytes; }
+protected:
+    // HookBase pure virtual implementations
+    Pattern GetSignature() const override;
+    std::vector<uint8_t> GenerateDetourPayload() override;
+    size_t ComputeStolenLength() override;
 
 private:
     static constexpr size_t kFlagOffset = 32;
-    static constexpr size_t kDefaultStolenBytes = 5;
     static constexpr size_t kMaxCategoryLength = 128;
     static constexpr size_t kMaxTextLength = 2048;
-    static constexpr size_t kCategoryRegisterOffset = 4;
-    static constexpr size_t kTextRegisterOffset = 12;
+    static constexpr size_t kDefaultStolenBytes = 5;
+    static constexpr size_t kCategoryRegisterOffset = 4;  // EBX
+    static constexpr size_t kTextRegisterOffset = 12;      // EDX
 
-    bool FindNetworkTriggerAddress();
-    bool AllocateDetourMemory();
-    bool WriteDetourCode();
-    bool PatchOriginalFunction();
-    void RestoreOriginalFunction();
-
-    std::vector<uint8_t> CreateDetourBytecode();
-    void EmitRegisterBackup(std::vector<uint8_t>& code);
-    void EmitRegisterRestore(std::vector<uint8_t>& code);
-    void EmitNewDataFlag(std::vector<uint8_t>& code);
-    void EmitStolenInstructions(std::vector<uint8_t>& code);
-    void EmitReturnJump(std::vector<uint8_t>& code);
-
-    size_t ComputeStolenLength();
-
-    std::shared_ptr<IProcessMemory> m_memory;
-    bool m_is_installed = false;
-
-    uintptr_t m_hook_address = 0;
-    uintptr_t m_detour_address = 0;
-    uintptr_t m_backup_address = 0;
-    std::vector<uint8_t> m_original_bytes;
-
-    bool m_verbose = false;
-    bool m_instr_safe = true;
-    size_t m_readback_n = 16;
-    dqxclarity::Logger m_logger{};
-
-    Capture m_last_capture{};
+    Capture last_capture_;
 };
 
 } // namespace dqxclarity

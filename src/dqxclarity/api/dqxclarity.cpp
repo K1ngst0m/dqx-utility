@@ -9,6 +9,7 @@
 #include "../hooking/NetworkTextHook.hpp"
 #include "../hooking/PlayerHook.hpp"
 #include "../hooking/QuestHook.hpp"
+#include "../hooking/HookCreateInfo.hpp"
 #include "../hooking/IntegrityDetour.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
 #include "../hooking/HookRegistry.hpp"
@@ -211,36 +212,37 @@ bool Engine::start_hook(StartPolicy policy)
         // Try to install hook (non-fatal if it fails)
         {
             PROFILE_SCOPE_CUSTOM("Engine.InstallDialogHook");
-            impl_->hook = std::make_unique<dqxclarity::DialogHook>(impl_->memory);
-            impl_->hook->SetVerbose(impl_->cfg.verbose);
-            impl_->hook->SetLogger(impl_->log);
-            impl_->hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
-            impl_->hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-            impl_->hook->SetCachedRegions(cached_regions);
-            impl_->hook->SetOriginalBytesChangedCallback(
-                [this](uintptr_t addr, const std::vector<uint8_t>& bytes)
+            HookCreateInfo hook_info;
+            hook_info.memory = impl_->memory;
+            hook_info.logger = impl_->log;
+            hook_info.verbose = impl_->cfg.verbose;
+            hook_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
+            hook_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
+            hook_info.cached_regions = cached_regions;
+            hook_info.on_original_bytes_changed = [this](uintptr_t addr, const std::vector<uint8_t>& bytes)
+            {
+                if (impl_->integrity)
                 {
-                    if (impl_->integrity)
-                    {
-                        impl_->integrity->UpdateRestoreTarget(addr, bytes);
-                    }
-                    if (impl_->monitor)
-                    {
-                        impl_->monitor->UpdateRestoreTarget(addr, bytes);
-                    }
-                });
-            impl_->hook->SetHookSiteChangedCallback(
-                [this](uintptr_t old_addr, uintptr_t new_addr, const std::vector<uint8_t>& bytes)
+                    impl_->integrity->UpdateRestoreTarget(addr, bytes);
+                }
+                if (impl_->monitor)
                 {
-                    if (impl_->integrity)
-                    {
-                        impl_->integrity->MoveRestoreTarget(old_addr, new_addr, bytes);
-                    }
-                    if (impl_->monitor)
-                    {
-                        impl_->monitor->MoveRestoreTarget(old_addr, new_addr, bytes);
-                    }
-                });
+                    impl_->monitor->UpdateRestoreTarget(addr, bytes);
+                }
+            };
+            hook_info.on_hook_site_changed = [this](uintptr_t old_addr, uintptr_t new_addr, const std::vector<uint8_t>& bytes)
+            {
+                if (impl_->integrity)
+                {
+                    impl_->integrity->MoveRestoreTarget(old_addr, new_addr, bytes);
+                }
+                if (impl_->monitor)
+                {
+                    impl_->monitor->MoveRestoreTarget(old_addr, new_addr, bytes);
+                }
+            };
+
+            impl_->hook = std::make_unique<dqxclarity::DialogHook>(hook_info);
             if (impl_->hook->InstallHook(/*enable_patch=*/false))
             {
                 hook_installed = true;
@@ -315,12 +317,15 @@ bool Engine::start_hook(StartPolicy policy)
 
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallQuestHook");
-        impl_->quest_hook = std::make_unique<dqxclarity::QuestHook>(impl_->memory);
-        impl_->quest_hook->SetVerbose(impl_->cfg.verbose);
-        impl_->quest_hook->SetLogger(impl_->log);
-        impl_->quest_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
-        impl_->quest_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-        impl_->quest_hook->SetCachedRegions(cached_regions);
+        HookCreateInfo quest_info;
+        quest_info.memory = impl_->memory;
+        quest_info.logger = impl_->log;
+        quest_info.verbose = impl_->cfg.verbose;
+        quest_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
+        quest_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
+        quest_info.cached_regions = cached_regions;
+
+        impl_->quest_hook = std::make_unique<dqxclarity::QuestHook>(quest_info);
         if (impl_->quest_hook && !impl_->quest_hook->InstallHook(/*enable_patch=*/false))
         {
             if (impl_->log.warn)
@@ -357,12 +362,15 @@ bool Engine::start_hook(StartPolicy policy)
 
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallPlayerHook");
-        impl_->player_hook = std::make_unique<dqxclarity::PlayerHook>(impl_->memory);
-        impl_->player_hook->SetVerbose(impl_->cfg.verbose);
-        impl_->player_hook->SetLogger(impl_->log);
-        impl_->player_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
-        impl_->player_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-        impl_->player_hook->SetCachedRegions(cached_regions);
+        HookCreateInfo player_info;
+        player_info.memory = impl_->memory;
+        player_info.logger = impl_->log;
+        player_info.verbose = impl_->cfg.verbose;
+        player_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
+        player_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
+        player_info.cached_regions = cached_regions;
+
+        impl_->player_hook = std::make_unique<dqxclarity::PlayerHook>(player_info);
         if (impl_->player_hook && !impl_->player_hook->InstallHook(/*enable_patch=*/false))
         {
             if (impl_->log.warn)
@@ -412,12 +420,15 @@ bool Engine::start_hook(StartPolicy policy)
 
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallCornerTextHook");
-        impl_->corner_hook = std::make_unique<dqxclarity::CornerTextHook>(impl_->memory);
-        impl_->corner_hook->SetVerbose(impl_->cfg.verbose);
-        impl_->corner_hook->SetLogger(impl_->log);
-        impl_->corner_hook->SetInstructionSafeSteal(impl_->cfg.instruction_safe_steal);
-        impl_->corner_hook->SetReadbackBytes(static_cast<size_t>(impl_->cfg.readback_bytes));
-        impl_->corner_hook->SetCachedRegions(cached_regions);
+        HookCreateInfo corner_info;
+        corner_info.memory = impl_->memory;
+        corner_info.logger = impl_->log;
+        corner_info.verbose = impl_->cfg.verbose;
+        corner_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
+        corner_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
+        corner_info.cached_regions = cached_regions;
+
+        impl_->corner_hook = std::make_unique<dqxclarity::CornerTextHook>(corner_info);
         if (impl_->corner_hook && !impl_->corner_hook->InstallHook(/*enable_patch=*/false))
         {
             if (impl_->log.warn)

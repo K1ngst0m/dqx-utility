@@ -1,20 +1,19 @@
 #pragma once
 
-#include "../memory/IProcessMemory.hpp"
-#include "Codegen.hpp"
-#include "../memory/MemoryPatch.hpp"
-#include "../api/dqxclarity.hpp"
-#include "../pattern/MemoryRegion.hpp"
+#include "HookBase.hpp"
+#include "HookCreateInfo.hpp"
 
-#include <cstdint>
-#include <memory>
 #include <string>
-#include <vector>
 
 namespace dqxclarity
 {
 
-class QuestHook
+/**
+ * @brief Hook for capturing quest text data
+ * 
+ * Captures quest metadata including title, description, objectives, and rewards.
+ */
+class QuestHook : public HookBase
 {
 public:
     struct QuestData
@@ -26,81 +25,33 @@ public:
         std::string repeat_rewards;
     };
 
-    explicit QuestHook(std::shared_ptr<IProcessMemory> memory);
-    ~QuestHook();
+    explicit QuestHook(const HookCreateInfo& create_info);
+    ~QuestHook() = default;
 
-    bool InstallHook(bool enable_patch = true);
-    bool EnablePatch();
-    bool RemoveHook();
-    bool ReapplyPatch();
-    bool IsPatched() const;
-
-    void SetLogger(const dqxclarity::Logger& log) { m_logger = log; }
-
-    void SetVerbose(bool enabled) { m_verbose = enabled; }
-
-    void SetInstructionSafeSteal(bool enabled) { m_instr_safe = enabled; }
-
-    void SetReadbackBytes(size_t n) { m_readback_n = n; }
-
-    // Set pre-parsed memory regions to avoid repeated ParseMaps calls
-    void SetCachedRegions(const std::vector<MemoryRegion>& regions) { m_cached_regions = regions; }
-
+    // Hook-specific polling
     bool PollQuestData();
 
-    const QuestData& GetLastQuest() const { return m_last_data; }
+    const QuestData& GetLastQuest() const { return last_data_; }
 
-    uintptr_t GetHookAddress() const { return m_hook_address; }
-
-    const std::vector<uint8_t>& GetOriginalBytes() const { return m_original_bytes; }
-
-    uintptr_t GetDetourAddress() const { return m_detour_address; }
-    uintptr_t GetBackupAddress() const { return m_backup_address; }
+protected:
+    // HookBase pure virtual implementations
+    Pattern GetSignature() const override;
+    std::vector<uint8_t> GenerateDetourPayload() override;
+    size_t ComputeStolenLength() override;
 
 private:
     static constexpr size_t kFlagOffset = 32;
     static constexpr size_t kMaxStringLength = 2048;
     static constexpr size_t kDefaultStolenBytes = 6;
 
-    // Offsets discovered from reference implementation
+    // Offsets for quest data in backup buffer
     static constexpr uint32_t kSubquestNameOffset = 20;
     static constexpr uint32_t kQuestNameOffset = 76;
     static constexpr uint32_t kDescriptionOffset = 132;
     static constexpr uint32_t kRewardsOffset = 640;
     static constexpr uint32_t kRepeatRewardsOffset = 744;
 
-    std::shared_ptr<IProcessMemory> m_memory;
-    bool m_is_installed = false;
-
-    uintptr_t m_hook_address = 0;
-    uintptr_t m_detour_address = 0;
-    uintptr_t m_backup_address = 0;
-    std::vector<uint8_t> m_original_bytes;
-
-    bool m_verbose = false;
-    bool m_instr_safe = true;
-    size_t m_readback_n = 16;
-    dqxclarity::Logger m_logger{};
-
-    // Cached memory regions
-    std::vector<MemoryRegion> m_cached_regions;
-
-    QuestData m_last_data;
-
-    bool FindQuestTriggerAddress();
-    bool AllocateDetourMemory();
-    bool WriteDetourCode();
-    bool PatchOriginalFunction();
-    void RestoreOriginalFunction();
-
-    std::vector<uint8_t> CreateDetourBytecode();
-    void EmitRegisterBackup(std::vector<uint8_t>& code);
-    void EmitRegisterRestore(std::vector<uint8_t>& code);
-    void EmitNewDataFlag(std::vector<uint8_t>& code);
-    void EmitStolenInstructions(std::vector<uint8_t>& code);
-    void EmitReturnJump(std::vector<uint8_t>& code);
-
-    size_t ComputeStolenLength();
+    QuestData last_data_;
 };
 
 } // namespace dqxclarity
