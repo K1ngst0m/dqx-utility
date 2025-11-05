@@ -10,16 +10,15 @@ bool IntegrityMonitor::start()
 {
     if (!memory_ || !memory_->IsProcessAttached() || state_addr_ == 0 || worker_.joinable())
         return false;
-    stop_.store(false);
-    worker_ = std::thread(
-        [this]
+    worker_ = std::jthread(
+        [this](std::stop_token stoken)
         {
             using namespace std::chrono_literals;
             try
             {
                 bool first = true;
                 uint32_t hits = 0;
-                while (!stop_.load())
+                while (!stoken.stop_requested())
                 {
                     uint8_t flag = 0;
                     if (memory_->ReadMemory(state_addr_, &flag, 1) && flag == 1)
@@ -72,7 +71,7 @@ bool IntegrityMonitor::start()
                     // Wait up to 10ms or until stopped
                     {
                         std::unique_lock<std::mutex> lk(cv_mutex_);
-                        cv_.wait_for(lk, 10ms, [this]{ return stop_.load(std::memory_order_relaxed); });
+                        cv_.wait_for(lk, 10ms, [&stoken]{ return stoken.stop_requested(); });
                     }
                 }
             }
@@ -96,7 +95,7 @@ bool IntegrityMonitor::start()
 
 void IntegrityMonitor::stop()
 {
-    stop_.store(true, std::memory_order_relaxed);
+    worker_.request_stop();
     cv_.notify_one();
     if (worker_.joinable())
         worker_.join();

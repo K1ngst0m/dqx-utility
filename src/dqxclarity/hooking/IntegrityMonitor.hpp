@@ -73,8 +73,7 @@ private:
     std::vector<RestoreSite> restore_;
     mutable std::mutex restore_mutex_;
 
-    std::thread worker_;
-    std::atomic<bool> stop_{ false };
+    std::jthread worker_;
     std::mutex cv_mutex_;
     std::condition_variable cv_;
 };

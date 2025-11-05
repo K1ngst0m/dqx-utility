@@ -60,8 +60,7 @@ struct Engine::Impl
     std::atomic<std::uint64_t> seq{ 0 };
     SpscRing<DialogStreamItem, 1024> stream_ring;
     std::atomic<std::uint64_t> stream_seq{ 0 };
-    std::thread poller;
-    std::atomic<bool> poll_stop{ false };
+    std::jthread poller;
     std::unique_ptr<IntegrityMonitor> monitor;
 
     std::atomic<std::uint64_t> quest_seq{ 0 };
@@ -331,7 +330,7 @@ bool Engine::start_hook(StartPolicy policy)
         if (impl_->cfg.proactive_verify_after_enable_ms > 0)
         {
             auto delay = std::chrono::milliseconds(impl_->cfg.proactive_verify_after_enable_ms);
-            std::thread([this, delay] {
+            std::jthread([this, delay](std::stop_token) {
                 std::this_thread::sleep_for(delay);
                 impl_->hook_manager.VerifyAllPatches(impl_->log, impl_->cfg.verbose);
             }).detach();
@@ -368,14 +367,13 @@ bool Engine::start_hook(StartPolicy policy)
         impl_->log.info("Hook installed");
 
     // Start poller thread to capture dialog events and publish to ring buffer
-    impl_->poll_stop.store(false);
-    impl_->poller = std::thread(
-        [this]
+    impl_->poller = std::jthread(
+        [this](std::stop_token stoken)
         {
             using namespace std::chrono_literals;
             try
             {
-                while (!impl_->poll_stop.load())
+                while (!stoken.stop_requested())
                 {
                     auto now = std::chrono::steady_clock::now();
 
@@ -695,7 +693,7 @@ bool Engine::stop_hook()
 
     try
     {
-        impl_->poll_stop.store(true);
+        impl_->poller.request_stop();
         if (impl_->poller.joinable())
             impl_->poller.join();
 

@@ -160,28 +160,22 @@ namespace dqxclarity
 struct DQXClarityLauncher::Impl
 {
     std::unique_ptr<dqxclarity::Engine> engine;
-    std::thread monitor;
-    std::atomic<bool> stop_flag{ false };
+    std::jthread monitor;
     std::atomic<bool> shutdown_called{ false };
     std::mutex engine_mutex;
     bool waiting_delay = false;
     std::chrono::steady_clock::time_point detect_tp{};
-    int delay_ms = 5000; // default 5s; make configurable later
+    int delay_ms = 5000;
 
-    std::thread watchdog;
-    std::atomic<bool> watchdog_stop{ false };
+    std::jthread watchdog;
     std::atomic<std::uint64_t> heartbeat_seq{ 0 };
     std::atomic<bool> fatal_signal{ false };
     std::atomic<bool> stop_in_progress{ false };
 
-    // Notice wait worker
-    std::thread notice_worker;
-    std::atomic<bool> cancel_notice{ false };
+    std::jthread notice_worker;
     std::atomic<bool> notice_found{ false };
 
-    // Post-login heuristic detector
-    std::thread post_login_worker;
-    std::atomic<bool> cancel_post_login{ false };
+    std::jthread post_login_worker;
     std::atomic<bool> post_login_found{ false };
 
     // Process state for start policy
@@ -384,14 +378,14 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
 
     // Start controller monitor thread
-    pimpl_->monitor = std::thread(
-        [this]
+    pimpl_->monitor = std::jthread(
+        [this](std::stop_token stoken)
         {
             try
             {
                 using namespace std::chrono;
                 bool initialized = false;
-                while (!pimpl_->stop_flag.load())
+                while (!stoken.stop_requested())
                 {
                     try
                     {
@@ -427,45 +421,46 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                                         // no immediate start; ensure wait workers below will be created
                                     }
                                     pimpl_->attempted_auto_start = true;
-                                    // Stop any lingering workers
-                                    if (pimpl_->notice_worker.joinable())
-                                    {
-                                        pimpl_->cancel_notice.store(true);
-                                        pimpl_->notice_worker.join();
-                                    }
-                                    if (pimpl_->post_login_worker.joinable())
-                                    {
-                                        pimpl_->cancel_post_login.store(true);
-                                        pimpl_->post_login_worker.join();
-                                    }
+                                    pimpl_->notice_worker.request_stop();
+                                    pimpl_->post_login_worker.request_stop();
                                 }
                                 else if (!pimpl_->notice_worker.joinable())
                                 {
                                     PLOG_INFO << "DQXGame.exe detected; waiting for \"Important notice\" and "
                                                  "post-login heuristic";
-                                    pimpl_->cancel_notice.store(false);
                                     pimpl_->notice_found.store(false);
-                                    pimpl_->notice_worker = std::thread(
-                                        [this]
+                                    pimpl_->notice_worker = std::jthread(
+                                        [this](std::stop_token stoken)
                                         {
-                                            // Wait for notice with configured timeout (0 = infinite)
+                                            std::atomic<bool> cancel{false};
+                                            auto cancel_thread = std::jthread([&stoken, &cancel](std::stop_token) {
+                                                while (!stoken.stop_requested()) {
+                                                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                                                }
+                                                cancel.store(true);
+                                            });
                                             bool ok = wait_for_notice_screen(
-                                                pimpl_->cancel_notice, std::chrono::milliseconds(250),
+                                                cancel, std::chrono::milliseconds(250),
                                                 std::chrono::milliseconds(pimpl_->notice_wait_timeout_ms));
                                             if (ok)
                                             {
                                                 pimpl_->notice_found.store(true);
                                             }
                                         });
-                                    // Run post-login detector in parallel when enabled
                                     if (pimpl_->enable_post_login_heuristics && !pimpl_->post_login_worker.joinable())
                                     {
-                                        pimpl_->cancel_post_login.store(false);
                                         pimpl_->post_login_found.store(false);
-                                        pimpl_->post_login_worker = std::thread(
-                                            [this]
+                                        pimpl_->post_login_worker = std::jthread(
+                                            [this](std::stop_token stoken)
                                             {
-                                                bool ok = detect_post_login(pimpl_->cancel_post_login,
+                                                std::atomic<bool> cancel{false};
+                                                auto cancel_thread = std::jthread([&stoken, &cancel](std::stop_token) {
+                                                    while (!stoken.stop_requested()) {
+                                                        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                                                    }
+                                                    cancel.store(true);
+                                                });
+                                                bool ok = detect_post_login(cancel,
                                                                             std::chrono::milliseconds(250),
                                                                             std::chrono::milliseconds(0));
                                                 if (ok)
@@ -482,32 +477,16 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                                     PLOG_INFO << "Important notice found; starting hook (defer until integrity)...";
                                     (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::DeferUntilIntegrity);
                                     pimpl_->notice_found.store(false);
-                                    // Cancel heuristic worker
-                                    if (pimpl_->post_login_worker.joinable())
-                                    {
-                                        pimpl_->cancel_post_login.store(true);
-                                        pimpl_->post_login_worker.join();
-                                    }
-                                    if (pimpl_->notice_worker.joinable())
-                                    {
-                                        pimpl_->notice_worker.join();
-                                    }
+                                    pimpl_->post_login_worker.request_stop();
+                                    pimpl_->notice_worker.request_stop();
                                 }
                                 else if (pimpl_->post_login_found.load())
                                 {
                                     PLOG_INFO << "Post-login heuristic matched; enabling immediately...";
                                     (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
                                     pimpl_->post_login_found.store(false);
-                                    // Cancel notice worker
-                                    if (pimpl_->notice_worker.joinable())
-                                    {
-                                        pimpl_->cancel_notice.store(true);
-                                        pimpl_->notice_worker.join();
-                                    }
-                                    if (pimpl_->post_login_worker.joinable())
-                                    {
-                                        pimpl_->post_login_worker.join();
-                                    }
+                                    pimpl_->notice_worker.request_stop();
+                                    pimpl_->post_login_worker.request_stop();
                                 }
                             }
                         }
@@ -516,16 +495,8 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                             // Process not running: reset state and cancel any pending workers
                             pimpl_->process_running_at_start = false;
                             pimpl_->attempted_auto_start = false;
-                            if (pimpl_->notice_worker.joinable())
-                            {
-                                pimpl_->cancel_notice.store(true);
-                                pimpl_->notice_worker.join();
-                            }
-                            if (pimpl_->post_login_worker.joinable())
-                            {
-                                pimpl_->cancel_post_login.store(true);
-                                pimpl_->post_login_worker.join();
-                            }
+                            pimpl_->notice_worker.request_stop();
+                            pimpl_->post_login_worker.request_stop();
                             if (pimpl_->waiting_delay)
                                 pimpl_->waiting_delay = false;
                             if (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting ||
@@ -628,16 +599,14 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
             }
         });
 
-    pimpl_->watchdog = std::thread(
-        [this]
+    pimpl_->watchdog = std::jthread(
+        [this](std::stop_token stoken)
         {
             using namespace std::chrono;
             std::uint64_t last_seq = pimpl_->heartbeat_seq.load(std::memory_order_relaxed);
             int stagnant_ticks = 0;
-            while (!pimpl_->watchdog_stop.load(std::memory_order_acquire))
+            while (!stoken.stop_requested())
             {
-                if (pimpl_->stop_flag.load(std::memory_order_acquire))
-                    break;
                 std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Reduced from 500ms
                 const auto seq = pimpl_->heartbeat_seq.load(std::memory_order_relaxed);
                 if (seq == last_seq)
@@ -748,17 +717,9 @@ bool DQXClarityLauncher::launch()
         return false;
     }
     PLOG_INFO << "Start requested";
-    pimpl_->waiting_delay = false; // cancel any pending delay and start now
-    if (pimpl_->notice_worker.joinable())
-    {
-        pimpl_->cancel_notice.store(true);
-        pimpl_->notice_worker.join();
-    }
-    if (pimpl_->post_login_worker.joinable())
-    {
-        pimpl_->cancel_post_login.store(true);
-        pimpl_->post_login_worker.join();
-    }
+    pimpl_->waiting_delay = false;
+    pimpl_->notice_worker.request_stop();
+    pimpl_->post_login_worker.request_stop();
     bool ok = pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
     if (!ok && pimpl_->getLastErrorMessage().empty())
     {
@@ -771,16 +732,8 @@ bool DQXClarityLauncher::stop()
 {
     PLOG_INFO << "Stop requested";
     pimpl_->waiting_delay = false;
-    pimpl_->cancel_notice.store(true);
-    if (pimpl_->notice_worker.joinable())
-    {
-        pimpl_->notice_worker.join();
-    }
-    pimpl_->cancel_post_login.store(true);
-    if (pimpl_->post_login_worker.joinable())
-    {
-        pimpl_->post_login_worker.join();
-    }
+    pimpl_->notice_worker.request_stop();
+    pimpl_->post_login_worker.request_stop();
     bool ok = pimpl_->stopHookLocked();
     if (!ok && pimpl_->getLastErrorMessage().empty())
     {
@@ -887,8 +840,8 @@ void DQXClarityLauncher::shutdown()
         return;
     }
 
-    pimpl_->stop_flag.store(true);
-    pimpl_->watchdog_stop.store(true, std::memory_order_release);
+    pimpl_->monitor.request_stop();
+    pimpl_->watchdog.request_stop();
     (void)stop();
 
     if (pimpl_->monitor.joinable())
@@ -901,17 +854,8 @@ void DQXClarityLauncher::shutdown()
         pimpl_->watchdog.join();
     }
 
-    if (pimpl_->notice_worker.joinable())
-    {
-        pimpl_->cancel_notice.store(true);
-        pimpl_->notice_worker.join();
-    }
-
-    if (pimpl_->post_login_worker.joinable())
-    {
-        pimpl_->cancel_post_login.store(true);
-        pimpl_->post_login_worker.join();
-    }
+    pimpl_->notice_worker.request_stop();
+    pimpl_->post_login_worker.request_stop();
 }
 
 DQXClarityStatus DQXClarityLauncher::getStatus() const
