@@ -23,8 +23,9 @@
 #include "../../services/DQXClarityService.hpp"
 #include "../../services/DQXClarityLauncher.hpp"
 #include "../../dqxclarity/api/dialog_message.hpp"
-#include "../Localization.hpp"
+#include "../../dqxclarity/api/corner_text.hpp"
 #include "../../dqxclarity/api/dqxclarity.hpp"
+#include "../Localization.hpp"
 
 namespace
 {
@@ -351,33 +352,56 @@ void DialogWindow::applyPending()
         return true;
     };
 
-    // Pull new dialog messages from in-process backlog
+    // Pull new dialog messages from in-process backlog (UI-layer merging)
     const TranslationConfig& config = activeTranslationConfig();
     const std::string corner_speaker_label = ui::LocalizedOrFallback("dialog.corner.speaker", "Follower Dialogue");
 
     if (auto* launcher = DQXClarityService_Get())
     {
-        std::vector<dqxclarity::DialogStreamItem> items;
-        if (launcher->copyDialogStreamSince(last_applied_seq_, items))
+        // Pull dialog messages (from DialogHook + DialogMemoryReader)
+        if (config.include_dialog_stream)
         {
-            for (auto& item : items)
+            std::vector<dqxclarity::DialogMessage> dialog_items;
+            if (launcher->copyDialogsSince(last_applied_seq_, dialog_items))
             {
-                bool allow_type = (item.type == dqxclarity::DialogStreamType::Dialog) ? config.include_dialog_stream :
-                                                                                        config.include_corner_stream;
-
-                bool hasValidText = !item.text.empty() && !is_blank(item.text);
-                bool hasValidSpeaker = !item.speaker.empty() && item.speaker != "No_NPC";
-
-                if (allow_type && (hasValidText || hasValidSpeaker))
+                for (auto& item : dialog_items)
                 {
-                    PendingMsg pm;
-                    pm.type = item.type;
-                    pm.text = std::move(item.text);
-                    pm.speaker = std::move(item.speaker);
-                    pm.seq = item.seq;
-                    pending_.push(std::move(pm));
+                    bool hasValidText = !item.text.empty() && !is_blank(item.text);
+                    bool hasValidSpeaker = !item.speaker.empty() && item.speaker != "No_NPC";
+
+                    if (hasValidText || hasValidSpeaker)
+                    {
+                        PendingMsg pm;
+                        pm.is_corner_text = false;
+                        pm.text = std::move(item.text);
+                        pm.speaker = std::move(item.speaker);
+                        pm.seq = item.seq;
+                        pending_.push(std::move(pm));
+                    }
+                    last_applied_seq_ = std::max(last_applied_seq_, item.seq);
                 }
-                last_applied_seq_ = std::max(last_applied_seq_, item.seq);
+            }
+        }
+
+        // Pull corner text messages separately (from CornerTextHook)
+        if (config.include_corner_stream)
+        {
+            std::vector<dqxclarity::CornerTextItem> corner_items;
+            if (launcher->copyCornerTextSince(last_corner_text_seq_, corner_items))
+            {
+                for (auto& item : corner_items)
+                {
+                    if (!item.text.empty() && !is_blank(item.text))
+                    {
+                        PendingMsg pm;
+                        pm.is_corner_text = true;
+                        pm.text = std::move(item.text);
+                        pm.speaker = corner_speaker_label;
+                        pm.seq = item.seq;
+                        pending_.push(std::move(pm));
+                    }
+                    last_corner_text_seq_ = std::max(last_corner_text_seq_, item.seq);
+                }
             }
         }
     }
@@ -408,7 +432,7 @@ void DialogWindow::applyPending()
         std::string target_lang_code = toTargetCode(config.target_lang_enum);
         bool use_glossary_replacement = config.glossary_enabled && !isLLMBackend(config.translation_backend);
         std::string processed_text =
-            (m.type == dqxclarity::DialogStreamType::CornerText) ?
+            m.is_corner_text ?
                 text_to_process :
                 text_pipeline_->process(text_to_process, target_lang_code, use_glossary_replacement);
 
@@ -419,7 +443,7 @@ void DialogWindow::applyPending()
         }
 
         std::string speaker = m.speaker;
-        if (speaker.empty() && m.type == dqxclarity::DialogStreamType::CornerText)
+        if (speaker.empty() && m.is_corner_text)
         {
             speaker = corner_speaker_label;
         }

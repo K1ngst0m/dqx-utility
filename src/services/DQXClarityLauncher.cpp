@@ -11,7 +11,7 @@
 
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "dqxclarity/api/dialog_message.hpp"
-#include "dqxclarity/api/dialog_stream.hpp"
+#include "dqxclarity/api/corner_text.hpp"
 #include "dqxclarity/api/player_info.hpp"
 #include "dqxclarity/api/quest_message.hpp"
 #include "DQXClarityService.hpp"
@@ -191,9 +191,9 @@ struct DQXClarityLauncher::Impl
     std::vector<dqxclarity::DialogMessage> backlog;
     static constexpr std::size_t kMaxBacklog = 2048;
 
-    mutable std::mutex stream_mutex;
-    std::vector<dqxclarity::DialogStreamItem> stream_backlog;
-    static constexpr std::size_t kMaxStreamBacklog = 2048;
+    mutable std::mutex corner_text_mutex;
+    std::vector<dqxclarity::CornerTextItem> corner_text_backlog;
+    static constexpr std::size_t kMaxCornerTextBacklog = 1024;
 
     mutable std::mutex quest_mutex;
     dqxclarity::QuestMessage latest_quest;
@@ -528,19 +528,19 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                             }
                         }
 
-                        std::vector<dqxclarity::DialogStreamItem> stream_items;
-                        if (pimpl_->engine->drainStream(stream_items) && !stream_items.empty())
+                        std::vector<dqxclarity::CornerTextItem> corner_text_items;
+                        if (pimpl_->engine->drainCornerText(corner_text_items) && !corner_text_items.empty())
                         {
-                            std::lock_guard<std::mutex> lock(pimpl_->stream_mutex);
-                            for (auto& item : stream_items)
+                            std::lock_guard<std::mutex> lock(pimpl_->corner_text_mutex);
+                            for (auto& item : corner_text_items)
                             {
-                                pimpl_->stream_backlog.push_back(std::move(item));
-                                if (pimpl_->stream_backlog.size() > pimpl_->kMaxStreamBacklog)
+                                pimpl_->corner_text_backlog.push_back(std::move(item));
+                                if (pimpl_->corner_text_backlog.size() > pimpl_->kMaxCornerTextBacklog)
                                 {
-                                    pimpl_->stream_backlog.erase(
-                                        pimpl_->stream_backlog.begin(),
-                                        pimpl_->stream_backlog.begin() +
-                                            (pimpl_->stream_backlog.size() - pimpl_->kMaxStreamBacklog));
+                                    pimpl_->corner_text_backlog.erase(
+                                        pimpl_->corner_text_backlog.begin(),
+                                        pimpl_->corner_text_backlog.begin() +
+                                            (pimpl_->corner_text_backlog.size() - pimpl_->kMaxCornerTextBacklog));
                                 }
                             }
                         }
@@ -666,13 +666,13 @@ bool DQXClarityLauncher::copyDialogsSince(std::uint64_t since_seq, std::vector<d
     return !out.empty();
 }
 
-bool DQXClarityLauncher::copyDialogStreamSince(std::uint64_t since_seq,
-                                               std::vector<dqxclarity::DialogStreamItem>& out) const
+bool DQXClarityLauncher::copyCornerTextSince(std::uint64_t since_seq,
+                                             std::vector<dqxclarity::CornerTextItem>& out) const
 {
-    std::lock_guard<std::mutex> lock(pimpl_->stream_mutex);
-    if (pimpl_->stream_backlog.empty())
+    std::lock_guard<std::mutex> lock(pimpl_->corner_text_mutex);
+    if (pimpl_->corner_text_backlog.empty())
         return false;
-    for (const auto& item : pimpl_->stream_backlog)
+    for (const auto& item : pimpl_->corner_text_backlog)
     {
         if (item.seq > since_seq)
             out.push_back(item);
@@ -759,8 +759,8 @@ bool DQXClarityLauncher::reinitialize(ConfigManager& config)
         pimpl_->backlog.clear();
     }
     {
-        std::lock_guard<std::mutex> lock(pimpl_->stream_mutex);
-        pimpl_->stream_backlog.clear();
+        std::lock_guard<std::mutex> lock(pimpl_->corner_text_mutex);
+        pimpl_->corner_text_backlog.clear();
     }
     {
         std::lock_guard<std::mutex> lock(pimpl_->quest_mutex);

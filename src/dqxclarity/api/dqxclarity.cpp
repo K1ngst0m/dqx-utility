@@ -15,8 +15,8 @@
 #include "../hooking/IntegrityMonitor.hpp"
 #include "../hooking/HookRegistry.hpp"
 #include "dialog_message.hpp"
-#include "dialog_stream.hpp"
 #include "quest_message.hpp"
+#include "corner_text.hpp"
 #include "../util/SPSCRing.hpp"
 #include "../util/Profile.hpp"
 #include "../pattern/MemoryRegion.hpp"
@@ -58,8 +58,8 @@ struct Engine::Impl
 
     SpscRing<DialogMessage, 1024> ring;
     std::atomic<std::uint64_t> seq{ 0 };
-    SpscRing<DialogStreamItem, 1024> stream_ring;
-    std::atomic<std::uint64_t> stream_seq{ 0 };
+    SpscRing<CornerTextItem, 512> corner_text_ring;
+    std::atomic<std::uint64_t> corner_text_seq{ 0 };
     std::jthread poller;
     std::unique_ptr<IntegrityMonitor> monitor;
 
@@ -585,13 +585,6 @@ bool Engine::start_hook(StartPolicy policy)
                             msg.lang.clear();
                             impl_->ring.try_push(std::move(msg));
 
-                            DialogStreamItem stream_item;
-                            stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
-                            stream_item.type = DialogStreamType::Dialog;
-                            stream_item.text = dialog.text;
-                            stream_item.speaker = dialog.speaker;
-                            impl_->stream_ring.try_push(std::move(stream_item));
-
                             // Add to global cache
                             {
                                 std::lock_guard<std::mutex> cache_lock(impl_->cache_mutex);
@@ -652,12 +645,10 @@ bool Engine::start_hook(StartPolicy policy)
                         const std::string& captured = corner_hook_ptr->GetLastText();
                         if (!captured.empty())
                         {
-                            DialogStreamItem stream_item;
-                            stream_item.seq = impl_->stream_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
-                            stream_item.type = DialogStreamType::CornerText;
-                            stream_item.text = captured;
-                            stream_item.speaker.clear();
-                            impl_->stream_ring.try_push(std::move(stream_item));
+                            CornerTextItem corner_item;
+                            corner_item.seq = impl_->corner_text_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+                            corner_item.text = captured;
+                            impl_->corner_text_ring.try_push(std::move(corner_item));
                         }
                     }
                     std::this_thread::sleep_for(100ms);
@@ -755,7 +746,7 @@ bool Engine::stop_hook()
 
 bool Engine::drain(std::vector<DialogMessage>& out) { return impl_->ring.pop_all(out) > 0; }
 
-bool Engine::drainStream(std::vector<DialogStreamItem>& out) { return impl_->stream_ring.pop_all(out) > 0; }
+bool Engine::drainCornerText(std::vector<CornerTextItem>& out) { return impl_->corner_text_ring.pop_all(out) > 0; }
 
 bool Engine::latest_quest(QuestMessage& out) const
 {

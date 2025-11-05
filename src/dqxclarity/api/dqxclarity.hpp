@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "player_info.hpp"
+#include "corner_text.hpp"
 
 namespace dqxclarity
 {
@@ -20,7 +21,7 @@ enum class Status
 };
 
 struct QuestMessage;
-struct DialogStreamItem;
+struct DialogMessage;
 
 struct Config
 {
@@ -67,11 +68,11 @@ public:
     Status status() const { return status_; }
 
     // Drain all available dialog messages into out (single consumer)
-    bool drain(std::vector<struct DialogMessage>& out);
-    bool drainStream(std::vector<struct DialogStreamItem>& out);
+    bool drain(std::vector<DialogMessage>& out);
+    bool drainCornerText(std::vector<CornerTextItem>& out);
 
-    bool latest_quest(struct QuestMessage& out) const;
-    bool latest_player(struct PlayerInfo& out) const;
+    bool latest_quest(QuestMessage& out) const;
+    bool latest_player(PlayerInfo& out) const;
     void update_player_info(PlayerInfo info);
 
 private:

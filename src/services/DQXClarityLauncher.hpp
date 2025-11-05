@@ -8,7 +8,7 @@
 namespace dqxclarity
 {
 struct DialogMessage;
-struct DialogStreamItem;
+struct CornerTextItem;
 struct QuestMessage;
 struct PlayerInfo;
 enum class Status;
@@ -59,7 +59,7 @@ public:
 
     // Copy messages with seq > since_seq into out (non-destructive snapshot)
     bool copyDialogsSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogMessage>& out) const;
-    bool copyDialogStreamSince(std::uint64_t since_seq, std::vector<dqxclarity::DialogStreamItem>& out) const;
+    bool copyCornerTextSince(std::uint64_t since_seq, std::vector<dqxclarity::CornerTextItem>& out) const;
 
     bool getLatestQuest(dqxclarity::QuestMessage& out) const;
     bool getLatestPlayer(dqxclarity::PlayerInfo& out) const;

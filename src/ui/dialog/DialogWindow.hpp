@@ -7,7 +7,6 @@
 #include "../WindowAnimator.hpp"
 #include "../../utils/PendingQueue.hpp"
 #include "DialogSettingsView.hpp"
-#include "../../dqxclarity/api/dialog_stream.hpp"
 
 #include <string>
 #include <mutex>
@@ -68,7 +67,7 @@ public:
 private:
     struct PendingMsg
     {
-        dqxclarity::DialogStreamType type = dqxclarity::DialogStreamType::Dialog;
+        bool is_corner_text = false;
         std::string text;
         std::string speaker;
         std::uint64_t seq = 0;
@@ -139,6 +138,7 @@ private:
     // In-process messaging: pending messages and last seen seq
     PendingQueue<PendingMsg> pending_;
     std::uint64_t last_applied_seq_ = 0;
+    std::uint64_t last_corner_text_seq_ = 0;
     ActivityMonitor activity_monitor_;
     bool scroll_to_bottom_requested_ = false;
 
