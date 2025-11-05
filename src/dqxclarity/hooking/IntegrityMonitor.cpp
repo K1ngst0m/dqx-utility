@@ -41,7 +41,7 @@ bool IntegrityMonitor::start()
                         if (log_.info)
                             log_.info(std::string("Integrity signal observed; hits=") + std::to_string(hits) +
                                       "; restoring");
-                        // Delay before re-applying the dialog hook to avoid racing the checker
+                        // Delay before re-applying hooks to avoid racing the integrity checker
                         std::this_thread::sleep_for(std::chrono::milliseconds(2500));
                         if (on_integrity_)
                         {
@@ -68,7 +68,12 @@ bool IntegrityMonitor::start()
                         uint8_t zero = 0;
                         (void)memory_->WriteMemory(state_addr_, &zero, 1);
                     }
-                    std::this_thread::sleep_for(1ms);
+                    
+                    // Wait up to 10ms or until stopped
+                    {
+                        std::unique_lock<std::mutex> lk(cv_mutex_);
+                        cv_.wait_for(lk, 10ms, [this]{ return stop_.load(std::memory_order_relaxed); });
+                    }
                 }
             }
             catch (const std::exception& e)
@@ -91,7 +96,8 @@ bool IntegrityMonitor::start()
 
 void IntegrityMonitor::stop()
 {
-    stop_.store(true);
+    stop_.store(true, std::memory_order_relaxed);
+    cv_.notify_one();
     if (worker_.joinable())
         worker_.join();
 }

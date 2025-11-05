@@ -7,6 +7,7 @@
 #include <memory>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 
 namespace dqxclarity
 {
@@ -74,6 +75,8 @@ private:
 
     std::thread worker_;
     std::atomic<bool> stop_{ false };
+    std::mutex cv_mutex_;
+    std::condition_variable cv_;
 };
 
 } // namespace dqxclarity
