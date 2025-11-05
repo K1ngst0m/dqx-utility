@@ -103,8 +103,8 @@ private:
     // Hook instances keyed by type
     std::map<persistence::HookType, std::unique_ptr<IHook>> hooks_;
 
-    // Process memory interface (shared across all hooks)
-    std::shared_ptr<IProcessMemory> memory_;
+    // Process memory interface
+    IProcessMemory* memory_ = nullptr;
 
     // Logger for hook manager diagnostics
     Logger logger_;

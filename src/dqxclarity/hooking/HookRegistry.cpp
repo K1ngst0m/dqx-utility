@@ -395,9 +395,7 @@ size_t HookRegistry::CleanupOrphanedHooks(const std::vector<HookRecord>& orphans
             continue;
         }
 
-        auto memory_unique = MemoryFactory::CreatePlatformMemory();
-        std::shared_ptr<IProcessMemory> memory(std::move(memory_unique));
-
+        auto memory = MemoryFactory::CreatePlatformMemory();
         if (!memory || !memory->AttachProcess(record.process_id))
         {
             if (s_logger_.error)

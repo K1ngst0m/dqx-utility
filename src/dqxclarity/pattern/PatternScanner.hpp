@@ -13,7 +13,7 @@ namespace dqxclarity
 class PatternScanner
 {
 public:
-    explicit PatternScanner(std::shared_ptr<IProcessMemory> memory);
+    explicit PatternScanner(IProcessMemory* memory);
 
     std::optional<uintptr_t> ScanRegion(const MemoryRegion& region, const Pattern& pattern);
 
@@ -29,7 +29,7 @@ public:
     std::vector<uintptr_t> ScanProcessAll(const Pattern& pattern, bool require_executable = true);
 
 private:
-    std::shared_ptr<IProcessMemory> m_memory;
+    IProcessMemory* m_memory;
 
     std::vector<size_t> BuildBadCharTable(const Pattern& pattern);
 

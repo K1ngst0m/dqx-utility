@@ -15,8 +15,8 @@ namespace dqxclarity
 class PatternFinder
 {
 public:
-    explicit PatternFinder(std::shared_ptr<IProcessMemory> memory)
-        : memory_(std::move(memory))
+    explicit PatternFinder(IProcessMemory* memory)
+        : memory_(memory)
     {
     }
 
@@ -75,7 +75,7 @@ public:
     }
 
 private:
-    std::shared_ptr<IProcessMemory> memory_;
+    IProcessMemory* memory_;
 
     static bool MatchAt(const std::vector<uint8_t>& buf, size_t i, const Pattern& pat)
     {

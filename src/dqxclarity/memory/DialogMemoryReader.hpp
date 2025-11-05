@@ -24,7 +24,7 @@ namespace dqxclarity
 class DialogMemoryReader
 {
 public:
-    explicit DialogMemoryReader(std::shared_ptr<IProcessMemory> memory);
+    explicit DialogMemoryReader(IProcessMemory* memory);
     ~DialogMemoryReader() = default;
 
     /**
@@ -81,7 +81,7 @@ private:
     static constexpr size_t kPatternSize = sizeof(kDialogPattern);
     static constexpr size_t kPointerOffset = 36; // Offset from pattern to pointer (32 + 4)
 
-    std::shared_ptr<IProcessMemory> memory_;
+    IProcessMemory* memory_;
     bool verbose_ = false;
     Logger logger_{};
     bool initialized_ = false;

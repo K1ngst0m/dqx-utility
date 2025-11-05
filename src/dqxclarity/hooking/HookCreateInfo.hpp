@@ -13,7 +13,7 @@ namespace dqxclarity
 
 struct HookCreateInfo
 {
-    std::shared_ptr<IProcessMemory> memory;
+    IProcessMemory* memory = nullptr;
 
     dqxclarity::Logger logger = {};
     bool verbose = false;

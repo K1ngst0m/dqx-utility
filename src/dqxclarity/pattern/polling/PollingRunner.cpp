@@ -4,8 +4,8 @@
 namespace dqxclarity
 {
 
-PollingRunner::PollingRunner(std::shared_ptr<IMemoryScanner> scanner)
-    : scanner_(std::move(scanner))
+PollingRunner::PollingRunner(IMemoryScanner* scanner)
+    : scanner_(scanner)
 {
 }
 

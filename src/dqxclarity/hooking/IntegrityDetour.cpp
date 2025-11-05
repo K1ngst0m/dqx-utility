@@ -26,8 +26,8 @@ static bool FullMatchAt(dqxclarity::IProcessMemory& mem, uintptr_t addr, const d
 static dqxclarity::Pattern MakeAnchor(const dqxclarity::Pattern& pat, size_t n);
 static std::string HexDump(const uint8_t* data, size_t count, size_t bytes_per_group = 1); // defined below
 
-IntegrityDetour::IntegrityDetour(std::shared_ptr<IProcessMemory> memory)
-    : m_memory(std::move(memory))
+IntegrityDetour::IntegrityDetour(IProcessMemory* memory)
+    : m_memory(memory)
 {
 }
 

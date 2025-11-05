@@ -22,6 +22,7 @@
 #include "../pattern/MemoryRegion.hpp"
 
 #include <chrono>
+#include <memory>
 #include <thread>
 #include <atomic>
 #include <mutex>
@@ -49,7 +50,7 @@ struct Engine::Impl
 {
     Config cfg{};
     Logger log{};
-    std::shared_ptr<IProcessMemory> memory;
+    std::unique_ptr<IProcessMemory> memory = nullptr;
     std::unique_ptr<DialogMemoryReader> memory_reader; // Alternative non-invasive dialog reader
     std::unique_ptr<class IntegrityDetour> integrity;
     
@@ -161,8 +162,7 @@ bool Engine::start_hook(StartPolicy policy)
         }
 
         // Create memory interface and attach
-        auto mem_unique = dqxclarity::MemoryFactory::CreatePlatformMemory();
-        impl_->memory = std::shared_ptr<IProcessMemory>(std::move(mem_unique));
+        impl_->memory = dqxclarity::MemoryFactory::CreatePlatformMemory();
         if (!impl_->memory || !impl_->memory->AttachProcess(pids[0]))
         {
             if (impl_->log.error)
@@ -181,7 +181,7 @@ bool Engine::start_hook(StartPolicy policy)
 
     // Build common HookCreateInfo for all hooks
     HookCreateInfo base_hook_info;
-    base_hook_info.memory = impl_->memory;
+    base_hook_info.memory = impl_->memory.get();
     base_hook_info.logger = impl_->log;
     base_hook_info.verbose = impl_->cfg.verbose;
     base_hook_info.instruction_safe_steal = impl_->cfg.instruction_safe_steal;
@@ -198,7 +198,7 @@ bool Engine::start_hook(StartPolicy policy)
             impl_->log.info("Compatibility mode: using memory reader only (no hooking)");
 
         PROFILE_SCOPE_CUSTOM("Engine.InitializeMemoryReader");
-        impl_->memory_reader = std::make_unique<dqxclarity::DialogMemoryReader>(impl_->memory);
+        impl_->memory_reader = std::make_unique<dqxclarity::DialogMemoryReader>(impl_->memory.get());
         impl_->memory_reader->SetVerbose(impl_->cfg.verbose);
         impl_->memory_reader->SetLogger(impl_->log);
         if (!impl_->memory_reader->Initialize())
@@ -231,7 +231,7 @@ bool Engine::start_hook(StartPolicy policy)
         // Always initialize memory reader in auto mode (catches cutscenes/story dialogs)
         {
             PROFILE_SCOPE_CUSTOM("Engine.InitializeMemoryReader");
-            impl_->memory_reader = std::make_unique<dqxclarity::DialogMemoryReader>(impl_->memory);
+            impl_->memory_reader = std::make_unique<dqxclarity::DialogMemoryReader>(impl_->memory.get());
             impl_->memory_reader->SetVerbose(impl_->cfg.verbose);
             impl_->memory_reader->SetLogger(impl_->log);
             if (!impl_->memory_reader->Initialize())
@@ -292,7 +292,7 @@ bool Engine::start_hook(StartPolicy policy)
     // Install integrity detour and configure it to restore dialog hook bytes during checks
     {
         PROFILE_SCOPE_CUSTOM("Engine.InstallIntegrityDetour");
-        impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory);
+        impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory.get());
         impl_->integrity->SetLogger(impl_->log);
         impl_->integrity->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
         impl_->integrity->SetCachedRegions(cached_regions);
@@ -373,7 +373,7 @@ bool Engine::start_hook(StartPolicy policy)
     else
     {
         impl_->monitor = std::make_unique<dqxclarity::IntegrityMonitor>(
-            impl_->memory, impl_->log, state_addr,
+            impl_->memory.get(), impl_->log, state_addr,
             [this](bool first)
             {
                 if (first)

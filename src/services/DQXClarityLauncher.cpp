@@ -44,15 +44,14 @@ bool run_pattern_waiter(const char* name, const dqxclarity::Pattern& pattern, bo
         return false;
     }
 
-    auto memory_unique = dqxclarity::MemoryFactory::CreatePlatformMemory();
-    std::shared_ptr<dqxclarity::IProcessMemory> memory(std::move(memory_unique));
+    auto memory = dqxclarity::MemoryFactory::CreatePlatformMemory();
     if (!memory || !memory->AttachProcess(pids[0]))
     {
         return false;
     }
 
-    auto scanner = std::make_shared<dqxclarity::ProcessMemoryScanner>(memory);
-    dqxclarity::PollingRunner runner(scanner);
+    dqxclarity::ProcessMemoryScanner scanner(memory.get());
+    dqxclarity::PollingRunner runner(&scanner);
     bool matched = false;
 
     std::optional<std::chrono::milliseconds> timeout_opt;
@@ -99,16 +98,15 @@ bool scan_player_names(dqxclarity::PlayerInfo& out)
         return false;
     }
 
-    auto memory_unique = MemoryFactory::CreatePlatformMemory();
-    std::shared_ptr<IProcessMemory> memory(std::move(memory_unique));
+    auto memory = MemoryFactory::CreatePlatformMemory();
     if (!memory || !memory->AttachProcess(pids[0]))
     {
         PLOG_DEBUG << "[PlayerScan] failed to attach to process";
         return false;
     }
 
-    auto scanner = std::make_shared<ProcessMemoryScanner>(memory);
-    PollingRunner runner(scanner);
+    ProcessMemoryScanner scanner(memory.get());
+    PollingRunner runner(&scanner);
     std::atomic<bool> cancel{ false };
     PlayerInfo captured;
     bool captured_valid = false;

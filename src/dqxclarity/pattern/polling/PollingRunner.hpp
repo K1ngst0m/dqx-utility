@@ -28,12 +28,12 @@ struct PollingResult
 class PollingRunner
 {
 public:
-    explicit PollingRunner(std::shared_ptr<IMemoryScanner> scanner);
+    explicit PollingRunner(IMemoryScanner* scanner);
 
     PollingResult Run(IPollingTask& task, std::atomic<bool>& cancel_token) const;
 
 private:
-    std::shared_ptr<IMemoryScanner> scanner_;
+    IMemoryScanner* scanner_;
 };
 
 } // namespace dqxclarity

@@ -21,13 +21,13 @@ public:
 class ProcessMemoryScanner : public IMemoryScanner
 {
 public:
-    explicit ProcessMemoryScanner(std::shared_ptr<class IProcessMemory> memory);
+    explicit ProcessMemoryScanner(class IProcessMemory* memory);
 
     std::optional<uintptr_t> ScanProcess(const Pattern& pattern, bool require_executable) override;
     std::vector<uintptr_t> ScanProcessAll(const Pattern& pattern, bool require_executable) override;
 
 private:
-    std::shared_ptr<class IProcessMemory> memory_;
+    class IProcessMemory* memory_;
 };
 
 } // namespace dqxclarity

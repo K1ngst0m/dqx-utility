@@ -20,9 +20,9 @@ public:
         std::vector<uint8_t> bytes;
     };
 
-    IntegrityMonitor(std::shared_ptr<IProcessMemory> memory, Logger logger, uintptr_t state_addr,
+    IntegrityMonitor(IProcessMemory* memory, Logger logger, uintptr_t state_addr,
                      std::function<void(bool first)> on_integrity)
-        : memory_(std::move(memory))
+        : memory_(memory)
         , log_(std::move(logger))
         , state_addr_(state_addr)
         , on_integrity_(std::move(on_integrity))
@@ -64,7 +64,7 @@ public:
     void stop();
 
 private:
-    std::shared_ptr<IProcessMemory> memory_;
+    IProcessMemory* memory_;
     Logger log_{};
     uintptr_t state_addr_ = 0;
     std::function<void(bool)> on_integrity_;

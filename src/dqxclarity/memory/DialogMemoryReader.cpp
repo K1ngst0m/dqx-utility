@@ -20,7 +20,7 @@
 namespace dqxclarity
 {
 
-DialogMemoryReader::DialogMemoryReader(std::shared_ptr<IProcessMemory> memory)
+DialogMemoryReader::DialogMemoryReader(IProcessMemory* memory)
     : memory_(memory)
 {
 }

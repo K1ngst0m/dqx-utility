@@ -6,8 +6,8 @@
 namespace dqxclarity
 {
 
-ProcessMemoryScanner::ProcessMemoryScanner(std::shared_ptr<IProcessMemory> memory)
-    : memory_(std::move(memory))
+ProcessMemoryScanner::ProcessMemoryScanner(IProcessMemory* memory)
+    : memory_(memory)
 {
 }
 

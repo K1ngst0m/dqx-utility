@@ -58,7 +58,7 @@ protected:
     const std::vector<uint8_t>& stolen_bytes() const { return original_bytes_; }
     const dqxclarity::Logger& logger() const { return logger_; }
     bool verbose() const { return verbose_; }
-    std::shared_ptr<IProcessMemory> memory() const { return memory_; }
+    IProcessMemory* memory() const { return memory_; }
     bool IsHookInstalled() const { return is_installed_; }
 
     // Virtual: override for hook-specific stolen byte computation
@@ -80,7 +80,7 @@ private:
     bool RefreshOriginalBytes();
 
     // Configuration (immutable after construction)
-    std::shared_ptr<IProcessMemory> memory_;
+    IProcessMemory* memory_;
     dqxclarity::Logger logger_;
     bool verbose_;
     bool instruction_safe_steal_;

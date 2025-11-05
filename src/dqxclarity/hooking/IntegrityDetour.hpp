@@ -15,7 +15,7 @@ namespace dqxclarity
 class IntegrityDetour
 {
 public:
-    explicit IntegrityDetour(std::shared_ptr<IProcessMemory> memory);
+    explicit IntegrityDetour(IProcessMemory* memory);  // Non-owning pointer (Engine owns lifetime)
     ~IntegrityDetour();
 
     // Install the integrity trampoline and patch the integrity function.
@@ -86,7 +86,7 @@ private:
         std::vector<uint8_t> bytes; // original bytes to restore
     };
 
-    std::shared_ptr<IProcessMemory> m_memory;
+    IProcessMemory* m_memory;
     bool m_installed = false;
     bool m_diag = false; // detailed diagnostics switch
     dqxclarity::Logger m_log{};

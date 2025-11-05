@@ -19,7 +19,7 @@ static std::string ToLowerCase(const std::string& str)
     return result;
 }
 
-PatternScanner::PatternScanner(std::shared_ptr<IProcessMemory> memory)
+PatternScanner::PatternScanner(IProcessMemory* memory)
     : m_memory(memory)
 {
 }
