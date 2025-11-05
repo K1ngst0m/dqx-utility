@@ -75,6 +75,11 @@ public:
     bool latest_player(PlayerInfo& out) const;
     void update_player_info(PlayerInfo info);
 
+    // Scanner state access
+    bool isNoticeScreenVisible() const;
+    bool isPostLoginDetected() const;
+    bool scanPlayerInfo(PlayerInfo& out);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

@@ -2,7 +2,6 @@
 
 #include "../memory/MemoryFactory.hpp"
 #include "../memory/IProcessMemory.hpp"
-#include "../memory/DialogMemoryReader.hpp"
 #include "../process/ProcessFinder.hpp"
 #include "../hooking/DialogHook.hpp"
 #include "../hooking/CornerTextHook.hpp"
@@ -14,6 +13,14 @@
 #include "../hooking/IntegrityHook.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
 #include "../hooking/HookRegistry.hpp"
+#include "../scanning/ScannerManager.hpp"
+#include "../scanning/DialogScanner.hpp"
+#include "../scanning/NoticeScreenScanner.hpp"
+#include "../scanning/PostLoginScanner.hpp"
+#include "../scanning/PlayerNameScanner.hpp"
+#include "../scanning/ScannerCreateInfo.hpp"
+#include "../signatures/Signatures.hpp"
+#include "../pattern/Pattern.hpp"
 #include "dialog_message.hpp"
 #include "quest_message.hpp"
 #include "corner_text.hpp"
@@ -33,6 +40,25 @@
 namespace dqxclarity
 {
 
+// Helper to create dialog pattern (from DialogMemoryReader)
+static Pattern CreateDialogPattern()
+{
+    // Pattern: \xFF\xFF\xFF\x7F\xFF\xFF\xFF\x7F\x00\x00\x00\x00\x00\x00\x00\x00\xFD.\xA8\x99
+    // Note: byte at index 17 is wildcard (0xFF)
+    static constexpr uint8_t kDialogPatternBytes[] = {
+        0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFF, 0x7F, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFD, 0xFF, 0xA8, 0x99
+    };
+    static constexpr size_t kPatternSize = sizeof(kDialogPatternBytes);
+    
+    Pattern pattern;
+    pattern.bytes.assign(kDialogPatternBytes, kDialogPatternBytes + kPatternSize);
+    pattern.mask.assign(kPatternSize, true);
+    pattern.mask[17] = false; // Wildcard at index 17
+    
+    return pattern;
+}
+
 struct PendingDialog
 {
     std::string text;
@@ -42,7 +68,7 @@ struct PendingDialog
     enum Source
     {
         Hook,
-        MemoryReader
+        Scanner
     } source;
 };
 
@@ -51,10 +77,12 @@ struct Engine::Impl
     Config cfg{};
     Logger log{};
     std::unique_ptr<IProcessMemory> memory = nullptr;
-    std::unique_ptr<DialogMemoryReader> memory_reader;
     
     // Centralized hook lifecycle manager
     HookManager hook_manager;
+    
+    // Centralized scanner lifecycle manager
+    std::unique_ptr<ScannerManager> scanner_manager;
 
     SpscRing<DialogMessage, 1024> ring;
     std::atomic<std::uint64_t> seq{ 0 };
@@ -72,6 +100,10 @@ struct Engine::Impl
     mutable std::mutex player_mutex;
     PlayerInfo player_snapshot;
     bool player_valid = false;
+
+    // Scanner state tracking
+    std::atomic<bool> notice_screen_visible{ false };
+    std::atomic<bool> post_login_detected{ false };
 
     // Two-phase commit: pending queue for deduplication
     std::vector<PendingDialog> pending_dialogs;
@@ -92,9 +124,9 @@ struct Engine::Impl
     struct CaptureTimings
     {
         std::chrono::steady_clock::time_point hook_captured;
-        std::chrono::steady_clock::time_point memory_reader_captured;
+        std::chrono::steady_clock::time_point scanner_captured;
         bool hook_valid = false;
-        bool memory_reader_valid = false;
+        bool scanner_valid = false;
     } last_capture_timings;
 
     std::mutex diagnostics_mutex;
@@ -117,6 +149,10 @@ bool Engine::initialize(const Config& cfg, Logger loggers)
     // Set profiling logger to route profiling output through dqxclarity's Logger
     profiling::SetProfilingLogger(&impl_->log);
 #endif
+
+    // Initialize hook persistence system
+    persistence::HookRegistry::SetLogger(impl_->log);
+    persistence::HookRegistry::CheckAndCleanup();
 
     return true;
 }
@@ -186,6 +222,9 @@ bool Engine::start_hook(StartPolicy policy)
     base_hook_info.readback_bytes = static_cast<size_t>(impl_->cfg.readback_bytes);
     base_hook_info.cached_regions = cached_regions;
 
+    // Initialize ScannerManager
+    impl_->scanner_manager = std::make_unique<ScannerManager>();
+
     // Initialize dialog capture based on mode
     bool hook_installed = false;
 
@@ -193,27 +232,38 @@ bool Engine::start_hook(StartPolicy policy)
     if (impl_->cfg.compatibility_mode)
     {
         if (impl_->log.info)
-            impl_->log.info("Compatibility mode: using memory reader only (no hooking)");
+            impl_->log.info("Compatibility mode: using dialog scanner only (no hooking)");
 
-        PROFILE_SCOPE_CUSTOM("Engine.InitializeMemoryReader");
-        impl_->memory_reader = std::make_unique<dqxclarity::DialogMemoryReader>(impl_->memory.get());
-        impl_->memory_reader->SetVerbose(impl_->cfg.verbose);
-        impl_->memory_reader->SetLogger(impl_->log);
-        if (!impl_->memory_reader->Initialize())
+        PROFILE_SCOPE_CUSTOM("Engine.InitializeDialogScanner");
+        ScannerCreateInfo dialog_info;
+        dialog_info.memory = impl_->memory.get();
+        dialog_info.logger = impl_->log;
+        dialog_info.verbose = impl_->cfg.verbose;
+        dialog_info.pattern = CreateDialogPattern();
+        
+        auto dialog_scanner = std::make_unique<DialogScanner>(dialog_info);
+        if (!dialog_scanner->Initialize())
         {
             if (impl_->log.error)
-                impl_->log.error("Failed to initialize memory reader in compatibility mode");
+                impl_->log.error("Failed to initialize dialog scanner in compatibility mode");
+            status_ = Status::Error;
+            return false;
+        }
+        if (!impl_->scanner_manager->RegisterScanner(ScannerType::Dialog, std::move(dialog_scanner)))
+        {
+            if (impl_->log.error)
+                impl_->log.error("Failed to register dialog scanner in compatibility mode");
             status_ = Status::Error;
             return false;
         }
         if (impl_->log.info)
-            impl_->log.info("Memory reader initialized successfully (compatibility mode)");
+            impl_->log.info("Dialog scanner initialized successfully (compatibility mode)");
     }
-    // Mode 2: Auto mode (hook + memory reader for maximum coverage)
+    // Mode 2: Auto mode (hook + dialog scanner for maximum coverage)
     else
     {
         if (impl_->log.info)
-            impl_->log.info("Auto mode: initializing hook + memory reader for maximum coverage");
+            impl_->log.info("Auto mode: initializing hook + dialog scanner for maximum coverage");
 
         // Try to install dialog hook (non-fatal if it fails)
         // Note: Integrity callbacks will be wired after integrity is created
@@ -226,31 +276,80 @@ bool Engine::start_hook(StartPolicy policy)
                 nullptr);
         }
 
-        // Always initialize memory reader in auto mode (catches cutscenes/story dialogs)
+        // Always initialize dialog scanner in auto mode (catches cutscenes/story dialogs)
         {
-            PROFILE_SCOPE_CUSTOM("Engine.InitializeMemoryReader");
-            impl_->memory_reader = std::make_unique<dqxclarity::DialogMemoryReader>(impl_->memory.get());
-            impl_->memory_reader->SetVerbose(impl_->cfg.verbose);
-            impl_->memory_reader->SetLogger(impl_->log);
-            if (!impl_->memory_reader->Initialize())
+            PROFILE_SCOPE_CUSTOM("Engine.InitializeDialogScanner");
+            ScannerCreateInfo dialog_info;
+            dialog_info.memory = impl_->memory.get();
+            dialog_info.logger = impl_->log;
+            dialog_info.verbose = impl_->cfg.verbose;
+            dialog_info.pattern = CreateDialogPattern();
+            
+            auto dialog_scanner = std::make_unique<DialogScanner>(dialog_info);
+            if (!dialog_scanner->Initialize() || !impl_->scanner_manager->RegisterScanner(ScannerType::Dialog, std::move(dialog_scanner)))
             {
                 if (impl_->log.warn)
-                    impl_->log.warn("Failed to initialize memory reader; will retry during polling");
+                    impl_->log.warn("Failed to initialize dialog scanner; will retry during polling");
             }
             else
             {
                 if (impl_->log.info)
-                    impl_->log.info("Memory reader initialized successfully");
+                    impl_->log.info("Dialog scanner initialized successfully");
             }
         }
 
         // In auto mode, we need at least one method to work
-        if (!hook_installed && !impl_->memory_reader)
+        auto dialog_scanner = impl_->scanner_manager->GetScanner(ScannerType::Dialog);
+        if (!hook_installed && !dialog_scanner)
         {
             if (impl_->log.error)
-                impl_->log.error("Failed to initialize dialog capture (both hook and memory reader unavailable)");
+                impl_->log.error("Failed to initialize dialog capture (both hook and scanner unavailable)");
             status_ = Status::Error;
             return false;
+        }
+    }
+    
+    // Register other scanners (NoticeScreen, PostLogin, PlayerName)
+    {
+        PROFILE_SCOPE_CUSTOM("Engine.InitializeOtherScanners");
+        
+        // NoticeScreen scanner for detecting loading screen
+        ScannerCreateInfo notice_info;
+        notice_info.memory = impl_->memory.get();
+        notice_info.logger = impl_->log;
+        notice_info.verbose = impl_->cfg.verbose;
+        notice_info.pattern = Signatures::GetNoticeString();
+        
+        auto notice_scanner = std::make_unique<NoticeScreenScanner>(notice_info);
+        if (notice_scanner->Initialize())
+        {
+            impl_->scanner_manager->RegisterScanner(ScannerType::NoticeScreen, std::move(notice_scanner));
+        }
+        
+        // PostLogin scanner for detecting logged-in state
+        ScannerCreateInfo postlogin_info;
+        postlogin_info.memory = impl_->memory.get();
+        postlogin_info.logger = impl_->log;
+        postlogin_info.verbose = impl_->cfg.verbose;
+        postlogin_info.pattern = Signatures::GetWalkthroughPattern();
+        
+        auto postlogin_scanner = std::make_unique<PostLoginScanner>(postlogin_info);
+        if (postlogin_scanner->Initialize())
+        {
+            impl_->scanner_manager->RegisterScanner(ScannerType::PostLogin, std::move(postlogin_scanner));
+        }
+        
+        // PlayerName scanner for on-demand player info extraction
+        ScannerCreateInfo player_info;
+        player_info.memory = impl_->memory.get();
+        player_info.logger = impl_->log;
+        player_info.verbose = impl_->cfg.verbose;
+        player_info.pattern = Signatures::GetSiblingNamePattern();
+        
+        auto player_scanner = std::make_unique<PlayerNameScanner>(player_info);
+        if (player_scanner->Initialize())
+        {
+            impl_->scanner_manager->RegisterScanner(ScannerType::PlayerName, std::move(player_scanner));
         }
     }
     // Do NOT change page protection at startup (keeps login stable on this build)
@@ -404,29 +503,29 @@ bool Engine::start_hook(StartPolicy policy)
                                 impl_->last_capture_timings.hook_captured = now;
                                 impl_->last_capture_timings.hook_valid = true;
 
-                                // Log latency if memory reader captured recently
+                                // Log latency if dialog scanner captured recently
                                 if (impl_->cfg.verbose && impl_->log.info &&
-                                    impl_->last_capture_timings.memory_reader_valid)
+                                    impl_->last_capture_timings.scanner_valid)
                                 {
-                                    auto latency = now - impl_->last_capture_timings.memory_reader_captured;
+                                    auto latency = now - impl_->last_capture_timings.scanner_captured;
                                     if (latency < 1000ms)
                                     {
                                         auto latency_ms =
                                             std::chrono::duration_cast<std::chrono::milliseconds>(latency).count();
                                         impl_->log.info("Hook captured +" + std::to_string(latency_ms) +
-                                                        "ms after memory reader");
+                                                        "ms after dialog scanner");
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Memory reader capture (safe pointer capture to avoid TOCTOU race)
-                    auto memory_reader_ptr = impl_->memory_reader.get();
-                    if (memory_reader_ptr && memory_reader_ptr->PollDialogData())
+                    // Dialog scanner capture (safe pointer capture to avoid TOCTOU race)
+                    auto dialog_scanner = dynamic_cast<DialogScanner*>(impl_->scanner_manager->GetScanner(ScannerType::Dialog));
+                    if (dialog_scanner && dialog_scanner->Poll())
                     {
-                        std::string text = memory_reader_ptr->GetLastDialogText();
-                        std::string speaker = memory_reader_ptr->GetLastNpcName();
+                        std::string text = dialog_scanner->GetLastDialogText();
+                        std::string speaker = dialog_scanner->GetLastNpcName();
                         if (!text.empty())
                         {
                             // Add to pending queue
@@ -436,21 +535,38 @@ bool Engine::start_hook(StartPolicy policy)
                                 pending.text = text;
                                 pending.speaker = speaker;
                                 pending.capture_time = now;
-                                pending.source = PendingDialog::MemoryReader;
+                                pending.source = PendingDialog::Scanner;
                                 impl_->pending_dialogs.push_back(std::move(pending));
                             }
 
-                            // Diagnostics: track memory reader capture time
+                            // Diagnostics: track dialog scanner capture time
                             {
                                 std::lock_guard<std::mutex> lock(impl_->diagnostics_mutex);
-                                impl_->last_capture_timings.memory_reader_captured = now;
-                                impl_->last_capture_timings.memory_reader_valid = true;
+                                impl_->last_capture_timings.scanner_captured = now;
+                                impl_->last_capture_timings.scanner_valid = true;
 
                                 if (impl_->cfg.verbose && impl_->log.info)
                                 {
-                                    impl_->log.info("Memory reader captured dialog");
+                                    impl_->log.info("Dialog scanner captured dialog");
                                 }
                             }
+                        }
+                    }
+                    
+                    // Poll other scanners and update state
+                    {
+                        auto notice_scanner = dynamic_cast<NoticeScreenScanner*>(impl_->scanner_manager->GetScanner(ScannerType::NoticeScreen));
+                        if (notice_scanner)
+                        {
+                            notice_scanner->Poll();
+                            impl_->notice_screen_visible.store(notice_scanner->IsVisible(), std::memory_order_release);
+                        }
+                        
+                        auto postlogin_scanner = dynamic_cast<PostLoginScanner*>(impl_->scanner_manager->GetScanner(ScannerType::PostLogin));
+                        if (postlogin_scanner)
+                        {
+                            postlogin_scanner->Poll();
+                            impl_->post_login_detected.store(postlogin_scanner->IsLoggedIn(), std::memory_order_release);
                         }
                     }
 
@@ -461,9 +577,9 @@ bool Engine::start_hook(StartPolicy policy)
                         auto hook_wait_ms = std::chrono::milliseconds(impl_->cfg.hook_wait_timeout_ms);
                         std::vector<PendingDialog> ready_to_publish;
 
-                        // Pass 1: Separate hooks and memory readers (avoids iterator invalidation)
+                        // Pass 1: Separate hooks and scanner results (avoids iterator invalidation)
                         std::vector<PendingDialog> hooks;
-                        std::vector<PendingDialog> memory_readers;
+                        std::vector<PendingDialog> scanner_results;
 
                         for (auto& dialog : impl_->pending_dialogs)
                         {
@@ -473,31 +589,31 @@ bool Engine::start_hook(StartPolicy policy)
                             }
                             else
                             {
-                                memory_readers.push_back(std::move(dialog));
+                                scanner_results.push_back(std::move(dialog));
                             }
                         }
                         impl_->pending_dialogs.clear();
 
-                        // Pass 2: Process hooks and mark memory reader duplicates
-                        std::set<size_t> memory_reader_indices_to_skip;
+                        // Pass 2: Process hooks and mark scanner duplicates
+                        std::set<size_t> scanner_indices_to_skip;
 
                         for (auto& hook : hooks)
                         {
-                            for (size_t i = 0; i < memory_readers.size(); ++i)
+                            for (size_t i = 0; i < scanner_results.size(); ++i)
                             {
-                                if (memory_readers[i].text == hook.text)
+                                if (scanner_results[i].text == hook.text)
                                 {
-                                    // Found memory reader duplicate - hook upgrades it
+                                    // Found scanner duplicate - hook upgrades it
                                     if (impl_->cfg.verbose && impl_->log.info)
                                     {
-                                        auto upgrade_latency = now - memory_readers[i].capture_time;
+                                        auto upgrade_latency = now - scanner_results[i].capture_time;
                                         auto latency_ms =
                                             std::chrono::duration_cast<std::chrono::milliseconds>(upgrade_latency)
                                                 .count();
-                                        impl_->log.info("Hook upgraded memory reader capture (+" +
+                                        impl_->log.info("Hook upgraded scanner capture (+" +
                                                         std::to_string(latency_ms) + "ms, has NPC name)");
                                     }
-                                    memory_reader_indices_to_skip.insert(i);
+                                    scanner_indices_to_skip.insert(i);
                                     break;
                                 }
                             }
@@ -506,30 +622,30 @@ bool Engine::start_hook(StartPolicy policy)
                             ready_to_publish.push_back(std::move(hook));
                         }
 
-                        // Pass 3: Process memory reader timeouts (skip those upgraded by hooks)
-                        for (size_t i = 0; i < memory_readers.size(); ++i)
+                        // Pass 3: Process scanner timeouts (skip those upgraded by hooks)
+                        for (size_t i = 0; i < scanner_results.size(); ++i)
                         {
-                            if (memory_reader_indices_to_skip.count(i) > 0)
+                            if (scanner_indices_to_skip.count(i) > 0)
                             {
                                 continue; // Skip - was upgraded by hook
                             }
 
-                            auto age = now - memory_readers[i].capture_time;
+                            auto age = now - scanner_results[i].capture_time;
                             if (age >= hook_wait_ms)
                             {
-                                // Memory reader timeout - hook didn't capture, publish memory reader version
+                                // Scanner timeout - hook didn't capture, publish scanner version
                                 if (impl_->cfg.verbose && impl_->log.info)
                                 {
                                     auto wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(age).count();
-                                    impl_->log.debug("Memory reader timeout (waited " + std::to_string(wait_ms) +
+                                    impl_->log.debug("Scanner timeout (waited " + std::to_string(wait_ms) +
                                                      "ms, hook didn't capture)");
                                 }
-                                ready_to_publish.push_back(std::move(memory_readers[i]));
+                                ready_to_publish.push_back(std::move(scanner_results[i]));
                             }
                             else
                             {
                                 // Not timed out yet - put back in pending queue
-                                impl_->pending_dialogs.push_back(std::move(memory_readers[i]));
+                                impl_->pending_dialogs.push_back(std::move(scanner_results[i]));
                             }
                         }
 
@@ -601,7 +717,7 @@ bool Engine::start_hook(StartPolicy policy)
 
                                 impl_->log.info(
                                     "Published dialog (source: " +
-                                    std::string(dialog.source == PendingDialog::Hook ? "Hook" : "MemoryReader") +
+                                    std::string(dialog.source == PendingDialog::Hook ? "Hook" : "Scanner") +
                                     ", latency: " + std::to_string(capture_ms) + "ms)");
                             }
                         }
@@ -793,4 +909,27 @@ void Engine::update_player_info(PlayerInfo info)
     }
 }
 
+bool Engine::isNoticeScreenVisible() const
+{
+    return impl_->notice_screen_visible.load(std::memory_order_acquire);
+}
+
+bool Engine::isPostLoginDetected() const
+{
+    return impl_->post_login_detected.load(std::memory_order_acquire);
+}
+
+bool Engine::scanPlayerInfo(PlayerInfo& out)
+{
+    if (!impl_->scanner_manager)
+        return false;
+        
+    auto player_scanner = dynamic_cast<PlayerNameScanner*>(impl_->scanner_manager->GetScanner(ScannerType::PlayerName));
+    if (!player_scanner)
+        return false;
+        
+    return player_scanner->ScanPlayerInfo(out);
+}
+
 } // namespace dqxclarity
+

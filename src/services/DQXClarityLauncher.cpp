@@ -15,14 +15,6 @@
 #include "dqxclarity/api/player_info.hpp"
 #include "dqxclarity/api/quest_message.hpp"
 #include "DQXClarityService.hpp"
-#include "dqxclarity/process/ProcessFinder.hpp"
-#include "dqxclarity/memory/MemoryFactory.hpp"
-#include "dqxclarity/memory/IProcessMemory.hpp"
-#include "dqxclarity/pattern/IMemoryScanner.hpp"
-#include "dqxclarity/pattern/polling/PollingRunner.hpp"
-#include "dqxclarity/pattern/polling/PatternPollingTask.hpp"
-#include "dqxclarity/signatures/Signatures.hpp"
-#include "dqxclarity/hooking/HookRegistry.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -31,130 +23,6 @@
 #include <exception>
 #include <optional>
 
-namespace
-{
-
-bool run_pattern_waiter(const char* name, const dqxclarity::Pattern& pattern, bool require_executable,
-                        std::chrono::milliseconds poll_interval, std::chrono::milliseconds timeout,
-                        std::atomic<bool>& cancel)
-{
-    auto pids = dqxclarity::ProcessFinder::FindByName("DQXGame.exe", false);
-    if (pids.empty())
-    {
-        return false;
-    }
-
-    auto memory = dqxclarity::MemoryFactory::CreatePlatformMemory();
-    if (!memory || !memory->AttachProcess(pids[0]))
-    {
-        return false;
-    }
-
-    dqxclarity::ProcessMemoryScanner scanner(memory.get());
-    dqxclarity::PollingRunner runner(&scanner);
-    bool matched = false;
-
-    std::optional<std::chrono::milliseconds> timeout_opt;
-    if (timeout.count() > 0)
-    {
-        timeout_opt = timeout;
-    }
-
-    dqxclarity::PatternPollingTask task(name, pattern, require_executable, poll_interval, timeout_opt,
-                                        dqxclarity::TerminationMode::FirstMatch,
-                                        [&](uintptr_t)
-                                        {
-                                            matched = true;
-                                        });
-
-    auto result = runner.Run(task, cancel);
-    memory->DetachProcess();
-    return matched && result.status == dqxclarity::PollingResult::Status::Matched;
-}
-
-bool wait_for_notice_screen(std::atomic<bool>& cancel, std::chrono::milliseconds poll_interval,
-                            std::chrono::milliseconds timeout)
-{
-    return run_pattern_waiter("NoticeWaiter", dqxclarity::Signatures::GetNoticeString(), /*require_executable=*/false,
-                              poll_interval, timeout, cancel);
-}
-
-bool detect_post_login(std::atomic<bool>& cancel, std::chrono::milliseconds poll_interval,
-                       std::chrono::milliseconds timeout)
-{
-    return run_pattern_waiter("PostLoginDetector", dqxclarity::Signatures::GetWalkthroughPattern(),
-                              /*require_executable=*/false, poll_interval, timeout, cancel);
-}
-
-bool scan_player_names(dqxclarity::PlayerInfo& out)
-{
-    using namespace dqxclarity;
-    PLOG_DEBUG << "[PlayerScan] begin polling";
-
-    auto pids = ProcessFinder::FindByName("DQXGame.exe", false);
-    if (pids.empty())
-    {
-        PLOG_DEBUG << "[PlayerScan] DQXGame.exe not found";
-        return false;
-    }
-
-    auto memory = MemoryFactory::CreatePlatformMemory();
-    if (!memory || !memory->AttachProcess(pids[0]))
-    {
-        PLOG_DEBUG << "[PlayerScan] failed to attach to process";
-        return false;
-    }
-
-    ProcessMemoryScanner scanner(memory.get());
-    PollingRunner runner(&scanner);
-    std::atomic<bool> cancel{ false };
-    PlayerInfo captured;
-    bool captured_valid = false;
-
-    auto callback = [&](uintptr_t address)
-    {
-        std::string player_name;
-        std::string sibling_name;
-        if (!memory->ReadString(address - 21, player_name, 128))
-            return;
-        if (!memory->ReadString(address + 51, sibling_name, 128))
-            return;
-        if (!player_name.empty() && static_cast<unsigned char>(player_name.front()) < 0x20)
-            player_name.erase(player_name.begin());
-        if (!sibling_name.empty() && static_cast<unsigned char>(sibling_name.front()) < 0x20)
-            sibling_name.erase(sibling_name.begin());
-        if (player_name.empty() || sibling_name.empty())
-            return;
-        captured.player_name = std::move(player_name);
-        captured.sibling_name = std::move(sibling_name);
-        captured.relationship = PlayerRelationship::Unknown;
-        captured_valid = true;
-    };
-
-    PatternPollingTask task("PlayerNamePatternScan", Signatures::GetSiblingNamePattern(), false,
-                            std::chrono::milliseconds(250), std::chrono::milliseconds(2000),
-                            TerminationMode::FirstMatch, callback);
-
-    auto result = runner.Run(task, cancel);
-    memory->DetachProcess();
-
-    if (captured_valid && result.status == PollingResult::Status::Matched)
-    {
-        PLOG_INFO << "[PlayerScan] captured player=\"" << captured.player_name << "\" sibling=\""
-                  << captured.sibling_name << "\"";
-        out = std::move(captured);
-        return true;
-    }
-    PLOG_DEBUG << "[PlayerScan] no match (status=" << static_cast<int>(result.status) << ")";
-    return false;
-}
-
-} // namespace
-
-namespace dqxclarity
-{
-
-} // namespace dqxclarity
 
 // Private implementation details
 struct DQXClarityLauncher::Impl
@@ -371,9 +239,6 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
         }
     };
 
-    dqxclarity::persistence::HookRegistry::SetLogger(log);
-    dqxclarity::persistence::HookRegistry::CheckAndCleanup();
-
     pimpl_->engine->initialize(pimpl_->engine_cfg, std::move(log));
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
 
@@ -432,19 +297,24 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                                     pimpl_->notice_worker = std::jthread(
                                         [this](std::stop_token stoken)
                                         {
-                                            std::atomic<bool> cancel{false};
-                                            auto cancel_thread = std::jthread([&stoken, &cancel](std::stop_token) {
-                                                while (!stoken.stop_requested()) {
-                                                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                                                }
-                                                cancel.store(true);
-                                            });
-                                            bool ok = wait_for_notice_screen(
-                                                cancel, std::chrono::milliseconds(250),
-                                                std::chrono::milliseconds(pimpl_->notice_wait_timeout_ms));
-                                            if (ok)
+                                            auto start_time = std::chrono::steady_clock::now();
+                                            while (!stoken.stop_requested())
                                             {
-                                                pimpl_->notice_found.store(true);
+                                                if (pimpl_->engine->isNoticeScreenVisible())
+                                                {
+                                                    pimpl_->notice_found.store(true);
+                                                    break;
+                                                }
+                                                
+                                                if (pimpl_->notice_wait_timeout_ms > 0)
+                                                {
+                                                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                        std::chrono::steady_clock::now() - start_time);
+                                                    if (elapsed.count() >= pimpl_->notice_wait_timeout_ms)
+                                                        break;
+                                                }
+                                                
+                                                std::this_thread::sleep_for(std::chrono::milliseconds(250));
                                             }
                                         });
                                     if (pimpl_->enable_post_login_heuristics && !pimpl_->post_login_worker.joinable())
@@ -453,19 +323,14 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                                         pimpl_->post_login_worker = std::jthread(
                                             [this](std::stop_token stoken)
                                             {
-                                                std::atomic<bool> cancel{false};
-                                                auto cancel_thread = std::jthread([&stoken, &cancel](std::stop_token) {
-                                                    while (!stoken.stop_requested()) {
-                                                        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                                                    }
-                                                    cancel.store(true);
-                                                });
-                                                bool ok = detect_post_login(cancel,
-                                                                            std::chrono::milliseconds(250),
-                                                                            std::chrono::milliseconds(0));
-                                                if (ok)
+                                                while (!stoken.stop_requested())
                                                 {
-                                                    pimpl_->post_login_found.store(true);
+                                                    if (pimpl_->engine->isPostLoginDetected())
+                                                    {
+                                                        pimpl_->post_login_found.store(true);
+                                                        break;
+                                                    }
+                                                    std::this_thread::sleep_for(std::chrono::milliseconds(250));
                                                 }
                                             });
                                     }
@@ -553,22 +418,20 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                             pimpl_->quest_valid = true;
                         }
 
-#if 0
-                dqxclarity::PlayerInfo player_snapshot;
-                if (pimpl_->engine->latest_player(player_snapshot))
-                {
-                    std::lock_guard<std::mutex> plock(pimpl_->player_mutex);
-                    pimpl_->latest_player = std::move(player_snapshot);
-                    pimpl_->player_valid = true;
-                }
-                else if (scan_player_names(player_snapshot))
-                {
-                    pimpl_->engine->update_player_info(player_snapshot);
-                    std::lock_guard<std::mutex> plock(pimpl_->player_mutex);
-                    pimpl_->latest_player = std::move(player_snapshot);
-                    pimpl_->player_valid = true;
-                }
-#endif
+                        dqxclarity::PlayerInfo player_snapshot;
+                        if (pimpl_->engine->latest_player(player_snapshot))
+                        {
+                            std::lock_guard<std::mutex> plock(pimpl_->player_mutex);
+                            pimpl_->latest_player = std::move(player_snapshot);
+                            pimpl_->player_valid = true;
+                        }
+                        else if (pimpl_->engine->scanPlayerInfo(player_snapshot))
+                        {
+                            pimpl_->engine->update_player_info(player_snapshot);
+                            std::lock_guard<std::mutex> plock(pimpl_->player_mutex);
+                            pimpl_->latest_player = std::move(player_snapshot);
+                            pimpl_->player_valid = true;
+                        }
 
                         std::this_thread::sleep_for(std::chrono::seconds(1));
                     }

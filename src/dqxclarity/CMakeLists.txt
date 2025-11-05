@@ -16,7 +16,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/MemoryFactory.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/ProcessMemory.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/memory/DialogMemoryReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/Pattern.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/PatternScanner.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pattern/PatternFinder.cpp
@@ -38,9 +37,14 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/MemoryPatch.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/HookRegistry.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/HookManager.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scanning/ScannerBase.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scanning/ScannerManager.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scanning/DialogScanner.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scanning/NoticeScreenScanner.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scanning/PostLoginScanner.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scanning/PlayerNameScanner.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/api/dqxclarity.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/api/quest_message.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/api/dialog_stream.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/console/ConsoleFactory.cpp
 )
 
