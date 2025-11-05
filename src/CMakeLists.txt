@@ -200,6 +200,13 @@ target_sources(dqxu_core
 
 target_sources(dqxu_core
   PRIVATE
+    monster/MonsterInfo.hpp
+    monster/MonsterManager.cpp
+    monster/MonsterManager.hpp
+)
+
+target_sources(dqxu_core
+  PRIVATE
     updater/UpdateTypes.hpp
     updater/Version.cpp
     updater/Version.hpp
