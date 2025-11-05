@@ -11,7 +11,7 @@
 #include "../hooking/QuestHook.hpp"
 #include "../hooking/HookCreateInfo.hpp"
 #include "../hooking/HookManager.hpp"
-#include "../hooking/IntegrityDetour.hpp"
+#include "../hooking/IntegrityHook.hpp"
 #include "../hooking/IntegrityMonitor.hpp"
 #include "../hooking/HookRegistry.hpp"
 #include "dialog_message.hpp"
@@ -51,8 +51,7 @@ struct Engine::Impl
     Config cfg{};
     Logger log{};
     std::unique_ptr<IProcessMemory> memory = nullptr;
-    std::unique_ptr<DialogMemoryReader> memory_reader; // Alternative non-invasive dialog reader
-    std::unique_ptr<class IntegrityDetour> integrity;
+    std::unique_ptr<DialogMemoryReader> memory_reader;
     
     // Centralized hook lifecycle manager
     HookManager hook_manager;
@@ -63,7 +62,7 @@ struct Engine::Impl
     std::atomic<std::uint64_t> stream_seq{ 0 };
     std::thread poller;
     std::atomic<bool> poll_stop{ false };
-    std::unique_ptr<class IntegrityMonitor> monitor;
+    std::unique_ptr<IntegrityMonitor> monitor;
 
     std::atomic<std::uint64_t> quest_seq{ 0 };
     mutable std::mutex quest_mutex;
@@ -289,60 +288,36 @@ bool Engine::start_hook(StartPolicy policy)
             nullptr);
     }
 
-    // Install integrity detour and configure it to restore dialog hook bytes during checks
+    // Install integrity hook through HookManager
     {
-        PROFILE_SCOPE_CUSTOM("Engine.InstallIntegrityDetour");
-        impl_->integrity = std::make_unique<dqxclarity::IntegrityDetour>(impl_->memory.get());
-        impl_->integrity->SetLogger(impl_->log);
-        impl_->integrity->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
-        impl_->integrity->SetCachedRegions(cached_regions);
+        PROFILE_SCOPE_CUSTOM("Engine.InstallIntegrityHook");
         
-        // Wire all hooks to integrity system for restoration during anti-cheat checks
-        impl_->hook_manager.WireIntegrityCallbacks(impl_->integrity.get(), nullptr);
+        // Configure integrity-specific settings
+        HookCreateInfo integrity_info = base_hook_info;
         
-        bool integrity_installed = impl_->integrity->Install();
-
-        // Register IntegrityDetour in hook registry for crash recovery
-        if (integrity_installed && impl_->integrity->GetHookAddress() != 0)
-        {
-            try
-            {
-                persistence::HookRecord record;
-                record.type = persistence::HookType::Integrity;
-                record.process_id = impl_->memory->GetAttachedPid();
-                record.hook_address = impl_->integrity->GetHookAddress();
-                record.detour_address = impl_->integrity->GetTrampolineAddress();
-                record.detour_size = 1024;
-                record.backup_address = impl_->integrity->GetStateAddress();
-                record.backup_size = 8;
-                record.original_bytes = impl_->integrity->GetOriginalBytes();
-                record.installed_time = std::chrono::system_clock::now();
-                record.hook_checksum = persistence::HookRegistry::ComputeCRC32(
-                    record.original_bytes.data(), record.original_bytes.size());
-                record.detour_checksum = 0;
-
-                if (!persistence::HookRegistry::RegisterHook(record))
-                {
-                    if (impl_->log.warn)
-                        impl_->log.warn("Failed to register integrity hook in registry");
-                }
-            }
-            catch (const std::exception& e)
-            {
-                if (impl_->log.warn)
-                    impl_->log.warn(std::string("Exception while registering integrity hook: ") + e.what());
-            }
-        }
+        bool integrity_installed = impl_->hook_manager.RegisterHook(
+            persistence::HookType::Integrity,
+            integrity_info,
+            nullptr, nullptr);
 
         if (!integrity_installed)
         {
             if (impl_->log.error)
-                impl_->log.error("Failed to install integrity detour");
-            impl_->integrity.reset();
+                impl_->log.error("Failed to install integrity hook");
             impl_->hook_manager.RemoveAllHooks();
             impl_->memory.reset();
             status_ = Status::Error;
             return false;
+        }
+        
+        // Configure integrity-specific settings
+        auto* integrity_hook = impl_->hook_manager.GetIntegrityHook();
+        if (integrity_hook)
+        {
+            integrity_hook->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
+            
+            // Wire all hooks to integrity system
+            impl_->hook_manager.WireIntegrityCallbacks(integrity_hook, nullptr);
         }
     }
 
@@ -363,8 +338,9 @@ bool Engine::start_hook(StartPolicy policy)
         }
     }
 
-    // Start integrity monitor to enable/reapply dialog hook
-    auto state_addr = impl_->integrity ? impl_->integrity->GetStateAddress() : 0;
+    // Start integrity monitor
+    auto* integrity_hook = impl_->hook_manager.GetIntegrityHook();
+    auto state_addr = integrity_hook ? integrity_hook->GetStateAddress() : 0;
     if (state_addr == 0)
     {
         if (impl_->log.warn)
@@ -382,8 +358,8 @@ bool Engine::start_hook(StartPolicy policy)
                     impl_->hook_manager.ReapplyAllPatches(impl_->log);
             });
         
-        // Wire all hooks to integrity monitor for out-of-process restoration
-        impl_->hook_manager.WireIntegrityCallbacks(nullptr, impl_->monitor.get());
+        // Wire all hooks to integrity monitor
+        impl_->hook_manager.WireIntegrityCallbacks(integrity_hook, impl_->monitor.get());
         
         (void)impl_->monitor->start();
     }
@@ -741,11 +717,6 @@ bool Engine::stop_hook()
         // Remove all hooks via HookManager (handles cleanup and persistence unregistration)
         impl_->hook_manager.RemoveAllHooks();
         
-        if (impl_->integrity)
-        {
-            impl_->integrity->Remove();
-            impl_->integrity.reset();
-        }
         impl_->memory.reset();
         if (impl_->log.info)
             impl_->log.info("Hook removed");

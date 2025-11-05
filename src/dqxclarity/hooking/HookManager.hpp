@@ -11,7 +11,7 @@
 namespace dqxclarity
 {
 
-class IntegrityDetour;
+class IntegrityHook;
 class IntegrityMonitor;
 class IHook;
 
@@ -37,16 +37,16 @@ public:
      * Creates the appropriate hook type, installs it (deferred patch),
      * registers with HookRegistry for crash recovery, and wires integrity callbacks.
      * 
-     * @param type Hook type to create (Dialog, Quest, Player, Corner, Network)
+     * @param type Hook type to create (Dialog, Quest, Player, Corner, Network, Integrity)
      * @param info Hook configuration (memory, logger, settings)
-     * @param integrity Integrity detour instance for callback wiring (can be nullptr)
+     * @param integrity Integrity hook instance for callback wiring (can be nullptr)
      * @param monitor Integrity monitor instance for callback wiring (can be nullptr)
      * @return true if hook was successfully created and installed
      */
     bool RegisterHook(
         persistence::HookType type,
         const HookCreateInfo& info,
-        IntegrityDetour* integrity,
+        IntegrityHook* integrity,
         IntegrityMonitor* monitor);
 
     /**
@@ -64,17 +64,24 @@ public:
      * @return Pointer to hook instance, or nullptr if not registered
      */
     IHook* GetHook(persistence::HookType type);
+    
+    /**
+     * @brief Access the integrity hook with proper type
+     * 
+     * @return Pointer to IntegrityHook instance, or nullptr if not registered
+     */
+    IntegrityHook* GetIntegrityHook();
 
     /**
      * @brief Wire integrity callbacks to all registered hooks
      * 
-     * Should be called after IntegrityDetour and IntegrityMonitor are created.
+     * Should be called after IntegrityHook and IntegrityMonitor are created.
      * Updates hook callbacks so they notify integrity system when hooks are refreshed.
      * 
-     * @param integrity Integrity detour instance (can be nullptr)
+     * @param integrity Integrity hook instance (can be nullptr)
      * @param monitor Integrity monitor instance (can be nullptr)
      */
-    void WireIntegrityCallbacks(IntegrityDetour* integrity, IntegrityMonitor* monitor);
+    void WireIntegrityCallbacks(IntegrityHook* integrity, IntegrityMonitor* monitor);
 
     /**
      * @brief Enable patches on all registered hooks

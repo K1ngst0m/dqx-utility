@@ -33,7 +33,7 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/NetworkTextHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/PlayerHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/QuestHook.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityDetour.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityHook.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/IntegrityMonitor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/memory/MemoryPatch.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/hooking/HookRegistry.cpp

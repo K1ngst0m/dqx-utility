@@ -5,7 +5,7 @@
 #include "PlayerHook.hpp"
 #include "CornerTextHook.hpp"
 #include "NetworkTextHook.hpp"
-#include "IntegrityDetour.hpp"
+#include "IntegrityHook.hpp"
 #include "IntegrityMonitor.hpp"
 #include "IHook.hpp"
 
@@ -17,7 +17,7 @@ namespace dqxclarity
 bool HookManager::RegisterHook(
     persistence::HookType type,
     const HookCreateInfo& info,
-    IntegrityDetour* integrity,
+    IntegrityHook* integrity,
     IntegrityMonitor* monitor)
 {
     // Store memory and logger for later use
@@ -82,10 +82,8 @@ bool HookManager::RegisterHook(
             break;
             
         case persistence::HookType::Integrity:
-            // Integrity hook is managed separately (IntegrityDetour), not through HookManager
-            if (logger_.warn)
-                logger_.warn("HookManager::RegisterHook called with Integrity type - this is handled separately");
-            return false;
+            hook = std::make_unique<IntegrityHook>(hook_info);
+            break;
             
         default:
             if (logger_.error)
@@ -98,17 +96,7 @@ bool HookManager::RegisterHook(
     {
         if (logger_.warn)
         {
-            std::string type_name;
-            switch (type)
-            {
-                case persistence::HookType::Dialog: type_name = "Dialog"; break;
-                case persistence::HookType::Quest: type_name = "Quest"; break;
-                case persistence::HookType::Player: type_name = "Player"; break;
-                case persistence::HookType::Corner: type_name = "Corner"; break;
-                case persistence::HookType::Network: type_name = "Network"; break;
-                default: type_name = "Unknown"; break;
-            }
-            logger_.warn("Failed to install " + type_name + " hook");
+            logger_.warn("Failed to install " + GetHookTypeName(type) + " hook");
         }
         return false;
     }
@@ -138,17 +126,7 @@ bool HookManager::RegisterHook(
         {
             if (logger_.warn)
             {
-                std::string type_name;
-                switch (type)
-                {
-                    case persistence::HookType::Dialog: type_name = "Dialog"; break;
-                    case persistence::HookType::Quest: type_name = "Quest"; break;
-                    case persistence::HookType::Player: type_name = "Player"; break;
-                    case persistence::HookType::Corner: type_name = "Corner"; break;
-                    case persistence::HookType::Network: type_name = "Network"; break;
-                    default: type_name = "Unknown"; break;
-                }
-                logger_.warn("Failed to register " + type_name + " hook in persistence: " + e.what());
+                logger_.warn("Failed to register " + GetHookTypeName(type) + " hook in persistence: " + e.what());
             }
         }
     }
@@ -158,17 +136,7 @@ bool HookManager::RegisterHook(
     
     if (logger_.info)
     {
-        std::string type_name;
-        switch (type)
-        {
-            case persistence::HookType::Dialog: type_name = "Dialog"; break;
-            case persistence::HookType::Quest: type_name = "Quest"; break;
-            case persistence::HookType::Player: type_name = "Player"; break;
-            case persistence::HookType::Corner: type_name = "Corner"; break;
-            case persistence::HookType::Network: type_name = "Network"; break;
-            default: type_name = "Unknown"; break;
-        }
-        logger_.info(type_name + " hook installed successfully");
+        logger_.info(GetHookTypeName(type) + " hook installed successfully");
     }
     
     return true;
@@ -193,17 +161,7 @@ void HookManager::RemoveAllHooks()
             {
                 if (logger_.warn)
                 {
-                    std::string type_name;
-                    switch (type)
-                    {
-                        case persistence::HookType::Dialog: type_name = "Dialog"; break;
-                        case persistence::HookType::Quest: type_name = "Quest"; break;
-                        case persistence::HookType::Player: type_name = "Player"; break;
-                        case persistence::HookType::Corner: type_name = "Corner"; break;
-                        case persistence::HookType::Network: type_name = "Network"; break;
-                        default: type_name = "Unknown"; break;
-                    }
-                    logger_.warn("Failed to unregister " + type_name + " hook from persistence: " + e.what());
+                    logger_.warn("Failed to unregister " + GetHookTypeName(type) + " hook from persistence: " + e.what());
                 }
             }
         }
@@ -226,17 +184,27 @@ IHook* HookManager::GetHook(persistence::HookType type)
     return nullptr;
 }
 
-void HookManager::WireIntegrityCallbacks(IntegrityDetour* integrity, IntegrityMonitor* monitor)
+IntegrityHook* HookManager::GetIntegrityHook()
 {
-    // Add all registered hooks as restore targets for integrity system
+    auto* hook = GetHook(persistence::HookType::Integrity);
+    return dynamic_cast<IntegrityHook*>(hook);
+}
+
+void HookManager::WireIntegrityCallbacks(IntegrityHook* integrity, IntegrityMonitor* monitor)
+{
+    // Add all registered hooks (except integrity itself) as restore targets
     // This ensures integrity can restore original bytes when the game's anti-cheat runs
     
     for (const auto& [type, hook] : hooks_)
     {
         if (!hook || hook->GetHookAddress() == 0)
             continue;
+        
+        // Skip the integrity hook itself - don't add it as a restore target
+        if (type == persistence::HookType::Integrity)
+            continue;
             
-        // Add to integrity detour
+        // Add to integrity hook
         if (integrity)
         {
             integrity->AddRestoreTarget(hook->GetHookAddress(), hook->GetOriginalBytes());
@@ -251,7 +219,8 @@ void HookManager::WireIntegrityCallbacks(IntegrityDetour* integrity, IntegrityMo
     
     if (logger_.info && (integrity || monitor))
     {
-        logger_.info("Wired integrity callbacks for " + std::to_string(hooks_.size()) + " hooks");
+        size_t count = hooks_.size() - (hooks_.count(persistence::HookType::Integrity) > 0 ? 1 : 0);
+        logger_.info("Wired integrity callbacks for " + std::to_string(count) + " hooks");
     }
 }
 
