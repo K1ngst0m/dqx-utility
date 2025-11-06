@@ -306,12 +306,11 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
     return static_cast<int>(state_.content_state().segments.size()) - 1;
 }
 
-DialogWindow::DialogWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, int instance_id, const std::string& name, bool is_default)
+DialogWindow::DialogWindow(FontManager& font_manager, ConfigManager& config, int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
     , config_(config)
     , cached_backend_(translate::Backend::OpenAI)
     , settings_view_(state_, font_manager_, session_, config)
-    , registry_(registry)
 {
 
     name_ = name;
@@ -1095,9 +1094,6 @@ void DialogWindow::renderDialogContextMenu()
     // Use cached docked state from render
     bool is_docked = state_.ui_state().is_docked;
 
-    // Get total dialog count from config manager registry
-    int dialog_count = static_cast<int>(registry_.windowsByType(UIWindowType::Dialog).size());
-
     // Render the context menu
     std::string popup_id = "DialogContextMenu###" + id_suffix_;
     if (ImGui::BeginPopup(popup_id.c_str()))
@@ -1132,11 +1128,9 @@ void DialogWindow::renderDialogContextMenu()
 
         ImGui::Separator();
 
-        // Disable remove button if this is the only dialog
-        bool can_remove = dialog_count > 1;
+        bool can_remove = !is_default_instance_ && !is_docked;
         if (ImGui::MenuItem(i18n::get("common.remove"), nullptr, false, can_remove))
         {
-            // Signal for removal - we'll handle this in the registry
             should_be_removed_ = true;
         }
 

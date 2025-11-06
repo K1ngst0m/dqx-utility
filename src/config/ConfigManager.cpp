@@ -52,8 +52,7 @@ static long long file_mtime_ms(const fs::path& p)
     return std::chrono::duration_cast<std::chrono::milliseconds>(sctp.time_since_epoch()).count();
 }
 
-ConfigManager::ConfigManager(WindowRegistry& registry)
-    : registry_(registry)
+ConfigManager::ConfigManager()
 {
     config_path_ = "config.toml";
     last_mtime_ = file_mtime_ms(config_path_);
@@ -69,7 +68,7 @@ bool ConfigManager::saveAll()
 
     toml::table root = StateSerializer::serializeGlobal(global_state_);
 
-    auto windows = registry_.windowsByType(UIWindowType::Dialog);
+    auto windows = registry_->windowsByType(UIWindowType::Dialog);
     toml::array arr;
     for (auto* w : windows)
     {
@@ -81,7 +80,7 @@ bool ConfigManager::saveAll()
     }
     root.insert("dialogs", std::move(arr));
 
-    auto quest_windows = registry_.windowsByType(UIWindowType::Quest);
+    auto quest_windows = registry_->windowsByType(UIWindowType::Quest);
     toml::array quests_arr;
     for (auto* w : quest_windows)
     {
@@ -95,8 +94,8 @@ bool ConfigManager::saveAll()
         root.insert("quests", std::move(quests_arr));
     }
 
-    auto quest_helper_windows = registry_.windowsByType(UIWindowType::QuestHelper);
-    toml::array quest_helpers_arr;
+    auto quest_helper_windows = registry_->windowsByType(UIWindowType::QuestHelper);
+    toml::array quest_helpers_arr;  
     for (auto* w : quest_helper_windows)
     {
         auto* qhw = dynamic_cast<QuestHelperWindow*>(w);
@@ -220,23 +219,23 @@ bool ConfigManager::loadAndApply()
 
             if (!dialog_configs.empty())
             {
-                auto windows = registry_.windowsByType(UIWindowType::Dialog);
+                auto windows = registry_->windowsByType(UIWindowType::Dialog);
                 int have = static_cast<int>(windows.size());
                 int want = static_cast<int>(dialog_configs.size());
 
                 if (want > have)
                 {
                     for (int i = 0; i < want - have; ++i)
-                        registry_.createDialogWindow();
-                    windows = registry_.windowsByType(UIWindowType::Dialog);
+                        registry_->createDialogWindow();
+                    windows = registry_->windowsByType(UIWindowType::Dialog);
                 }
                 else if (want < have)
                 {
                     for (int i = have - 1; i >= want; --i)
                     {
-                        registry_.removeWindow(windows[i]);
+                        registry_->removeWindow(windows[i]);
                     }
-                    windows = registry_.windowsByType(UIWindowType::Dialog);
+                    windows = registry_->windowsByType(UIWindowType::Dialog);
                 }
 
                 int n = std::min(static_cast<int>(windows.size()), want);
@@ -265,7 +264,7 @@ bool ConfigManager::loadAndApply()
                     dw->setDefaultInstance(false);
                     if (global_state_.defaultDialogEnabled() && i == 0)
                     {
-                        registry_.markDialogAsDefault(*dw);
+                        registry_->markDialogAsDefault(*dw);
                     }
                 }
             }
@@ -313,7 +312,7 @@ bool ConfigManager::loadAndApply()
                 return;
             }
 
-            auto quests = registry_.windowsByType(UIWindowType::Quest);
+            auto quests = registry_->windowsByType(UIWindowType::Quest);
             QuestWindow* quest_window = nullptr;
             if (index < quests.size())
             {
@@ -321,7 +320,7 @@ bool ConfigManager::loadAndApply()
             }
             if (!quest_window)
             {
-                quest_window = &registry_.createQuestWindow();
+                quest_window = &registry_->createQuestWindow();
             }
 
             if (quest_window)
@@ -330,7 +329,7 @@ bool ConfigManager::loadAndApply()
                 quest_window->setDefaultInstance(false);
                 if (global_state_.defaultQuestEnabled() && index == 0)
                 {
-                    registry_.markQuestAsDefault(*quest_window);
+                    registry_->markQuestAsDefault(*quest_window);
                 }
             }
         };
@@ -353,22 +352,22 @@ bool ConfigManager::loadAndApply()
         }
         else
         {
-            if (global_state_.defaultQuestEnabled() && registry_.windowsByType(UIWindowType::Quest).empty())
+            if (global_state_.defaultQuestEnabled() && registry_->windowsByType(UIWindowType::Quest).empty())
             {
-                registry_.createQuestWindow(true);
+                registry_->createQuestWindow(true);
             }
         }
 
         auto processQuestHelperTable = [&](const toml::table& tbl, std::size_t index) {
             QuestHelperWindow* qh_window = nullptr;
-            auto existing_quest_helpers = registry_.windowsByType(UIWindowType::QuestHelper);
+            auto existing_quest_helpers = registry_->windowsByType(UIWindowType::QuestHelper);
             if (index < existing_quest_helpers.size())
             {
                 qh_window = dynamic_cast<QuestHelperWindow*>(existing_quest_helpers[index]);
             }
             if (!qh_window)
             {
-                qh_window = &registry_.createQuestHelperWindow(false);
+                qh_window = &registry_->createQuestHelperWindow(false);
             }
             std::string name;
             QuestHelperStateManager quest_helper_state;
@@ -379,7 +378,7 @@ bool ConfigManager::loadAndApply()
                 qh_window->setDefaultInstance(false);
                 if (global_state_.defaultQuestHelperEnabled() && index == 0)
                 {
-                    registry_.markQuestHelperAsDefault(*qh_window);
+                    registry_->markQuestHelperAsDefault(*qh_window);
                 }
             }
         };
@@ -398,9 +397,9 @@ bool ConfigManager::loadAndApply()
         }
         else
         {
-            if (global_state_.defaultQuestHelperEnabled() && registry_.windowsByType(UIWindowType::QuestHelper).empty())
+            if (global_state_.defaultQuestHelperEnabled() && registry_->windowsByType(UIWindowType::QuestHelper).empty())
             {
-                registry_.createQuestHelperWindow(true);
+                registry_->createQuestHelperWindow(true);
             }
         }
 

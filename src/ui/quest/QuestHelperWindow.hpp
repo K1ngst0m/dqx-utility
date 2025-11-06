@@ -23,7 +23,7 @@ class QuestHelperWindow : public UIWindow
 {
     friend class QuestWindow;
 public:
-    QuestHelperWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, const std::string& name);
+    QuestHelperWindow(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager, const std::string& name);
     ~QuestHelperWindow() override;
 
     UIWindowType type() const override { return UIWindowType::QuestHelper; }
@@ -113,6 +113,7 @@ private:
 
     FontManager& font_manager_;
     ConfigManager& config_;
+    QuestManager& quest_manager_;
     QuestHelperStateManager state_{};
     std::unique_ptr<QuestHelperSettingsView> settings_view_;
 
@@ -153,7 +154,6 @@ private:
     std::size_t last_content_hash_ = 0;
     float last_font_size_ = 0.0f;
     std::size_t visible_step_count_ = 3;
-    WindowRegistry& registry_;
     
     bool is_drawer_mode_ = false;
 };

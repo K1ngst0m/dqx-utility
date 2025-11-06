@@ -11,7 +11,6 @@
 #include "QuestHelperWindow.hpp"
 #include "../../services/DQXClarityLauncher.hpp"
 #include "../../services/DQXClarityService.hpp"
-#include "../../services/QuestManagerService.hpp"
 #include "../../quest/QuestManager.hpp"
 #include "../../config/ConfigManager.hpp"
 #include "../../translate/ITranslator.hpp"
@@ -491,11 +490,11 @@ bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string
 
 } // namespace
 
-QuestWindow::QuestWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, const std::string& name, bool is_default)
+QuestWindow::QuestWindow(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager, const std::string& name, bool is_default)
     : font_manager_(font_manager)
     , config_(config)
+    , quest_manager_(quest_manager)
     , name_(name)
-    , registry_(registry)
 {
     static int quest_counter = 0;
     ++quest_counter;
@@ -518,7 +517,7 @@ QuestWindow::QuestWindow(FontManager& font_manager, WindowRegistry& registry, Co
     settings_view_ = std::make_unique<QuestSettingsView>(state_, font_manager_, session_, config_);
 
     std::string drawer_name = name_ + " Helper (Drawer)";
-    drawer_helper_ = std::make_unique<QuestHelperWindow>(font_manager_, registry_, config_, drawer_name);
+    drawer_helper_ = std::make_unique<QuestHelperWindow>(font_manager_, config_, quest_manager_, drawer_name);
     drawer_helper_->setDefaultInstance(false);
     drawer_helper_->setDrawerMode(true);
     drawer_helper_->initTranslatorIfEnabled();
@@ -568,21 +567,17 @@ void QuestWindow::applyQuestUpdate()
     std::string quest_id;
     if (!msg.quest_name.empty())
     {
-        auto* quest_mgr = QuestManagerService_Get();
-        if (quest_mgr)
+        auto quest_data = quest_manager_.findQuestByName(msg.quest_name);
+        if (quest_data.has_value())
         {
-            auto quest_data = quest_mgr->findQuestByName(msg.quest_name);
-            if (quest_data.has_value())
+            try
             {
-                try
-                {
-                    nlohmann::json obj = nlohmann::json::parse(quest_data.value());
-                    quest_id = obj.value("id", "");
-                }
-                catch (const nlohmann::json::exception& e)
-                {
-                    PLOG_WARNING << "QuestWindow: Failed to parse quest JSON for ID extraction: " << e.what();
-                }
+                nlohmann::json obj = nlohmann::json::parse(quest_data.value());
+                quest_id = obj.value("id", "");
+            }
+            catch (const nlohmann::json::exception& e)
+            {
+                PLOG_WARNING << "QuestWindow: Failed to parse quest JSON for ID extraction: " << e.what();
             }
         }
     }
@@ -1140,7 +1135,6 @@ void QuestWindow::renderContextMenu()
     }
 
     bool is_docked = state_.ui_state().is_docked;
-    int quest_count = static_cast<int>(registry_.windowsByType(UIWindowType::Quest).size());
 
     if (ImGui::BeginPopup(popup_id.c_str()))
     {
@@ -1173,7 +1167,7 @@ void QuestWindow::renderContextMenu()
 
         ImGui::Separator();
 
-        bool can_remove = quest_count > 1;
+        bool can_remove = !is_default_instance_ && !is_docked;
         if (ImGui::MenuItem(i18n::get("common.remove"), nullptr, false, can_remove))
         {
             should_be_removed_ = true;

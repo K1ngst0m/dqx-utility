@@ -23,7 +23,6 @@
 #include "updater/Version.hpp"
 #include "updater/ManifestParser.hpp"
 #include "quest/QuestManager.hpp"
-#include "services/QuestManagerService.hpp"
 
 #include <plog/Log.h>
 #include <plog/Init.h>
@@ -217,11 +216,16 @@ void Application::setupManagers()
     PROFILE_SCOPE_FUNCTION();
 
     font_manager_ = std::make_unique<FontManager>();
-    registry_ = std::make_unique<WindowRegistry>(*font_manager_);
-
-    config_ = std::make_unique<ConfigManager>(*registry_);
     
-    registry_->setConfigManager(*config_);
+    quest_manager_ = std::make_unique<QuestManager>();
+    if (!quest_manager_->initialize("assets/quests.jsonl"))
+    {
+        PLOG_ERROR << "Failed to initialize QuestManager";
+    }
+
+    config_ = std::make_unique<ConfigManager>();
+    registry_ = std::make_unique<WindowRegistry>(*font_manager_, *config_, *quest_manager_);
+    config_->setRegistry(registry_.get());
 
     event_handler_ = std::make_unique<ui::UIEventHandler>(*context_, *registry_, *config_);
     mini_manager_ = std::make_unique<ui::MiniModeManager>(*context_, *registry_);
@@ -235,17 +239,8 @@ void Application::setupManagers()
     updater_service_ = std::make_unique<updater::UpdaterService>();
     UpdaterService_Set(updater_service_.get());
 
-    // Read installed version from manifest.json (or use fallback if not found)
     std::string installedVersion = getInstalledVersion();
     updater_service_->initialize("K1ngst0m", "dqx-utility", updater::Version(installedVersion));
-
-    // Initialize QuestManager
-    quest_manager_ = std::make_unique<QuestManager>();
-    QuestManagerService_Set(quest_manager_.get());
-    if (!quest_manager_->initialize("assets/quests.jsonl"))
-    {
-        PLOG_ERROR << "Failed to initialize QuestManager";
-    }
 }
 
 void Application::initializeConfig()

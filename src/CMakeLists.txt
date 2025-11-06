@@ -157,8 +157,6 @@ target_sources(dqxu_core
     services/DQXClarityLauncher.hpp
     services/DQXClarityService.cpp
     services/DQXClarityService.hpp
-    services/QuestManagerService.cpp
-    services/QuestManagerService.hpp
 )
 
 target_sources(dqxu_core

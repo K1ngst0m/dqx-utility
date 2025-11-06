@@ -15,18 +15,18 @@
 #include <imgui.h>
 #include <algorithm>
 
-// Prepares a registry capable of creating window instances.
-WindowRegistry::WindowRegistry(FontManager& font_manager)
+WindowRegistry::WindowRegistry(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager)
     : font_manager_(font_manager)
+    , config_(config)
+    , quest_manager_(quest_manager)
 {
 }
 
 WindowRegistry::~WindowRegistry() = default;
 
-// Registers and returns a new dialog window instance.
 DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 {
-    auto dialog = std::make_unique<DialogWindow>(font_manager_, *this, *config_, dialog_counter_, makeDialogName(), mark_default);
+    auto dialog = std::make_unique<DialogWindow>(font_manager_, config_, dialog_counter_, makeDialogName(), mark_default);
     DialogWindow& ref = *dialog;
     windows_.push_back(std::move(dialog));
     ++dialog_counter_;
@@ -37,7 +37,7 @@ DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 
 QuestWindow& WindowRegistry::createQuestWindow(bool mark_default)
 {
-    auto quest = std::make_unique<QuestWindow>(font_manager_, *this, *config_, makeQuestName(), mark_default);
+    auto quest = std::make_unique<QuestWindow>(font_manager_, config_, quest_manager_, makeQuestName(), mark_default);
     QuestWindow& ref = *quest;
     windows_.push_back(std::move(quest));
     ++quest_counter_;
@@ -48,7 +48,7 @@ QuestWindow& WindowRegistry::createQuestWindow(bool mark_default)
 
 HelpWindow& WindowRegistry::createHelpWindow()
 {
-    auto help = std::make_unique<HelpWindow>(font_manager_, *config_, makeHelpName());
+    auto help = std::make_unique<HelpWindow>(font_manager_, config_, makeHelpName());
     HelpWindow& ref = *help;
     windows_.push_back(std::move(help));
     ++help_counter_;
@@ -57,7 +57,7 @@ HelpWindow& WindowRegistry::createHelpWindow()
 
 QuestHelperWindow& WindowRegistry::createQuestHelperWindow(bool mark_default)
 {
-    auto quest_helper = std::make_unique<QuestHelperWindow>(font_manager_, *this, *config_, makeQuestHelperName());
+    auto quest_helper = std::make_unique<QuestHelperWindow>(font_manager_, config_, quest_manager_, makeQuestHelperName());
     QuestHelperWindow& ref = *quest_helper;
     windows_.push_back(std::move(quest_helper));
     ++quest_helper_counter_;
@@ -110,17 +110,39 @@ std::vector<UIWindow*> WindowRegistry::windowsByType(UIWindowType type) const
     return filtered;
 }
 
-// Process removal requests from dialog windows
 void WindowRegistry::processRemovals()
 {
+    // Count windows by type first
+    int dialog_count = 0;
+    int quest_count = 0;
+    int quest_helper_count = 0;
+    
+    for (const auto& window : windows_)
+    {
+        switch (window->type())
+        {
+            case UIWindowType::Dialog:
+                ++dialog_count;
+                break;
+            case UIWindowType::Quest:
+                ++quest_count;
+                break;
+            case UIWindowType::QuestHelper:
+                ++quest_helper_count;
+                break;
+            default:
+                break;
+        }
+    }
+
     windows_.erase(std::remove_if(windows_.begin(), windows_.end(),
-                                  [this](const std::unique_ptr<UIWindow>& window)
+                                  [this, dialog_count, quest_count, quest_helper_count](const std::unique_ptr<UIWindow>& window)
                                   {
                                       if (window->type() == UIWindowType::Dialog)
                                       {
                                           if (auto* dialog = dynamic_cast<DialogWindow*>(window.get()))
                                           {
-                                              if (dialog->shouldBeRemoved())
+                                              if (dialog->shouldBeRemoved() && dialog_count > 1)
                                               {
                                                   if (window.get() == default_dialog_)
                                                   {
@@ -135,7 +157,7 @@ void WindowRegistry::processRemovals()
                                       {
                                           if (auto* quest = dynamic_cast<QuestWindow*>(window.get()))
                                           {
-                                              if (quest->shouldBeRemoved())
+                                              if (quest->shouldBeRemoved() && quest_count > 1)
                                               {
                                                   if (window.get() == default_quest_)
                                                   {
@@ -146,9 +168,20 @@ void WindowRegistry::processRemovals()
                                               }
                                           }
                                       }
-                                      else if (window->type() == UIWindowType::Help)
+                                      else if (window->type() == UIWindowType::QuestHelper)
                                       {
-                                          return false;
+                                          if (auto* quest_helper = dynamic_cast<QuestHelperWindow*>(window.get()))
+                                          {
+                                              if (quest_helper->shouldBeRemoved() && quest_helper_count > 1)
+                                              {
+                                                  if (window.get() == default_quest_helper_)
+                                                  {
+                                                      quest_helper->setDefaultInstance(false);
+                                                      default_quest_helper_ = nullptr;
+                                                  }
+                                                  return true;
+                                              }
+                                          }
                                       }
                                       return false;
                                   }),

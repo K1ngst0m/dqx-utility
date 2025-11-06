@@ -36,7 +36,7 @@ class ITextNormalizer;
 class DialogWindow : public UIWindow
 {
 public:
-    DialogWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, int instance_id, const std::string& name, bool is_default = false);
+    DialogWindow(FontManager& font_manager, ConfigManager& config, int instance_id, const std::string& name, bool is_default = false);
     ~DialogWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Dialog; }
@@ -175,6 +175,4 @@ private:
 
     std::uint64_t observed_global_translation_version_ = 0;
     bool last_used_global_translation_ = false;
-    
-    WindowRegistry& registry_;
 };

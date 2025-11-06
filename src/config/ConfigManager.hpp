@@ -16,8 +16,10 @@ class ConfigManager
 public:
     using AppMode = GlobalStateManager::AppMode;
 
-    ConfigManager(WindowRegistry& registry);
+    ConfigManager();
     ~ConfigManager();
+
+    void setRegistry(WindowRegistry* registry) { registry_ = registry; }
 
     GlobalStateManager& globalState() { return global_state_; }
     const GlobalStateManager& globalState() const { return global_state_; }
@@ -51,7 +53,7 @@ private:
     std::string last_error_;
     long long last_mtime_ = 0;
     
-    WindowRegistry& registry_;
+    WindowRegistry* registry_ = nullptr;
     GlobalStateManager global_state_;
 
     // UI requests

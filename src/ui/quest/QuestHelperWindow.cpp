@@ -10,7 +10,6 @@
 #include "../../quest/QuestManager.hpp"
 #include "../../services/DQXClarityService.hpp"
 #include "../../services/DQXClarityLauncher.hpp"
-#include "../../services/QuestManagerService.hpp"
 #include "../common/BaseWindowState.hpp"
 #include "../../translate/ITranslator.hpp"
 #include "../FontManager.hpp"
@@ -21,11 +20,11 @@
 
 using json = nlohmann::json;
 
-QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, const std::string& name)
+QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager, const std::string& name)
     : font_manager_(font_manager)
     , config_(config)
+    , quest_manager_(quest_manager)
     , name_(name)
-    , registry_(registry)
 {
     static int quest_helper_counter = 0;
     ++quest_helper_counter;
@@ -95,11 +94,7 @@ void QuestHelperWindow::updateQuestData()
 
     current_quest_name_ = msg.quest_name;
 
-    auto* quest_mgr = QuestManagerService_Get();
-    if (!quest_mgr)
-        return;
-
-    auto quest_data = quest_mgr->findQuestByName(current_quest_name_);
+    auto quest_data = quest_manager_.findQuestByName(current_quest_name_);
     if (quest_data.has_value())
     {
         parseQuestJson(quest_data.value(), current_quest_name_);
@@ -479,8 +474,7 @@ void QuestHelperWindow::renderContextMenu()
 
         ImGui::Separator();
 
-        int quest_helper_count = static_cast<int>(registry_.windowsByType(UIWindowType::QuestHelper).size());
-        bool can_remove = quest_helper_count > 1;
+        bool can_remove = !is_default_instance_;
         if (ImGui::MenuItem(i18n::get("common.remove"), nullptr, false, can_remove))
         {
             should_be_removed_ = true;

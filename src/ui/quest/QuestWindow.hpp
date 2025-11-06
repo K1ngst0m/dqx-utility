@@ -16,13 +16,14 @@ class ITranslator;
 }
 class FontManager;
 class ConfigManager;
+class QuestManager;
 class QuestSettingsView;
 class QuestHelperWindow;
 
 class QuestWindow : public UIWindow
 {
 public:
-    QuestWindow(FontManager& font_manager, WindowRegistry& registry, ConfigManager& config, const std::string& name, bool is_default = false);
+    QuestWindow(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager, const std::string& name, bool is_default = false);
     ~QuestWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Quest; }
@@ -91,6 +92,7 @@ private:
 
     FontManager& font_manager_;
     ConfigManager& config_;
+    QuestManager& quest_manager_;
     QuestStateManager state_{};
     std::unique_ptr<QuestSettingsView> settings_view_;
 
@@ -143,7 +145,6 @@ private:
     bool last_used_global_translation_ = false;
     ui::WindowAnimator animator_;
     bool is_default_instance_ = false;
-    WindowRegistry& registry_;
 
     // Drawer popup helper
     std::unique_ptr<QuestHelperWindow> drawer_helper_;
