@@ -11,6 +11,7 @@ class Signatures
 {
 public:
     static const Pattern& GetDialogTrigger();
+    static const Pattern& GetDialogPattern();
     static const Pattern& GetIntegrityCheck();
     static const Pattern& GetNetworkText();
     static const Pattern& GetQuestText();

@@ -40,25 +40,6 @@
 namespace dqxclarity
 {
 
-// Helper to create dialog pattern (from DialogMemoryReader)
-static Pattern CreateDialogPattern()
-{
-    // Pattern: \xFF\xFF\xFF\x7F\xFF\xFF\xFF\x7F\x00\x00\x00\x00\x00\x00\x00\x00\xFD.\xA8\x99
-    // Note: byte at index 17 is wildcard (0xFF)
-    static constexpr uint8_t kDialogPatternBytes[] = {
-        0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFF, 0x7F, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFD, 0xFF, 0xA8, 0x99
-    };
-    static constexpr size_t kPatternSize = sizeof(kDialogPatternBytes);
-    
-    Pattern pattern;
-    pattern.bytes.assign(kDialogPatternBytes, kDialogPatternBytes + kPatternSize);
-    pattern.mask.assign(kPatternSize, true);
-    pattern.mask[17] = false; // Wildcard at index 17
-    
-    return pattern;
-}
-
 struct PendingDialog
 {
     std::string text;
@@ -239,7 +220,7 @@ bool Engine::start_hook(StartPolicy policy)
         dialog_info.memory = impl_->memory.get();
         dialog_info.logger = impl_->log;
         dialog_info.verbose = impl_->cfg.verbose;
-        dialog_info.pattern = CreateDialogPattern();
+        dialog_info.pattern = Signatures::GetDialogPattern();
         
         auto dialog_scanner = std::make_unique<DialogScanner>(dialog_info);
         if (!dialog_scanner->Initialize())
@@ -283,7 +264,7 @@ bool Engine::start_hook(StartPolicy policy)
             dialog_info.memory = impl_->memory.get();
             dialog_info.logger = impl_->log;
             dialog_info.verbose = impl_->cfg.verbose;
-            dialog_info.pattern = CreateDialogPattern();
+            dialog_info.pattern = Signatures::GetDialogPattern();
             
             auto dialog_scanner = std::make_unique<DialogScanner>(dialog_info);
             if (!dialog_scanner->Initialize() || !impl_->scanner_manager->RegisterScanner(ScannerType::Dialog, std::move(dialog_scanner)))

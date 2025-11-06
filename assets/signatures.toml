@@ -20,3 +20,6 @@ notice_string    = "E5 8B 95 E7 94 BB E9 85 8D E4 BF A1 E3 81 AE E9 9A 9B E3 81 
 
 # Post-login heuristic pattern
 walkthrough      = "04 02 ?? ?? 10 00 00 00 80 ?? ?? ?? 00 00 00 00 ??"
+
+# Dialog memory pattern (used by DialogScanner)
+dialog_pattern   = "FF FF FF 7F FF FF FF 7F 00 00 00 00 00 00 00 00 FD ?? A8 99"

@@ -81,6 +81,7 @@ void Signatures::InitializeSignatures()
     {
         // Fallback: initialize built-in defaults if file missing
         s_signatures["dialog_trigger"] = Pattern::FromString("FF ?? ?? C7 45 ?? 00 00 00 00 C7 45 ?? FD FF FF FF E8");
+        s_signatures["dialog_pattern"] = Pattern::FromString("FF FF FF 7F FF FF FF 7F 00 00 00 00 00 00 00 00 FD ?? A8 99");
         s_signatures["integrity_check"] = Pattern::FromString(
             "89 54 24 FC 8D 64 24 FC 89 4C 24 FC 8D 64 24 FC 8D 64 24 FC 89 04 24 E9 ?? ?? ?? ?? 89");
         s_signatures["network_text"] = Pattern::FromString("51 51 8B C4 89 10 8B CF");
@@ -107,6 +108,12 @@ const Pattern& Signatures::GetDialogTrigger()
 {
     InitializeSignatures();
     return s_signatures["dialog_trigger"];
+}
+
+const Pattern& Signatures::GetDialogPattern()
+{
+    InitializeSignatures();
+    return s_signatures["dialog_pattern"];
 }
 
 const Pattern& Signatures::GetIntegrityCheck()
