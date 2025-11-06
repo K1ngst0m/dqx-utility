@@ -36,6 +36,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <unordered_map>
 
 namespace dqxclarity
 {
@@ -82,9 +83,29 @@ struct Engine::Impl
     PlayerInfo player_snapshot;
     bool player_valid = false;
 
+    // Progress tracking
+    std::atomic<HookStage> hook_stage{ HookStage::Idle };
+    mutable std::mutex error_mutex;
+    std::string last_error_message;
+
     // Scanner state tracking
     std::atomic<bool> notice_screen_visible{ false };
     std::atomic<bool> post_login_detected{ false };
+
+    std::atomic<std::uint64_t> notice_listener_seq{ 1 };
+    std::mutex notice_listener_mutex;
+    std::unordered_map<std::uint64_t, std::function<void(bool)>> notice_listeners;
+
+    std::atomic<std::uint64_t> post_login_listener_seq{ 1 };
+    std::mutex post_login_listener_mutex;
+    std::unordered_map<std::uint64_t, std::function<void(bool)>> post_login_listeners;
+    
+    // Scanner warmup for notice/post-login detection before hooks
+    std::jthread warmup_thread;
+    std::atomic<bool> warmup_shutdown{ false };
+    std::condition_variable warmup_cv;
+    std::mutex warmup_mutex;
+    std::jthread delayed_enable_thread;
 
     // Two-phase commit: pending queue for deduplication
     std::vector<PendingDialog> pending_dialogs;
@@ -111,6 +132,81 @@ struct Engine::Impl
     } last_capture_timings;
 
     std::mutex diagnostics_mutex;
+
+    // Helper methods for scanner warmup phase
+    void SetError(const std::string& msg)
+    {
+        std::lock_guard<std::mutex> lock(error_mutex);
+        last_error_message = msg;
+        if (log.error)
+            log.error(msg);
+    }
+
+    /**
+     * @brief Wait for scanner readiness based on policy
+     * 
+     * For DeferUntilIntegrity: waits for notice screen detection
+     * For EnableImmediately: returns immediately
+     * 
+     * @param policy The startup policy
+     * @param timeout Maximum time to wait (0 = infinite)
+     * @return true if conditions satisfied, false on timeout or error
+     */
+    bool WaitForScannerReadiness(Engine::StartPolicy policy, std::chrono::milliseconds timeout)
+    {
+        if (policy == Engine::StartPolicy::EnableImmediately)
+        {
+            if (log.info)
+                log.info("StartPolicy::EnableImmediately - skipping scanner warmup");
+            return true;
+        }
+
+        if (log.debug)
+            log.debug("[warmup] Waiting for notice screen pattern before enabling hooks");
+
+        hook_stage.store(HookStage::ScanningForNotice, std::memory_order_release);
+
+        auto start_time = std::chrono::steady_clock::now();
+        const auto poll_interval = std::chrono::milliseconds(100);
+        int poll_counter = 0;
+
+        while (!warmup_shutdown.load(std::memory_order_acquire))
+        {
+            // Check if notice screen is visible
+            if (notice_screen_visible.load(std::memory_order_acquire))
+            {
+                if (log.debug)
+                    log.debug("[warmup] Notice screen detected - proceeding to hook installation");
+                hook_stage.store(HookStage::WaitingForIntegrity, std::memory_order_release);
+                return true;
+            }
+
+            // Check timeout (if specified)
+            if (timeout.count() > 0)
+            {
+                auto elapsed = std::chrono::steady_clock::now() - start_time;
+                if (elapsed >= timeout)
+                {
+                    SetError("Timeout waiting for notice screen pattern");
+                    return false;
+                }
+            }
+
+            // Sleep and continue polling
+            std::this_thread::sleep_for(poll_interval);
+
+            if (++poll_counter % 10 == 0 && cfg.verbose && log.info)
+            {
+                auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - start_time)
+                                      .count();
+                log.info("[warmup] Still waiting for notice screen (" + std::to_string(elapsed_ms) + " ms elapsed)");
+            }
+        }
+
+        // Shutdown requested
+        return false;
+    }
 };
 
 Engine::Engine()
@@ -151,6 +247,9 @@ bool Engine::start_hook(StartPolicy policy)
         return true;
     status_ = Status::Starting;
 
+    // Reset state
+    impl_->warmup_shutdown.store(false, std::memory_order_release);
+    impl_->hook_stage.store(HookStage::AttachingProcess, std::memory_order_release);
     impl_->quest_seq.store(0, std::memory_order_relaxed);
     {
         std::lock_guard<std::mutex> lock(impl_->quest_mutex);
@@ -164,15 +263,15 @@ bool Engine::start_hook(StartPolicy policy)
         impl_->player_snapshot = PlayerInfo{};
     }
 
-    // Find DQXGame.exe
+    // PHASE 1: Attach to DQXGame.exe
     {
         PROFILE_SCOPE_CUSTOM("Engine.FindProcess");
         auto pids = dqxclarity::ProcessFinder::FindByName("DQXGame.exe", false);
         if (pids.empty())
         {
-            if (impl_->log.error)
-                impl_->log.error("DQXGame.exe not found");
+            impl_->SetError("DQXGame.exe not found");
             status_ = Status::Error;
+            impl_->hook_stage.store(HookStage::Idle, std::memory_order_release);
             return false;
         }
 
@@ -180,11 +279,14 @@ bool Engine::start_hook(StartPolicy policy)
         impl_->memory = dqxclarity::MemoryFactory::CreatePlatformMemory();
         if (!impl_->memory || !impl_->memory->AttachProcess(pids[0]))
         {
-            if (impl_->log.error)
-                impl_->log.error("Failed to attach to DQXGame.exe");
+            impl_->SetError("Failed to attach to DQXGame.exe");
             status_ = Status::Error;
+            impl_->hook_stage.store(HookStage::Idle, std::memory_order_release);
             return false;
         }
+
+        if (impl_->log.info)
+            impl_->log.info("Attached to DQXGame.exe successfully");
     }
 
     // Parse memory regions once to avoid repeated parsing (optimization)
@@ -206,8 +308,8 @@ bool Engine::start_hook(StartPolicy policy)
     // Initialize ScannerManager
     impl_->scanner_manager = std::make_unique<ScannerManager>();
 
-    // Initialize dialog capture based on mode
-    bool hook_installed = false;
+    // Initialize dialog capture state (hook deferred until after warmup)
+    bool dialog_hook_installed = false;
 
     // Mode 1: Compatibility mode (memory reader only, safer)
     if (impl_->cfg.compatibility_mode)
@@ -221,7 +323,6 @@ bool Engine::start_hook(StartPolicy policy)
         dialog_info.logger = impl_->log;
         dialog_info.verbose = impl_->cfg.verbose;
         dialog_info.pattern = Signatures::GetDialogPattern();
-        dialog_info.cached_regions = cached_regions;
         
         auto dialog_scanner = std::make_unique<DialogScanner>(dialog_info);
         if (!dialog_scanner->Initialize())
@@ -245,20 +346,9 @@ bool Engine::start_hook(StartPolicy policy)
     else
     {
         if (impl_->log.info)
-            impl_->log.info("Auto mode: initializing hook + dialog scanner for maximum coverage");
+            impl_->log.info("Auto mode: preparing dialog hook (deferred until warmup) and initializing dialog scanner");
 
-        // Try to install dialog hook (non-fatal if it fails)
-        // Note: Integrity callbacks will be wired after integrity is created
-        {
-            PROFILE_SCOPE_CUSTOM("Engine.InstallDialogHook");
-            hook_installed = impl_->hook_manager.RegisterHook(
-                persistence::HookType::Dialog,
-                base_hook_info,
-                nullptr,  // Integrity will be wired after integrity detour is installed
-                nullptr);
-        }
-
-        // Always initialize dialog scanner in auto mode (catches cutscenes/story dialogs)
+        // Initialize dialog scanner in auto mode (catches cutscenes/story dialogs)
         {
             PROFILE_SCOPE_CUSTOM("Engine.InitializeDialogScanner");
             ScannerCreateInfo dialog_info;
@@ -266,7 +356,6 @@ bool Engine::start_hook(StartPolicy policy)
             dialog_info.logger = impl_->log;
             dialog_info.verbose = impl_->cfg.verbose;
             dialog_info.pattern = Signatures::GetDialogPattern();
-            dialog_info.cached_regions = cached_regions;
             
             auto dialog_scanner = std::make_unique<DialogScanner>(dialog_info);
             if (!dialog_scanner->Initialize() || !impl_->scanner_manager->RegisterScanner(ScannerType::Dialog, std::move(dialog_scanner)))
@@ -280,48 +369,84 @@ bool Engine::start_hook(StartPolicy policy)
                     impl_->log.info("Dialog scanner initialized successfully");
             }
         }
-
-        // In auto mode, we need at least one method to work
-        auto dialog_scanner = impl_->scanner_manager->GetScanner(ScannerType::Dialog);
-        if (!hook_installed && !dialog_scanner)
-        {
-            if (impl_->log.error)
-                impl_->log.error("Failed to initialize dialog capture (both hook and scanner unavailable)");
-            status_ = Status::Error;
-            return false;
-        }
     }
     
-    // Register other scanners (NoticeScreen, PostLogin, PlayerName)
+    // PHASE 2: Initialize scanners for warmup (before hooks)
     {
-        PROFILE_SCOPE_CUSTOM("Engine.InitializeOtherScanners");
+        PROFILE_SCOPE_CUSTOM("Engine.InitializeScannersForWarmup");
         
-        // NoticeScreen scanner for detecting loading screen
+        // NoticeScreen scanner with warmup callback
         ScannerCreateInfo notice_info;
         notice_info.memory = impl_->memory.get();
         notice_info.logger = impl_->log;
         notice_info.verbose = impl_->cfg.verbose;
         notice_info.pattern = Signatures::GetNoticeString();
-        notice_info.cached_regions = cached_regions;
+        notice_info.state_change_callback = [this](bool visible)
+        {
+            impl_->notice_screen_visible.store(visible, std::memory_order_release);
+            // Notify warmup waiter
+            {
+                std::lock_guard<std::mutex> lock(impl_->warmup_mutex);
+                impl_->warmup_cv.notify_all();
+            }
+            // Dispatch to external listeners
+            std::vector<std::function<void(bool)>> listeners;
+            {
+                std::lock_guard<std::mutex> lock(impl_->notice_listener_mutex);
+                listeners.reserve(impl_->notice_listeners.size());
+                for (auto& kv : impl_->notice_listeners)
+                    listeners.push_back(kv.second);
+            }
+            for (auto& cb : listeners)
+            {
+                if (cb)
+                    cb(visible);
+            }
+        };
         
         auto notice_scanner = std::make_unique<NoticeScreenScanner>(notice_info);
         if (notice_scanner->Initialize())
         {
             impl_->scanner_manager->RegisterScanner(ScannerType::NoticeScreen, std::move(notice_scanner));
+            if (impl_->log.info)
+                impl_->log.info("NoticeScreen scanner initialized");
+        }
+        else
+        {
+            if (impl_->log.warn)
+                impl_->log.warn("Failed to initialize NoticeScreen scanner");
         }
         
-        // PostLogin scanner for detecting logged-in state
+        // PostLogin scanner
         ScannerCreateInfo postlogin_info;
         postlogin_info.memory = impl_->memory.get();
         postlogin_info.logger = impl_->log;
         postlogin_info.verbose = impl_->cfg.verbose;
         postlogin_info.pattern = Signatures::GetWalkthroughPattern();
-        postlogin_info.cached_regions = cached_regions;
+        postlogin_info.state_change_callback = [this](bool logged_in)
+        {
+            impl_->post_login_detected.store(logged_in, std::memory_order_release);
+            // Dispatch to external listeners
+            std::vector<std::function<void(bool)>> listeners;
+            {
+                std::lock_guard<std::mutex> lock(impl_->post_login_listener_mutex);
+                listeners.reserve(impl_->post_login_listeners.size());
+                for (auto& kv : impl_->post_login_listeners)
+                    listeners.push_back(kv.second);
+            }
+            for (auto& cb : listeners)
+            {
+                if (cb)
+                    cb(logged_in);
+            }
+        };
         
         auto postlogin_scanner = std::make_unique<PostLoginScanner>(postlogin_info);
         if (postlogin_scanner->Initialize())
         {
             impl_->scanner_manager->RegisterScanner(ScannerType::PostLogin, std::move(postlogin_scanner));
+            if (impl_->log.info)
+                impl_->log.info("PostLogin scanner initialized");
         }
         
         // PlayerName scanner for on-demand player info extraction
@@ -330,7 +455,6 @@ bool Engine::start_hook(StartPolicy policy)
         player_info.logger = impl_->log;
         player_info.verbose = impl_->cfg.verbose;
         player_info.pattern = Signatures::GetSiblingNamePattern();
-        player_info.cached_regions = cached_regions;
         
         auto player_scanner = std::make_unique<PlayerNameScanner>(player_info);
         if (player_scanner->Initialize())
@@ -338,7 +462,107 @@ bool Engine::start_hook(StartPolicy policy)
             impl_->scanner_manager->RegisterScanner(ScannerType::PlayerName, std::move(player_scanner));
         }
     }
-    // Do NOT change page protection at startup (keeps login stable on this build)
+
+    // PHASE 3: Start scanner warmup thread (polls scanners until readiness)
+    impl_->warmup_thread = std::jthread(
+        [this](std::stop_token stoken)
+        {
+            using namespace std::chrono_literals;
+            if (impl_->log.info)
+                impl_->log.info("Scanner warmup thread started");
+
+            while (!stoken.stop_requested() && !impl_->warmup_shutdown.load(std::memory_order_acquire))
+            {
+                // Poll notice scanner
+                auto* notice_scanner = impl_->scanner_manager->GetScanner(ScannerType::NoticeScreen);
+                if (notice_scanner)
+                    notice_scanner->Poll();
+
+                // Poll post-login scanner
+                auto* postlogin_scanner = impl_->scanner_manager->GetScanner(ScannerType::PostLogin);
+                if (postlogin_scanner)
+                    postlogin_scanner->Poll();
+
+                std::this_thread::sleep_for(50ms);
+            }
+
+            if (impl_->log.info)
+                impl_->log.info("Scanner warmup thread stopped");
+        });
+
+    // PHASE 4: Wait for scanner readiness based on policy (blocks until satisfied)
+    if (!impl_->WaitForScannerReadiness(policy, std::chrono::seconds(0))) // 0 = infinite wait
+    {
+        // Timeout or error
+        impl_->warmup_shutdown.store(true, std::memory_order_release);
+        impl_->warmup_thread.request_stop();
+        if (impl_->warmup_thread.joinable())
+            impl_->warmup_thread.join();
+        
+        status_ = Status::Error;
+        impl_->hook_stage.store(HookStage::Idle, std::memory_order_release);
+        return false;
+    }
+
+    // Stop warmup thread now that we're ready to install hooks
+    impl_->warmup_shutdown.store(true, std::memory_order_release);
+    impl_->warmup_thread.request_stop();
+    if (impl_->warmup_thread.joinable())
+        impl_->warmup_thread.join();
+
+    // Schedule delayed patch enable after notice detection for defer policy
+    if (policy == StartPolicy::DeferUntilIntegrity)
+    {
+        if (impl_->delayed_enable_thread.joinable())
+            impl_->delayed_enable_thread.request_stop();
+
+        impl_->delayed_enable_thread = std::jthread(
+            [this](std::stop_token stoken)
+            {
+                using namespace std::chrono_literals;
+                if (impl_->log.debug)
+                    impl_->log.debug("[warmup] Scheduling hook patches to enable in 1 second");
+                std::this_thread::sleep_for(1s);
+                if (stoken.stop_requested())
+                    return;
+                if (impl_->log.debug)
+                    impl_->log.debug("[warmup] Enabling hook patches after notice screen warmup");
+                impl_->hook_manager.EnableAllPatches(impl_->log);
+            });
+    }
+
+    // PHASE 5: Install hooks
+    impl_->hook_stage.store(HookStage::InstallingHooks, std::memory_order_release);
+
+    // Defer dialog hook installation until after warmup completes (auto mode only)
+    if (!impl_->cfg.compatibility_mode)
+    {
+        PROFILE_SCOPE_CUSTOM("Engine.InstallDialogHook");
+        dialog_hook_installed = impl_->hook_manager.RegisterHook(
+            persistence::HookType::Dialog,
+            base_hook_info,
+            nullptr,
+            nullptr);
+
+        if (dialog_hook_installed)
+        {
+            if (impl_->log.info)
+                impl_->log.info("Dialog hook installed successfully (deferred)");
+        }
+        else
+        {
+            if (impl_->log.warn)
+                impl_->log.warn("Failed to install dialog hook (deferred)");
+        }
+
+        auto dialog_scanner = impl_->scanner_manager->GetScanner(ScannerType::Dialog);
+        if (!dialog_hook_installed && !dialog_scanner)
+        {
+            impl_->SetError("Failed to initialize dialog capture (both hook and scanner unavailable)");
+            status_ = Status::Error;
+            return false;
+        }
+    }
 
     // Do NOT pre-change page protections at startup; some builds crash on login if code pages change protection.
 
@@ -437,9 +661,17 @@ bool Engine::start_hook(StartPolicy policy)
             [this](bool first)
             {
                 if (first)
+                {
+                    if (impl_->log.debug)
+                        impl_->log.debug("[warmup] Integrity monitor first tick - enabling hook patches");
                     impl_->hook_manager.EnableAllPatches(impl_->log);
+                }
                 else
+                {
+                    if (impl_->cfg.verbose && impl_->log.info)
+                        impl_->log.info("[warmup] Integrity monitor reapplying hook patches");
                     impl_->hook_manager.ReapplyAllPatches(impl_->log);
+                }
             });
         
         // Wire all hooks to integrity monitor
@@ -539,20 +771,18 @@ bool Engine::start_hook(StartPolicy policy)
                         }
                     }
                     
-                    // Poll other scanners and update state
+                    // Poll other scanners
                     {
                         auto notice_scanner = dynamic_cast<NoticeScreenScanner*>(impl_->scanner_manager->GetScanner(ScannerType::NoticeScreen));
                         if (notice_scanner)
                         {
                             notice_scanner->Poll();
-                            impl_->notice_screen_visible.store(notice_scanner->IsVisible(), std::memory_order_release);
                         }
                         
                         auto postlogin_scanner = dynamic_cast<PostLoginScanner*>(impl_->scanner_manager->GetScanner(ScannerType::PostLogin));
                         if (postlogin_scanner)
                         {
                             postlogin_scanner->Poll();
-                            impl_->post_login_detected.store(postlogin_scanner->IsLoggedIn(), std::memory_order_release);
                         }
                     }
 
@@ -774,7 +1004,13 @@ bool Engine::start_hook(StartPolicy policy)
             }
         });
 
+    // PHASE 8: Mark as ready
     status_ = Status::Hooked;
+    impl_->hook_stage.store(HookStage::Ready, std::memory_order_release);
+
+    if (impl_->log.info)
+        impl_->log.info("Engine started successfully - all systems operational");
+
     return true;
 }
 
@@ -786,6 +1022,19 @@ bool Engine::stop_hook()
 
     try
     {
+        // Stop delayed enable thread if running
+        impl_->delayed_enable_thread.request_stop();
+        if (impl_->delayed_enable_thread.joinable())
+            impl_->delayed_enable_thread.join();
+
+        // Stop warmup thread if running
+        impl_->warmup_shutdown.store(true, std::memory_order_release);
+        if (impl_->warmup_thread.joinable())
+        {
+            impl_->warmup_thread.request_stop();
+            impl_->warmup_thread.join();
+        }
+
         impl_->poller.request_stop();
         if (impl_->poller.joinable())
             impl_->poller.join();
@@ -812,6 +1061,7 @@ bool Engine::stop_hook()
         if (impl_->log.info)
             impl_->log.info("Hook removed");
         status_ = Status::Stopped;
+        impl_->hook_stage.store(HookStage::Idle, std::memory_order_release);
 
         // Clear hook registry after successful cleanup
         try
@@ -915,6 +1165,56 @@ bool Engine::scanPlayerInfo(PlayerInfo& out)
         return false;
         
     return player_scanner->ScanPlayerInfo(out);
+}
+
+Engine::NoticeListenerId Engine::addNoticeStateListener(std::function<void(bool)> callback)
+{
+    if (!callback)
+        return 0;
+    std::lock_guard<std::mutex> lock(impl_->notice_listener_mutex);
+    auto id = impl_->notice_listener_seq.fetch_add(1, std::memory_order_relaxed);
+    impl_->notice_listeners[id] = std::move(callback);
+    return id;
+}
+
+void Engine::removeNoticeStateListener(Engine::NoticeListenerId id)
+{
+    if (id == 0)
+        return;
+    std::lock_guard<std::mutex> lock(impl_->notice_listener_mutex);
+    impl_->notice_listeners.erase(id);
+}
+
+Engine::PostLoginListenerId Engine::addPostLoginStateListener(std::function<void(bool)> callback)
+{
+    if (!callback)
+        return 0;
+    std::lock_guard<std::mutex> lock(impl_->post_login_listener_mutex);
+    auto id = impl_->post_login_listener_seq.fetch_add(1, std::memory_order_relaxed);
+    impl_->post_login_listeners[id] = std::move(callback);
+    return id;
+}
+
+void Engine::removePostLoginStateListener(Engine::PostLoginListenerId id)
+{
+    if (id == 0)
+        return;
+    std::lock_guard<std::mutex> lock(impl_->post_login_listener_mutex);
+    impl_->post_login_listeners.erase(id);
+}
+
+EngineState Engine::state() const
+{
+    EngineState s;
+    s.status = status_;
+    s.hook_stage = impl_->hook_stage.load(std::memory_order_acquire);
+    return s;
+}
+
+std::string Engine::last_error() const
+{
+    std::lock_guard<std::mutex> lock(impl_->error_mutex);
+    return impl_->last_error_message;
 }
 
 } // namespace dqxclarity

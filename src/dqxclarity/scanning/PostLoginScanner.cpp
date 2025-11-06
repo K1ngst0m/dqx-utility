@@ -9,6 +9,10 @@ namespace dqxclarity
 PostLoginScanner::PostLoginScanner(const ScannerCreateInfo& create_info)
     : ScannerBase(create_info)
 {
+    if (create_info.state_change_callback)
+    {
+        SetStateChangeCallback(create_info.state_change_callback);
+    }
 }
 
 bool PostLoginScanner::OnInitialize()

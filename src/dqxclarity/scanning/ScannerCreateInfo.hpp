@@ -21,10 +21,10 @@ struct ScannerCreateInfo
 
     Pattern pattern = {};
     std::chrono::milliseconds poll_interval{ 250 };
-    
+
     std::vector<MemoryRegion> cached_regions = {};
 
-    std::function<void()> on_state_changed;
+    std::function<void(bool)> state_change_callback;
 };
 
 } // namespace dqxclarity

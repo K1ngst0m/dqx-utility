@@ -40,15 +40,12 @@ struct DQXClarityLauncher::Impl
     std::atomic<bool> fatal_signal{ false };
     std::atomic<bool> stop_in_progress{ false };
 
-    std::jthread notice_worker;
-    std::atomic<bool> notice_found{ false };
-
-    std::jthread post_login_worker;
-    std::atomic<bool> post_login_found{ false };
-
     // Process state for start policy
     bool process_running_at_start = false;
     bool attempted_auto_start = false;
+
+    // Watchdog suspension: prevents false positives during engine warmup
+    std::atomic<bool> monitor_in_start_hook{ false };
 
     mutable std::mutex error_mutex;
     std::string last_error_message;
@@ -79,9 +76,16 @@ struct DQXClarityLauncher::Impl
 
     bool startHookLocked(dqxclarity::Engine::StartPolicy policy)
     {
+        // Signal watchdog that we're entering start_hook (may block during warmup)
+        monitor_in_start_hook.store(true, std::memory_order_release);
+        
         std::lock_guard<std::mutex> lock(engine_mutex);
         clearLastErrorMessage();
         bool ok = engine->start_hook(policy);
+        
+        // Clear the flag after start_hook completes
+        monitor_in_start_hook.store(false, std::memory_order_release);
+        
         if (!ok && last_error_message.empty())
         {
             std::string policy_name =
@@ -255,7 +259,7 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                     try
                     {
                         pimpl_->heartbeat_seq.fetch_add(1, std::memory_order_relaxed);
-                        PLOG_DEBUG << "Launcher monitor heartbeat " << pimpl_->heartbeat_seq.load();
+                        PLOG_VERBOSE << "Launcher monitor heartbeat " << pimpl_->heartbeat_seq.load();
                         if (!initialized)
                         {
                             pimpl_->process_running_at_start = isDQXGameRunning();
@@ -283,85 +287,26 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                                     }
                                     else
                                     {
-                                        // no immediate start; ensure wait workers below will be created
+                                        PLOG_INFO << "Process already running but policy defers; waiting for notice screen";
+                                        (void)pimpl_->startHookLocked(
+                                            dqxclarity::Engine::StartPolicy::DeferUntilIntegrity);
                                     }
                                     pimpl_->attempted_auto_start = true;
-                                    pimpl_->notice_worker.request_stop();
-                                    pimpl_->post_login_worker.request_stop();
                                 }
-                                else if (!pimpl_->notice_worker.joinable())
+                                else if (!pimpl_->process_running_at_start && !pimpl_->attempted_auto_start)
                                 {
-                                    PLOG_INFO << "DQXGame.exe detected; waiting for \"Important notice\" and "
-                                                 "post-login heuristic";
-                                    pimpl_->notice_found.store(false);
-                                    pimpl_->notice_worker = std::jthread(
-                                        [this](std::stop_token stoken)
-                                        {
-                                            auto start_time = std::chrono::steady_clock::now();
-                                            while (!stoken.stop_requested())
-                                            {
-                                                if (pimpl_->engine->isNoticeScreenVisible())
-                                                {
-                                                    pimpl_->notice_found.store(true);
-                                                    break;
-                                                }
-                                                
-                                                if (pimpl_->notice_wait_timeout_ms > 0)
-                                                {
-                                                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                                        std::chrono::steady_clock::now() - start_time);
-                                                    if (elapsed.count() >= pimpl_->notice_wait_timeout_ms)
-                                                        break;
-                                                }
-                                                
-                                                std::this_thread::sleep_for(std::chrono::milliseconds(250));
-                                            }
-                                        });
-                                    if (pimpl_->enable_post_login_heuristics && !pimpl_->post_login_worker.joinable())
-                                    {
-                                        pimpl_->post_login_found.store(false);
-                                        pimpl_->post_login_worker = std::jthread(
-                                            [this](std::stop_token stoken)
-                                            {
-                                                while (!stoken.stop_requested())
-                                                {
-                                                    if (pimpl_->engine->isPostLoginDetected())
-                                                    {
-                                                        pimpl_->post_login_found.store(true);
-                                                        break;
-                                                    }
-                                                    std::this_thread::sleep_for(std::chrono::milliseconds(250));
-                                                }
-                                            });
-                                    }
-                                }
-
-                                // If either signal is observed, start accordingly
-                                if (pimpl_->notice_found.load())
-                                {
-                                    PLOG_INFO << "Important notice found; starting hook (defer until integrity)...";
+                                    // Tool started first, game started later - wait for notice screen internally in engine
+                                    PLOG_INFO << "Game process detected; starting hook with DeferUntilIntegrity policy";
                                     (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::DeferUntilIntegrity);
-                                    pimpl_->notice_found.store(false);
-                                    pimpl_->post_login_worker.request_stop();
-                                    pimpl_->notice_worker.request_stop();
-                                }
-                                else if (pimpl_->post_login_found.load())
-                                {
-                                    PLOG_INFO << "Post-login heuristic matched; enabling immediately...";
-                                    (void)pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
-                                    pimpl_->post_login_found.store(false);
-                                    pimpl_->notice_worker.request_stop();
-                                    pimpl_->post_login_worker.request_stop();
+                                    pimpl_->attempted_auto_start = true;
                                 }
                             }
                         }
                         else
                         {
-                            // Process not running: reset state and cancel any pending workers
+                            // Process not running: reset state
                             pimpl_->process_running_at_start = false;
                             pimpl_->attempted_auto_start = false;
-                            pimpl_->notice_worker.request_stop();
-                            pimpl_->post_login_worker.request_stop();
                             if (pimpl_->waiting_delay)
                                 pimpl_->waiting_delay = false;
                             if (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting ||
@@ -482,9 +427,25 @@ void DQXClarityLauncher::lateInitialize(ConfigManager& config)
                     stagnant_ticks = 0;
                     last_seq = seq;
                 }
-                PLOG_DEBUG << "Launcher watchdog heartbeat check: seq=" << seq << " stagnant_ticks=" << stagnant_ticks;
+                PLOG_VERBOSE << "Launcher watchdog heartbeat check: seq=" << seq << " stagnant_ticks=" << stagnant_ticks;
                 const bool fatal = pimpl_->fatal_signal.load(std::memory_order_acquire);
-                const bool stalled = stagnant_ticks >= 6; // Reduced from 6
+                const bool in_start_hook = pimpl_->monitor_in_start_hook.load(std::memory_order_acquire);
+                
+                // Check if engine is in warmup phase (scanning for notice screen)
+                auto engine_state = pimpl_->engine->state();
+                const bool in_warmup = (engine_state.hook_stage == dqxclarity::HookStage::ScanningForNotice ||
+                                       engine_state.hook_stage == dqxclarity::HookStage::WaitingForIntegrity);
+                
+                // Skip stall checks during start_hook or warmup phase
+                const bool skip_stall_check = !fatal && (in_start_hook || in_warmup);
+                if (skip_stall_check)
+                {
+                    stagnant_ticks = 0;
+                    last_seq = seq;
+                    continue;
+                }
+
+                const bool stalled = (stagnant_ticks >= 6);
 
                 auto st = pimpl_->engine->status();
                 if ((fatal || stalled) && (st == dqxclarity::Status::Hooked || st == dqxclarity::Status::Starting ||
@@ -581,8 +542,6 @@ bool DQXClarityLauncher::launch()
     }
     PLOG_INFO << "Start requested";
     pimpl_->waiting_delay = false;
-    pimpl_->notice_worker.request_stop();
-    pimpl_->post_login_worker.request_stop();
     bool ok = pimpl_->startHookLocked(dqxclarity::Engine::StartPolicy::EnableImmediately);
     if (!ok && pimpl_->getLastErrorMessage().empty())
     {
@@ -595,8 +554,6 @@ bool DQXClarityLauncher::stop()
 {
     PLOG_INFO << "Stop requested";
     pimpl_->waiting_delay = false;
-    pimpl_->notice_worker.request_stop();
-    pimpl_->post_login_worker.request_stop();
     bool ok = pimpl_->stopHookLocked();
     if (!ok && pimpl_->getLastErrorMessage().empty())
     {
@@ -716,9 +673,6 @@ void DQXClarityLauncher::shutdown()
     {
         pimpl_->watchdog.join();
     }
-
-    pimpl_->notice_worker.request_stop();
-    pimpl_->post_login_worker.request_stop();
 }
 
 DQXClarityStatus DQXClarityLauncher::getStatus() const

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -18,6 +19,22 @@ enum class Status
     Hooked,
     Stopping,
     Error
+};
+
+enum class HookStage
+{
+    Idle,                    // Engine not started
+    AttachingProcess,        // Attaching to game process
+    ScanningForNotice,       // Waiting for notice screen pattern
+    WaitingForIntegrity,     // Notice found, waiting for integrity check completion
+    InstallingHooks,         // Installing memory hooks
+    Ready                    // Fully hooked and operational
+};
+
+struct EngineState
+{
+    Status status{ Status::Stopped };
+    HookStage hook_stage{ HookStage::Idle };
 };
 
 struct QuestMessage;
@@ -54,6 +71,19 @@ public:
     Engine();
     ~Engine() noexcept;
 
+    /**
+     * @brief Hook startup policy
+     * 
+     * Controls how the engine waits for readiness before installing hooks:
+     * 
+     * - DeferUntilIntegrity: Attach → scan for notice screen → wait for integrity → install hooks
+     *   Progress: Idle → AttachingProcess → ScanningForNotice → WaitingForIntegrity → InstallingHooks → Ready
+     * 
+     * - EnableImmediately: Attach → install hooks immediately (skip notice detection)
+     *   Progress: Idle → AttachingProcess → InstallingHooks → Ready
+     * 
+     * The engine internally manages scanner warmup and waits, exposing hook progress via Engine::state().
+     */
     enum class StartPolicy
     {
         DeferUntilIntegrity,
@@ -66,6 +96,8 @@ public:
     bool stop_hook();
 
     Status status() const { return status_; }
+    EngineState state() const;
+    std::string last_error() const;
 
     // Drain all available dialog messages into out (single consumer)
     bool drain(std::vector<DialogMessage>& out);
@@ -79,6 +111,15 @@ public:
     bool isNoticeScreenVisible() const;
     bool isPostLoginDetected() const;
     bool scanPlayerInfo(PlayerInfo& out);
+
+    // Scanner state listeners
+    using NoticeListenerId = std::uint64_t;
+    NoticeListenerId addNoticeStateListener(std::function<void(bool)> callback);
+    void removeNoticeStateListener(NoticeListenerId id);
+
+    using PostLoginListenerId = std::uint64_t;
+    PostLoginListenerId addPostLoginStateListener(std::function<void(bool)> callback);
+    void removePostLoginStateListener(PostLoginListenerId id);
 
 private:
     struct Impl;
