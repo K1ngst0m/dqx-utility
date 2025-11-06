@@ -221,6 +221,7 @@ bool Engine::start_hook(StartPolicy policy)
         dialog_info.logger = impl_->log;
         dialog_info.verbose = impl_->cfg.verbose;
         dialog_info.pattern = Signatures::GetDialogPattern();
+        dialog_info.cached_regions = cached_regions;
         
         auto dialog_scanner = std::make_unique<DialogScanner>(dialog_info);
         if (!dialog_scanner->Initialize())
@@ -265,6 +266,7 @@ bool Engine::start_hook(StartPolicy policy)
             dialog_info.logger = impl_->log;
             dialog_info.verbose = impl_->cfg.verbose;
             dialog_info.pattern = Signatures::GetDialogPattern();
+            dialog_info.cached_regions = cached_regions;
             
             auto dialog_scanner = std::make_unique<DialogScanner>(dialog_info);
             if (!dialog_scanner->Initialize() || !impl_->scanner_manager->RegisterScanner(ScannerType::Dialog, std::move(dialog_scanner)))
@@ -300,6 +302,7 @@ bool Engine::start_hook(StartPolicy policy)
         notice_info.logger = impl_->log;
         notice_info.verbose = impl_->cfg.verbose;
         notice_info.pattern = Signatures::GetNoticeString();
+        notice_info.cached_regions = cached_regions;
         
         auto notice_scanner = std::make_unique<NoticeScreenScanner>(notice_info);
         if (notice_scanner->Initialize())
@@ -313,6 +316,7 @@ bool Engine::start_hook(StartPolicy policy)
         postlogin_info.logger = impl_->log;
         postlogin_info.verbose = impl_->cfg.verbose;
         postlogin_info.pattern = Signatures::GetWalkthroughPattern();
+        postlogin_info.cached_regions = cached_regions;
         
         auto postlogin_scanner = std::make_unique<PostLoginScanner>(postlogin_info);
         if (postlogin_scanner->Initialize())
@@ -326,6 +330,7 @@ bool Engine::start_hook(StartPolicy policy)
         player_info.logger = impl_->log;
         player_info.verbose = impl_->cfg.verbose;
         player_info.pattern = Signatures::GetSiblingNamePattern();
+        player_info.cached_regions = cached_regions;
         
         auto player_scanner = std::make_unique<PlayerNameScanner>(player_info);
         if (player_scanner->Initialize())

@@ -25,6 +25,7 @@ ScannerBase::ScannerBase(const ScannerCreateInfo& create_info)
     , logger_(create_info.logger)
     , verbose_(create_info.verbose)
     , pattern_(create_info.pattern)
+    , cached_regions_(create_info.cached_regions)
 {
 }
 
@@ -105,7 +106,33 @@ uintptr_t ScannerBase::ScanAllMemory(const Pattern& pattern, bool require_execut
 {
     PROFILE_SCOPE_FUNCTION();
 
-    auto regions = require_executable ? GetExecutableRegions() : GetNonExecutableRegions();
+    std::vector<MemoryRegion> regions;
+    
+    // Use cached regions if available, otherwise parse memory maps
+    if (!cached_regions_.empty())
+    {
+        PROFILE_SCOPE_CUSTOM("ScannerBase.UseCachedRegions");
+        // Filter cached regions based on executable requirement
+        for (const auto& region : cached_regions_)
+        {
+            bool is_executable = (region.protection & static_cast<int>(MemoryProtection::Execute)) != 0;
+            if (require_executable == is_executable)
+            {
+                regions.push_back(region);
+            }
+        }
+        
+        if (verbose_)
+            std::cout << "ScannerBase: Using " << regions.size() << " cached regions (filtered from " << cached_regions_.size() << " total)\n";
+    }
+    else
+    {
+        PROFILE_SCOPE_CUSTOM("ScannerBase.ParseMemoryMaps");
+        regions = require_executable ? GetExecutableRegions() : GetNonExecutableRegions();
+        
+        if (verbose_)
+            std::cout << "ScannerBase: Parsed " << regions.size() << " regions from memory maps\n";
+    }
 
     if (verbose_)
         std::cout << "ScannerBase: Scanning " << regions.size() << " regions\n";

@@ -113,6 +113,7 @@ protected:
     Logger logger_;
     bool verbose_;
     Pattern pattern_;
+    std::vector<MemoryRegion> cached_regions_;
 
     bool initialized_ = false;
     bool shutdown_ = false;
