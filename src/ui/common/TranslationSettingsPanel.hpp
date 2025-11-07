@@ -12,11 +12,12 @@ class ITranslator;
 struct BaseWindowState;
 class TranslateSession;
 class ConfigManager;
+class GlobalStateManager;
 
 class TranslationSettingsPanel
 {
 public:
-    TranslationSettingsPanel(BaseWindowState& state, TranslateSession& session, ConfigManager& config);
+    TranslationSettingsPanel(BaseWindowState& state, TranslateSession& session, ConfigManager& config, GlobalStateManager& global_state);
 
     void render(translate::ITranslator* translator, std::string& applyHint, float& applyHintTimer,
                 bool& testingConnection, std::string& testResult, std::string& testTimestamp,
@@ -36,6 +37,7 @@ private:
     BaseWindowState& state_;
     [[maybe_unused]] TranslateSession& session_;
     ConfigManager& config_;
+    GlobalStateManager& global_state_;
     TranslationConfig* active_config_ = nullptr;
     TranslationConfig* global_config_ = nullptr;
     bool using_global_config_ = false;

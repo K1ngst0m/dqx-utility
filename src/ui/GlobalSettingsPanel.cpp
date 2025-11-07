@@ -134,8 +134,9 @@ std::vector<UIWindow*> collectAllWindows(WindowRegistry& registry)
 } // namespace
 
 // Builds a settings panel tied to the window registry.
-GlobalSettingsPanel::GlobalSettingsPanel(WindowRegistry& registry, ConfigManager& config, ExitCallback exitCallback)
+GlobalSettingsPanel::GlobalSettingsPanel(WindowRegistry& registry, GlobalStateManager& global_state, ConfigManager& config, ExitCallback exitCallback)
     : registry_(registry)
+    , global_state_(global_state)
     , config_(config)
     , exit_callback_(std::move(exitCallback))
     , dqxc_launcher_(std::make_unique<DQXClarityLauncher>())
@@ -154,12 +155,12 @@ void GlobalSettingsPanel::render(bool& open)
         ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
         ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
     }
-    else if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    else if (global_state_.appMode() == GlobalStateManager::AppMode::Mini)
         {
             ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
     }
 
-    if (config_.globalState().appMode() != GlobalStateManager::AppMode::Mini && DockState::ShouldReDock())
+    if (global_state_.appMode() != GlobalStateManager::AppMode::Mini && DockState::ShouldReDock())
         {
             ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImVec2(800.0f, 400.0f), ImGuiCond_Always);
@@ -173,7 +174,7 @@ void GlobalSettingsPanel::render(bool& open)
     UITheme::pushSettingsWindowStyle();
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-    if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    if (global_state_.appMode() == GlobalStateManager::AppMode::Mini)
             flags |= ImGuiWindowFlags_NoMove;
     if (ImGui::Begin((std::string(i18n::get("settings.title")) + "###global_settings").c_str(), &open, flags))
     {
@@ -423,17 +424,17 @@ void GlobalSettingsPanel::renderDQXClaritySection()
     ImGui::Spacing();
 
     // Compatibility mode checkbox
-    bool compat_mode = config_.globalState().compatibilityMode();
+    bool compat_mode = global_state_.compatibilityMode();
 
     if (ImGui::Checkbox(i18n::get("settings.dqxc.compatibility_mode"), &compat_mode))
     {
-        config_.globalState().setCompatibilityMode(compat_mode);
-        config_.saveAll();
+        global_state_.setCompatibilityMode(compat_mode);
+        config_.save();
 
         // Reinitialize engine with new compatibility mode setting
         if (dqxc_launcher_)
         {
-            dqxc_launcher_->reinitialize(config_);
+            dqxc_launcher_->reinitialize(global_state_);
         }
     }
 
@@ -752,7 +753,7 @@ void GlobalSettingsPanel::renderWindowManagementSection()
 {
     if (ImGui::CollapsingHeader(i18n::get("settings.sections.window_management")))
     {
-        auto& gs = config_.globalState();
+        auto& gs = global_state_;
 
         bool default_dialog = gs.defaultDialogEnabled();
         std::string dialog_label =
@@ -761,7 +762,7 @@ void GlobalSettingsPanel::renderWindowManagementSection()
         {
             gs.setDefaultDialogEnabled(default_dialog);
             registry_.setDefaultDialogEnabled(default_dialog);
-            config_.saveAll();
+            config_.save();
         }
 
         bool default_quest = gs.defaultQuestEnabled();
@@ -770,7 +771,7 @@ void GlobalSettingsPanel::renderWindowManagementSection()
         {
             gs.setDefaultQuestEnabled(default_quest);
             registry_.setDefaultQuestEnabled(default_quest);
-            config_.saveAll();
+            config_.save();
         }
 
         ImGui::Spacing();
@@ -935,12 +936,12 @@ void GlobalSettingsPanel::renderAppearanceSection()
 {
     if (ImGui::CollapsingHeader(i18n::get("settings.sections.appearance"), ImGuiTreeNodeFlags_DefaultOpen))
     {
-        float ui_scale = config_.globalState().uiScale();
+        float ui_scale = global_state_.uiScale();
         ImGui::TextUnformatted(i18n::get("settings.ui_scale"));
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::SliderFloat("##ui_scale_slider", &ui_scale, 0.75f, 2.0f, "%.2fx"))
         {
-            config_.globalState().applyUIScale(ui_scale);
+            global_state_.applyUIScale(ui_scale);
         }
 
         // UI Language selector (proof of concept)
@@ -948,7 +949,7 @@ void GlobalSettingsPanel::renderAppearanceSection()
         const char* langs[] = { i18n::get("settings.ui_language.option_en"),
                                 i18n::get("settings.ui_language.option_zh_cn") };
         int idx = 0;
-        const char* code = config_.globalState().uiLanguage().c_str();
+        const char* code = global_state_.uiLanguage().c_str();
             if (code && std::string(code) == "zh-CN")
                 idx = 1;
         
@@ -956,7 +957,7 @@ void GlobalSettingsPanel::renderAppearanceSection()
         if (ImGui::Combo("##ui_lang_combo", &idx, langs, IM_ARRAYSIZE(langs)))
         {
             const char* new_code = (idx == 1) ? "zh-CN" : "en";
-            config_.globalState().setUILanguage(new_code);
+            global_state_.setUILanguage(new_code);
             i18n::set_language(new_code);
         }
 
@@ -964,17 +965,17 @@ void GlobalSettingsPanel::renderAppearanceSection()
         const char* app_modes[] = { i18n::get("settings.app_mode.items.normal"),
                                     i18n::get("settings.app_mode.items.borderless"),
                                     i18n::get("settings.app_mode.items.mini") };
-        int app_mode_idx = static_cast<int>(config_.globalState().appMode());
+        int app_mode_idx = static_cast<int>(global_state_.appMode());
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::Combo("##app_mode_combo", &app_mode_idx, app_modes, IM_ARRAYSIZE(app_modes)))
         {
-            config_.globalState().setAppMode(static_cast<GlobalStateManager::AppMode>(app_mode_idx));
+            global_state_.setAppMode(static_cast<GlobalStateManager::AppMode>(app_mode_idx));
         }
 
-        bool always_on_top = config_.globalState().windowAlwaysOnTop();
+        bool always_on_top = global_state_.windowAlwaysOnTop();
             if (ImGui::Checkbox(i18n::get("settings.always_on_top"), &always_on_top))
             {
-            config_.globalState().setWindowAlwaysOnTop(always_on_top);
+            global_state_.setWindowAlwaysOnTop(always_on_top);
         }
     }
 }

@@ -39,7 +39,7 @@ public:
 class WindowRegistry
 {
 public:
-    WindowRegistry(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager);
+    WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager);
     ~WindowRegistry();
 
     DialogWindow& createDialogWindow(bool mark_default = false);
@@ -67,6 +67,8 @@ public:
     void setDefaultQuestEnabled(bool enabled);
     void setDefaultQuestHelperEnabled(bool enabled);
     void syncDefaultWindows(const GlobalStateManager& state);
+    
+    void registerWindowStateHandlers();
 
 private:
     std::string makeDialogName();
@@ -75,6 +77,7 @@ private:
     std::string makeQuestHelperName();
 
     FontManager& font_manager_;
+    GlobalStateManager& global_state_;
     ConfigManager& config_;
     QuestManager& quest_manager_;
     std::vector<std::unique_ptr<UIWindow>> windows_;

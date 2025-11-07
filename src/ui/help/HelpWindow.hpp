@@ -8,12 +8,13 @@
 #include <string>
 
 class FontManager;
+class GlobalStateManager;
 class ConfigManager;
 
 class HelpWindow : public UIWindow
 {
 public:
-    HelpWindow(FontManager& font_manager, ConfigManager& config, const std::string& name);
+    HelpWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, const std::string& name);
     ~HelpWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Help; }
@@ -55,6 +56,7 @@ private:
     static std::string sanitizeErrorMessage(const std::string& message);
 
     FontManager& font_manager_;
+    GlobalStateManager& global_state_;
     ConfigManager& config_;
     DialogStateManager state_{};
     std::string name_;

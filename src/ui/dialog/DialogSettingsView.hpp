@@ -8,6 +8,7 @@
 
 class FontManager;
 class ConfigManager;
+class GlobalStateManager;
 
 namespace translate
 {
@@ -19,7 +20,7 @@ struct DialogStateManager;
 class DialogSettingsView
 {
 public:
-    DialogSettingsView(DialogStateManager& state, FontManager& fontManager, TranslateSession& session, ConfigManager& config);
+    DialogSettingsView(DialogStateManager& state, FontManager& fontManager, TranslateSession& session, ConfigManager& config, GlobalStateManager& global_state);
 
     void render(translate::ITranslator* translator, std::string& applyHint, float& applyHintTimer,
                 bool& testingConnection, std::string& testResult, std::string& testTimestamp,
@@ -33,6 +34,7 @@ private:
     [[maybe_unused]] FontManager& fontManager_;
     [[maybe_unused]] TranslateSession& session_;
     ConfigManager& config_;
+    GlobalStateManager& global_state_;
     AppearanceSettingsPanel appearancePanel_;
     TranslationSettingsPanel translationPanel_;
     DebugSettingsPanel debugPanel_;

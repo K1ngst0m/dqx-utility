@@ -11,12 +11,17 @@
 #include "dialog/DialogStateManager.hpp"
 #include "quest/QuestStateManager.hpp"
 #include "quest/QuestHelperStateManager.hpp"
+#include "../config/ConfigManager.hpp"
+#include "../config/StateSerializer.hpp"
+#include "../utils/ErrorReporter.hpp"
 
 #include <imgui.h>
 #include <algorithm>
+#include <toml++/toml.h>
 
-WindowRegistry::WindowRegistry(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager)
+WindowRegistry::WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager)
     : font_manager_(font_manager)
+    , global_state_(global_state)
     , config_(config)
     , quest_manager_(quest_manager)
 {
@@ -26,7 +31,7 @@ WindowRegistry::~WindowRegistry() = default;
 
 DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 {
-    auto dialog = std::make_unique<DialogWindow>(font_manager_, config_, dialog_counter_, makeDialogName(), mark_default);
+    auto dialog = std::make_unique<DialogWindow>(font_manager_, global_state_, config_, dialog_counter_, makeDialogName(), mark_default);
     DialogWindow& ref = *dialog;
     windows_.push_back(std::move(dialog));
     ++dialog_counter_;
@@ -37,7 +42,7 @@ DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 
 QuestWindow& WindowRegistry::createQuestWindow(bool mark_default)
 {
-    auto quest = std::make_unique<QuestWindow>(font_manager_, config_, quest_manager_, makeQuestName(), mark_default);
+    auto quest = std::make_unique<QuestWindow>(font_manager_, global_state_, config_, quest_manager_, quest_counter_, makeQuestName(), mark_default);
     QuestWindow& ref = *quest;
     windows_.push_back(std::move(quest));
     ++quest_counter_;
@@ -48,7 +53,7 @@ QuestWindow& WindowRegistry::createQuestWindow(bool mark_default)
 
 HelpWindow& WindowRegistry::createHelpWindow()
 {
-    auto help = std::make_unique<HelpWindow>(font_manager_, config_, makeHelpName());
+    auto help = std::make_unique<HelpWindow>(font_manager_, global_state_, config_, makeHelpName());
     HelpWindow& ref = *help;
     windows_.push_back(std::move(help));
     ++help_counter_;
@@ -57,7 +62,7 @@ HelpWindow& WindowRegistry::createHelpWindow()
 
 QuestHelperWindow& WindowRegistry::createQuestHelperWindow(bool mark_default)
 {
-    auto quest_helper = std::make_unique<QuestHelperWindow>(font_manager_, config_, quest_manager_, makeQuestHelperName());
+    auto quest_helper = std::make_unique<QuestHelperWindow>(font_manager_, global_state_, config_, quest_manager_, makeQuestHelperName());
     QuestHelperWindow& ref = *quest_helper;
     windows_.push_back(std::move(quest_helper));
     ++quest_helper_counter_;
@@ -322,4 +327,320 @@ void WindowRegistry::syncDefaultWindows(const GlobalStateManager& state)
     setDefaultDialogEnabled(state.defaultDialogEnabled());
     setDefaultQuestEnabled(state.defaultQuestEnabled());
     setDefaultQuestHelperEnabled(state.defaultQuestHelperEnabled());
+}
+
+namespace
+{
+inline void safe_strncpy(char* dest, const char* src, size_t dest_size)
+{
+    if (dest_size == 0)
+        return;
+#ifdef _WIN32
+    strncpy_s(dest, dest_size, src, _TRUNCATE);
+#else
+    strncpy(dest, src, dest_size - 1);
+    dest[dest_size - 1] = '\0';
+#endif
+}
+}
+
+void WindowRegistry::registerWindowStateHandlers()
+{
+    // Dialog windows handler
+    {
+        TableCallbacks cb;
+        cb.load = [this](const toml::table& section) {
+            auto* arr = section["dialogs"].as_array();
+            if (!arr)
+                return;
+            
+            std::vector<std::pair<std::string, DialogStateManager>> dialog_configs;
+            for (auto&& node : *arr)
+            {
+                if (!node.is_table())
+                    continue;
+                auto tbl = *node.as_table();
+                DialogStateManager state;
+                state.applyDefaults();
+                if (state.translation_config().custom_prompt[0] == '\0')
+                {
+                    safe_strncpy(state.translation_config().custom_prompt.data(),
+                                i18n::get("dialog.settings.default_prompt"),
+                                state.translation_config().custom_prompt.size());
+                }
+                std::string name;
+                if (StateSerializer::deserialize(tbl, state, name))
+                {
+                    dialog_configs.emplace_back(std::move(name), std::move(state));
+                }
+                else
+                {
+                    utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration,
+                                                        "Skipped invalid dialog window in configuration",
+                                                        "Missing name for dialog entry in config file.");
+                }
+            }
+
+            if (!dialog_configs.empty())
+            {
+                auto windows = windowsByType(UIWindowType::Dialog);
+                int have = static_cast<int>(windows.size());
+                int want = static_cast<int>(dialog_configs.size());
+
+                if (want > have)
+                {
+                    for (int i = 0; i < want - have; ++i)
+                        createDialogWindow();
+                    windows = windowsByType(UIWindowType::Dialog);
+                }
+                else if (want < have)
+                {
+                    for (int i = have - 1; i >= want; --i)
+                    {
+                        removeWindow(windows[i]);
+                    }
+                    windows = windowsByType(UIWindowType::Dialog);
+                }
+
+                int n = std::min(static_cast<int>(windows.size()), want);
+                for (int i = 0; i < n; ++i)
+                {
+                    auto* dw = dynamic_cast<DialogWindow*>(windows[i]);
+                    if (!dw)
+                        continue;
+                    dw->rename(dialog_configs[i].first.c_str());
+
+                    dw->state() = dialog_configs[i].second;
+                    dw->reinitializePlaceholder();
+
+                    dw->state().ui_state().window_size =
+                        ImVec2(dw->state().ui_state().width, dw->state().ui_state().height);
+                    dw->state().ui_state().pending_resize = true;
+                    dw->state().ui_state().pending_reposition = true;
+                    dw->state().ui_state().font = nullptr;
+                    dw->state().ui_state().font_base_size = 0.0f;
+
+                    dw->refreshFontBinding();
+                    dw->initTranslatorIfEnabled();
+
+                    dw->setDefaultInstance(false);
+                    if (global_state_.defaultDialogEnabled() && i == 0)
+                    {
+                        markDialogAsDefault(*dw);
+                    }
+                }
+            }
+        };
+        
+        cb.save = [this]() -> toml::table {
+            toml::table t;
+            auto windows = windowsByType(UIWindowType::Dialog);
+            toml::array arr;
+            for (auto* w : windows)
+            {
+                auto* dw = dynamic_cast<DialogWindow*>(w);
+                if (!dw)
+                    continue;
+                auto tbl = StateSerializer::serialize(dw->displayName(), dw->state());
+                arr.push_back(std::move(tbl));
+            }
+            t.insert("dialogs", std::move(arr));
+            return t;
+        };
+        
+        config_.registerTable("", std::move(cb), {"dialogs"});
+    }
+    
+    // Quest windows handler
+    {
+        TableCallbacks cb;
+        cb.load = [this](const toml::table& section) {
+            auto* arr = section["quests"].as_array();
+            if (!arr)
+                return;
+            
+            std::vector<std::pair<std::string, QuestStateManager>> quest_configs;
+            for (auto&& node : *arr)
+            {
+                if (!node.is_table())
+                    continue;
+                auto tbl = *node.as_table();
+                QuestStateManager state;
+                state.applyDefaults();
+                std::string name;
+                if (StateSerializer::deserialize(tbl, state, name))
+                {
+                    quest_configs.emplace_back(std::move(name), std::move(state));
+                }
+            }
+
+            if (!quest_configs.empty())
+            {
+                auto windows = windowsByType(UIWindowType::Quest);
+                int have = static_cast<int>(windows.size());
+                int want = static_cast<int>(quest_configs.size());
+
+                if (want > have)
+                {
+                    for (int i = 0; i < want - have; ++i)
+                        createQuestWindow();
+                    windows = windowsByType(UIWindowType::Quest);
+                }
+                else if (want < have)
+                {
+                    for (int i = have - 1; i >= want; --i)
+                    {
+                        removeWindow(windows[i]);
+                    }
+                    windows = windowsByType(UIWindowType::Quest);
+                }
+
+                int n = std::min(static_cast<int>(windows.size()), want);
+                for (int i = 0; i < n; ++i)
+                {
+                    auto* qw = dynamic_cast<QuestWindow*>(windows[i]);
+                    if (!qw)
+                        continue;
+                    
+                    if (!quest_configs[i].first.empty())
+                        qw->rename(quest_configs[i].first.c_str());
+
+                    qw->state() = quest_configs[i].second;
+                    qw->state().quest.applyDefaults();
+                    qw->state().translated.applyDefaults();
+                    qw->state().original.applyDefaults();
+                    qw->state().translation_valid = false;
+                    qw->state().translation_failed = false;
+                    qw->state().translation_error.clear();
+                    qw->state().ui_state().window_size =
+                        ImVec2(qw->state().ui_state().width, qw->state().ui_state().height);
+                    qw->state().ui_state().pending_resize = true;
+                    qw->state().ui_state().pending_reposition = true;
+                    qw->state().ui_state().font = nullptr;
+                    qw->state().ui_state().font_base_size = 0.0f;
+                    qw->refreshFontBinding();
+                    qw->initTranslatorIfEnabled();
+
+                    qw->setDefaultInstance(false);
+                    if (global_state_.defaultQuestEnabled() && i == 0)
+                    {
+                        markQuestAsDefault(*qw);
+                    }
+                }
+            }
+        };
+        
+        cb.save = [this]() -> toml::table {
+            toml::table t;
+            auto windows = windowsByType(UIWindowType::Quest);
+            toml::array arr;
+            for (auto* w : windows)
+            {
+                auto* qw = dynamic_cast<QuestWindow*>(w);
+                if (!qw)
+                    continue;
+                arr.push_back(StateSerializer::serialize(qw->displayName(), qw->state()));
+            }
+            if (!arr.empty())
+            {
+                t.insert("quests", std::move(arr));
+            }
+            return t;
+        };
+        
+        config_.registerTable("", std::move(cb), {"quests"});
+    }
+    
+    // Quest helper windows handler
+    {
+        TableCallbacks cb;
+        cb.load = [this](const toml::table& section) {
+            auto* arr = section["quest_helpers"].as_array();
+            if (!arr)
+                return;
+            
+            std::vector<std::pair<std::string, QuestHelperStateManager>> helper_configs;
+            for (auto&& node : *arr)
+            {
+                if (!node.is_table())
+                    continue;
+                auto tbl = *node.as_table();
+                QuestHelperStateManager state;
+                state.applyDefaults();
+                std::string name;
+                if (StateSerializer::deserialize(tbl, state, name))
+                {
+                    helper_configs.emplace_back(std::move(name), std::move(state));
+                }
+            }
+
+            if (!helper_configs.empty())
+            {
+                auto windows = windowsByType(UIWindowType::QuestHelper);
+                int have = static_cast<int>(windows.size());
+                int want = static_cast<int>(helper_configs.size());
+
+                if (want > have)
+                {
+                    for (int i = 0; i < want - have; ++i)
+                        createQuestHelperWindow();
+                    windows = windowsByType(UIWindowType::QuestHelper);
+                }
+                else if (want < have)
+                {
+                    for (int i = have - 1; i >= want; --i)
+                    {
+                        removeWindow(windows[i]);
+                    }
+                    windows = windowsByType(UIWindowType::QuestHelper);
+                }
+
+                int n = std::min(static_cast<int>(windows.size()), want);
+                for (int i = 0; i < n; ++i)
+                {
+                    auto* qhw = dynamic_cast<QuestHelperWindow*>(windows[i]);
+                    if (!qhw)
+                        continue;
+                    
+                    if (!helper_configs[i].first.empty())
+                        qhw->rename(helper_configs[i].first.c_str());
+
+                    qhw->state() = helper_configs[i].second;
+                    qhw->state().ui_state().window_size =
+                        ImVec2(qhw->state().ui_state().width, qhw->state().ui_state().height);
+                    qhw->state().ui_state().pending_resize = true;
+                    qhw->state().ui_state().pending_reposition = true;
+                    qhw->state().ui_state().font = nullptr;
+                    qhw->state().ui_state().font_base_size = 0.0f;
+                    qhw->refreshFontBinding();
+
+                    qhw->setDefaultInstance(false);
+                    if (global_state_.defaultQuestHelperEnabled() && i == 0)
+                    {
+                        markQuestHelperAsDefault(*qhw);
+                    }
+                }
+            }
+        };
+        
+        cb.save = [this]() -> toml::table {
+            toml::table t;
+            auto windows = windowsByType(UIWindowType::QuestHelper);
+            toml::array arr;
+            for (auto* w : windows)
+            {
+                auto* qhw = dynamic_cast<QuestHelperWindow*>(w);
+                if (!qhw)
+                    continue;
+                arr.push_back(StateSerializer::serialize(qhw->displayName(), qhw->state()));
+            }
+            if (!arr.empty())
+            {
+                t.insert("quest_helpers", std::move(arr));
+            }
+            return t;
+        };
+        
+        config_.registerTable("", std::move(cb), {"quest_helpers"});
+    }
 }

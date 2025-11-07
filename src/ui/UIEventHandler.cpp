@@ -9,15 +9,17 @@
 #include "Localization.hpp"
 #include "UIHelper.hpp"
 #include "../app/Application.hpp"
+#include "GlobalStateManager.hpp"
 
 #include <string>
 
 namespace ui
 {
 
-UIEventHandler::UIEventHandler(AppContext& app_context, WindowRegistry& registry, ConfigManager& config)
-    : app_context_(app_context)
+UIEventHandler::UIEventHandler(AppContext& context, WindowRegistry& registry, GlobalStateManager& global_state, ConfigManager& config)
+    : context_(context)
     , registry_(registry)
+    , global_state_(global_state)
     , config_(config)
 {
 }
@@ -108,7 +110,7 @@ void UIEventHandler::HandleTransparentAreaClick()
     if (!IsMouseOutsideDialogs())
         return;
 
-    app_context_.triggerVignette(io.MousePos.x, io.MousePos.y);
+    context_.triggerVignette(io.MousePos.x, io.MousePos.y);
 }
 
 void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requested)
@@ -125,7 +127,7 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
 
         if (ImGui::BeginMenu(i18n::get("menu.app_mode")))
         {
-            auto& gs = config_.globalState();
+            auto& gs = global_state_;
             auto mode = gs.appMode();
                 if (ImGui::MenuItem(i18n::get("settings.app_mode.items.normal"), nullptr,
                                 mode == GlobalStateManager::AppMode::Normal))
@@ -139,14 +141,14 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
             std::string defaults_menu_label = ui::LocalizedOrFallback("menu.default_windows", "Default windows");
             if (ImGui::BeginMenu(defaults_menu_label.c_str()))
             {
-            auto& gs = config_.globalState();
+            auto& gs = global_state_;
             bool dialog_enabled = gs.defaultDialogEnabled();
                 std::string dialog_label = ui::LocalizedOrFallback("menu.default_dialog", "Default dialog window");
                 if (ImGui::MenuItem(dialog_label.c_str(), nullptr, dialog_enabled))
                 {
                 gs.setDefaultDialogEnabled(!dialog_enabled);
                 registry_.setDefaultDialogEnabled(!dialog_enabled);
-                config_.saveAll();
+                config_.save();
                 }
 
             bool quest_enabled = gs.defaultQuestEnabled();
@@ -155,7 +157,7 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
                 {
                 gs.setDefaultQuestEnabled(!quest_enabled);
                 registry_.setDefaultQuestEnabled(!quest_enabled);
-                config_.saveAll();
+                config_.save();
                 }
 
             bool quest_helper_enabled = gs.defaultQuestHelperEnabled();
@@ -164,7 +166,7 @@ void UIEventHandler::RenderGlobalContextMenu(bool& show_manager, bool& quit_requ
                 {
                 gs.setDefaultQuestHelperEnabled(!quest_helper_enabled);
                 registry_.setDefaultQuestHelperEnabled(!quest_helper_enabled);
-                config_.saveAll();
+                config_.save();
                 }
 
                 ImGui::EndMenu();

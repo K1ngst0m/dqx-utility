@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config/ConfigManager.hpp"
+#include "GlobalStateManager.hpp"
 
 class AppContext;
 class WindowRegistry;

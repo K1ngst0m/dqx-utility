@@ -3,35 +3,34 @@
 #include <string>
 #include <cstdint>
 #include <memory>
+#include <functional>
+#include <vector>
+#include <map>
 
-#include "../ui/GlobalStateManager.hpp"
+#include <toml++/toml.h>
 
-class WindowRegistry;
+struct TranslationConfig;
 
-// Manages application configuration including UI scale and dialog window settings
-// Automatically loads config.toml at startup and saves on exit
-// Supports hot-reloading of config file changes during runtime
+struct TableCallbacks
+{
+    std::function<void(const toml::table& section)> load;
+    std::function<toml::table()> save;
+};
+
 class ConfigManager
 {
 public:
-    using AppMode = GlobalStateManager::AppMode;
-
     ConfigManager();
     ~ConfigManager();
 
-    void setRegistry(WindowRegistry* registry) { registry_ = registry; }
-
-    GlobalStateManager& globalState() { return global_state_; }
-    const GlobalStateManager& globalState() const { return global_state_; }
+    bool registerTable(const std::string& path, TableCallbacks cb, std::vector<std::string> ownedKeys);
+    bool load();
+    bool reloadIfChanged();
+    bool save();
+    const toml::table& root() const;
     
-    void pollAndApply();
-    bool loadAtStartup();
-
-    bool saveAll();
-
     const char* lastError() const { return last_error_.c_str(); }
-
-    // UI requests from context menus
+    
     void requestShowGlobalSettings() { show_global_settings_requested_ = true; }
     bool isGlobalSettingsRequested() const { return show_global_settings_requested_; }
     void consumeGlobalSettingsRequest() { show_global_settings_requested_ = false; }
@@ -39,24 +38,23 @@ public:
     void requestQuit() { quit_requested_ = true; }
     bool isQuitRequested() const { return quit_requested_; }
     void consumeQuitRequest() { quit_requested_ = false; }
-
-    const TranslationConfig& globalTranslationConfig() const { return global_state_.translationConfig(); }
-    TranslationConfig& globalTranslationConfig() { return global_state_.translationConfig(); }
-
-    std::uint64_t globalTranslationVersion() const { return global_state_.translationVersion(); }
-    void markGlobalTranslationDirty() { global_state_.incrementTranslationVersion(); }
+    
 
 private:
-    bool loadAndApply();
+    toml::table* resolveTablePath(toml::table& root, const std::string& path);
+    const toml::table* resolveTablePath(const toml::table& root, const std::string& path) const;
 
     std::string config_path_;
     std::string last_error_;
     long long last_mtime_ = 0;
     
-    WindowRegistry* registry_ = nullptr;
-    GlobalStateManager global_state_;
-
-    // UI requests
+    struct HandlerEntry {
+        std::string path;
+        TableCallbacks callbacks;
+        std::vector<std::string> ownedKeys;
+    };
+    std::vector<HandlerEntry> handlers_;
+    std::unique_ptr<toml::table> root_;
     bool show_global_settings_requested_ = false;
     bool quit_requested_ = false;
 };

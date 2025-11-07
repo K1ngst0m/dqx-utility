@@ -19,6 +19,7 @@
 #include <functional>
 
 class ConfigManager;
+class GlobalStateManager;
 
 namespace translate
 {
@@ -36,7 +37,7 @@ class ITextNormalizer;
 class DialogWindow : public UIWindow
 {
 public:
-    DialogWindow(FontManager& font_manager, ConfigManager& config, int instance_id, const std::string& name, bool is_default = false);
+    DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, int instance_id, const std::string& name, bool is_default = false);
     ~DialogWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Dialog; }
@@ -103,6 +104,7 @@ private:
     void resetTranslatorState();
 
     FontManager& font_manager_;
+    GlobalStateManager& global_state_;
     ConfigManager& config_;
     DialogStateManager state_{};
     std::string name_;

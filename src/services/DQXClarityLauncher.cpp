@@ -4,6 +4,7 @@
 #include <plog/Log.h>
 
 #include "../config/ConfigManager.hpp"
+#include "../ui/GlobalStateManager.hpp"
 #include "../ui/Localization.hpp"
 #include "../utils/ErrorReporter.hpp"
 #include "../utils/CrashHandler.hpp"
@@ -203,11 +204,11 @@ DQXClarityLauncher::DQXClarityLauncher()
     utils::CrashHandler::RegisterFatalCleanup(CrashCleanupThunk);
 }
 
-void DQXClarityLauncher::lateInitialize(ConfigManager& config)
+void DQXClarityLauncher::lateInitialize(GlobalStateManager& global_state)
 {
     dqxclarity::Config cfg{};
     cfg.enable_post_login_heuristics = true;
-    auto& gs = config.globalState();
+    auto& gs = global_state;
     cfg.verbose = gs.verbose();
     cfg.compatibility_mode = gs.compatibilityMode();
     cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();
@@ -562,7 +563,7 @@ bool DQXClarityLauncher::stop()
     return ok;
 }
 
-bool DQXClarityLauncher::reinitialize(ConfigManager& config)
+bool DQXClarityLauncher::reinitialize(GlobalStateManager& global_state)
 {
     PLOG_INFO << "Reinitialize requested - reconfiguring with new compatibility mode";
 
@@ -592,7 +593,7 @@ bool DQXClarityLauncher::reinitialize(ConfigManager& config)
     // Re-read config and re-initialize engine with new settings
     dqxclarity::Config cfg{};
     cfg.enable_post_login_heuristics = true;
-    auto& gs = config.globalState();
+    auto& gs = global_state;
     cfg.verbose = gs.verbose();
     cfg.compatibility_mode = gs.compatibilityMode();
     cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();

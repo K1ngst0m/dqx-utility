@@ -1,4 +1,5 @@
 #include "AppModeManager.hpp"
+#include "GlobalStateManager.hpp"
 #include "AppContext.hpp"
 #include "WindowRegistry.hpp"
 #include "MiniModeManager.hpp"

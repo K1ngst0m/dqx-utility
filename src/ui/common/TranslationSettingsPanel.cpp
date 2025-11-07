@@ -9,11 +9,13 @@
 #include "../Localization.hpp"
 #include "../UITheme.hpp"
 #include "../../config/ConfigManager.hpp"
+#include "../GlobalStateManager.hpp"
 
-TranslationSettingsPanel::TranslationSettingsPanel(BaseWindowState& state, TranslateSession& session, ConfigManager& config)
+TranslationSettingsPanel::TranslationSettingsPanel(BaseWindowState& state, TranslateSession& session, ConfigManager& config, GlobalStateManager& global_state)
     : state_(state)
     , session_(session)
     , config_(config)
+    , global_state_(global_state)
 {
 }
 
@@ -135,7 +137,7 @@ void TranslationSettingsPanel::render(translate::ITranslator* translator, std::s
 
         if (using_global_config_ && config_dirty_pending_ && !use_global_toggled)
         {
-            config_.markGlobalTranslationDirty();
+            global_state_.incrementTranslationVersion();
             config_dirty_pending_ = false;
         }
     }

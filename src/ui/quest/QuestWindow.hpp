@@ -15,6 +15,7 @@ namespace translate
 class ITranslator;
 }
 class FontManager;
+class GlobalStateManager;
 class ConfigManager;
 class QuestManager;
 class QuestSettingsView;
@@ -23,7 +24,7 @@ class QuestHelperWindow;
 class QuestWindow : public UIWindow
 {
 public:
-    QuestWindow(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager, const std::string& name, bool is_default = false);
+    QuestWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, int instance_id, const std::string& name, bool is_default = false);
     ~QuestWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Quest; }
@@ -91,6 +92,7 @@ private:
     void resetTranslatorState();
 
     FontManager& font_manager_;
+    GlobalStateManager& global_state_;
     ConfigManager& config_;
     QuestManager& quest_manager_;
     QuestStateManager state_{};

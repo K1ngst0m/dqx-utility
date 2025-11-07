@@ -9,6 +9,7 @@
 #include "../FontManager.hpp"
 #include "QuestSettingsView.hpp"
 #include "QuestHelperWindow.hpp"
+#include "../GlobalStateManager.hpp"
 #include "../../services/DQXClarityLauncher.hpp"
 #include "../../services/DQXClarityService.hpp"
 #include "../../quest/QuestManager.hpp"
@@ -490,8 +491,9 @@ bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string
 
 } // namespace
 
-QuestWindow::QuestWindow(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager, const std::string& name, bool is_default)
+QuestWindow::QuestWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
+    , global_state_(global_state)
     , config_(config)
     , quest_manager_(quest_manager)
     , name_(name)
@@ -514,10 +516,10 @@ QuestWindow::QuestWindow(FontManager& font_manager, ConfigManager& config, Quest
     session_.setCapacity(5000);
     session_.enableCache(true);
 
-    settings_view_ = std::make_unique<QuestSettingsView>(state_, font_manager_, session_, config_);
+    settings_view_ = std::make_unique<QuestSettingsView>(state_, font_manager_, session_, config_, global_state_);
 
     std::string drawer_name = name_ + " Helper (Drawer)";
-    drawer_helper_ = std::make_unique<QuestHelperWindow>(font_manager_, config_, quest_manager_, drawer_name);
+    drawer_helper_ = std::make_unique<QuestHelperWindow>(font_manager_, global_state_, config_, quest_manager_, drawer_name);
     drawer_helper_->setDefaultInstance(false);
     drawer_helper_->setDrawerMode(true);
     drawer_helper_->initTranslatorIfEnabled();
@@ -638,7 +640,7 @@ void QuestWindow::render()
     bool using_global = usingGlobalTranslation();
     if (using_global)
     {
-        std::uint64_t version = config_.globalTranslationVersion();
+        std::uint64_t version = global_state_.translationVersion();
         if (version != observed_global_translation_version_)
         {
             observed_global_translation_version_ = version;
@@ -720,7 +722,7 @@ void QuestWindow::render()
         ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
         ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
     }
-    else if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    else if (global_state_.appMode() == GlobalStateManager::AppMode::Mini)
     {
         ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
     }
@@ -734,7 +736,7 @@ void QuestWindow::render()
 
     ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-    if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    if (global_state_.appMode() == GlobalStateManager::AppMode::Mini)
     {
         flags |= ImGuiWindowFlags_NoMove;
     }
@@ -1184,7 +1186,7 @@ void QuestWindow::renderContextMenu()
 
             if (ImGui::BeginMenu(i18n::get("menu.app_mode")))
             {
-                auto& gs = config_.globalState();
+                auto& gs = global_state_;
                 auto mode = gs.appMode();
                 bool sel_normal = (mode == GlobalStateManager::AppMode::Normal);
                 bool sel_borderless = (mode == GlobalStateManager::AppMode::Borderless);
@@ -1628,7 +1630,7 @@ const TranslationConfig& QuestWindow::activeTranslationConfig() const
 {
     if (state_.use_global_translation)
     {
-        return config_.globalTranslationConfig();
+        return global_state_.translationConfig();
     }
     return state_.translation_config();
 }

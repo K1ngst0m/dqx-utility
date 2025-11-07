@@ -223,15 +223,17 @@ void Application::setupManagers()
         PLOG_ERROR << "Failed to initialize QuestManager";
     }
 
+    global_state_ = std::make_unique<GlobalStateManager>();
+    global_state_->applyDefaults();
+    
     config_ = std::make_unique<ConfigManager>();
-    registry_ = std::make_unique<WindowRegistry>(*font_manager_, *config_, *quest_manager_);
-    config_->setRegistry(registry_.get());
+    registry_ = std::make_unique<WindowRegistry>(*font_manager_, *global_state_, *config_, *quest_manager_);
 
-    event_handler_ = std::make_unique<ui::UIEventHandler>(*context_, *registry_, *config_);
+    event_handler_ = std::make_unique<ui::UIEventHandler>(*context_, *registry_, *global_state_, *config_);
     mini_manager_ = std::make_unique<ui::MiniModeManager>(*context_, *registry_);
     mode_manager_ = std::make_unique<ui::AppModeManager>(*context_, *registry_, *mini_manager_);
 
-    settings_panel_ = std::make_unique<GlobalSettingsPanel>(*registry_, *config_, [this]() {
+    settings_panel_ = std::make_unique<GlobalSettingsPanel>(*registry_, *global_state_, *config_, [this]() {
         requestExit();
     });
     error_dialog_ = std::make_unique<ErrorDialog>();
@@ -247,18 +249,64 @@ void Application::initializeConfig()
 {
     PROFILE_SCOPE_FUNCTION();
 
-    if (!config_->loadAtStartup())
+    // Register all config handlers
+    global_state_->registerConfigHandler(*config_);
+    registry_->registerWindowStateHandlers();
+
+    // Load config and dispatch to all registered handlers
+    if (!config_->load())
     {
         utils::ErrorReporter::ReportWarning(utils::ErrorCategory::Configuration, "Failed to load configuration",
                                             config_->lastError());
     }
 
-    if (auto* dqxc = DQXClarityService_Get())
+    // Apply global side-effects after loading
+    auto& gs = *global_state_;
+    
+    // Apply UI scale
+    gs.applyUIScale(gs.uiScale());
+    
+    // Apply profiling level
     {
-        dqxc->lateInitialize(*config_);
+        int level = gs.profilingLevel();
+#if DQX_PROFILING_LEVEL >= 1
+        if (auto* prof_logger = plog::get<profiling::kProfilingLogInstance>())
+        {
+            if (level == 0)
+            {
+                prof_logger->setMaxSeverity(plog::none);
+            }
+            else
+            {
+                prof_logger->setMaxSeverity(plog::debug);
+            }
+        }
+#endif
+    }
+    
+    // Apply logging level
+    {
+        int level = gs.loggingLevel();
+        auto severity = static_cast<plog::Severity>(level);
+        
+        if (auto* logger = plog::get())
+        {
+            logger->setMaxSeverity(severity);
+        }
+        
+        if (auto* diag_logger = plog::get<processing::Diagnostics::kLogInstance>())
+        {
+            diag_logger->setMaxSeverity(severity);
+        }
+
+        processing::Diagnostics::SetVerbose(level >= 5);
     }
 
-    auto& gs = config_->globalState();
+    if (auto* dqxc = DQXClarityService_Get())
+    {
+        dqxc->lateInitialize(*global_state_);
+    }
+
     i18n::init(gs.uiLanguage().c_str());
 
     last_window_topmost_ = gs.windowAlwaysOnTop();
@@ -321,7 +369,7 @@ void Application::mainLoop()
 
 void Application::handleModeChanges()
 {
-    auto& gs = config_->globalState();
+    auto& gs = *global_state_;
     auto current_mode = gs.appMode();
     if (current_mode != mode_manager_->GetCurrentMode())
     {
@@ -379,7 +427,7 @@ void Application::handleQuitRequests()
         UpdaterService_Set(nullptr);
     }
 
-    config_->saveAll();
+    config_->save();
     running_ = false;
 }
 
@@ -390,7 +438,7 @@ void Application::cleanup()
         updater_service_->shutdown();
         UpdaterService_Set(nullptr);
     }
-    config_->saveAll();
+    config_->save();
 }
 
 bool Application::checkSingleInstance()
@@ -446,7 +494,7 @@ void Application::processEvents()
 
 void Application::setupMiniModeDockspace()
 {
-    auto current_mode = config_->globalState().appMode();
+    auto current_mode = global_state_->appMode();
     ImGuiID dockspace_id = 0;
 
     if (current_mode == GlobalStateManager::AppMode::Mini)

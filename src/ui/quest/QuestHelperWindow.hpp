@@ -10,6 +10,7 @@
 #include "../WindowRegistry.hpp"
 
 class FontManager;
+class GlobalStateManager;
 class ConfigManager;
 class QuestManager;
 class QuestHelperSettingsView;
@@ -23,7 +24,7 @@ class QuestHelperWindow : public UIWindow
 {
     friend class QuestWindow;
 public:
-    QuestHelperWindow(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager, const std::string& name);
+    QuestHelperWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, const std::string& name);
     ~QuestHelperWindow() override;
 
     UIWindowType type() const override { return UIWindowType::QuestHelper; }
@@ -112,6 +113,7 @@ private:
     void renderSettingsWindow();
 
     FontManager& font_manager_;
+    GlobalStateManager& global_state_;
     ConfigManager& config_;
     QuestManager& quest_manager_;
     QuestHelperStateManager state_{};

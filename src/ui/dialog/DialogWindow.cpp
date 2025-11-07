@@ -1,6 +1,6 @@
 #include "DialogWindow.hpp"
-
-#include <imgui.h>
+#include "DialogStateManager.hpp"
+#include "../GlobalStateManager.hpp"
 #include <plog/Log.h>
 #include "../../utils/ErrorReporter.hpp"
 #include "../DockState.hpp"
@@ -306,11 +306,12 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
     return static_cast<int>(state_.content_state().segments.size()) - 1;
 }
 
-DialogWindow::DialogWindow(FontManager& font_manager, ConfigManager& config, int instance_id, const std::string& name, bool is_default)
+DialogWindow::DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
+    , global_state_(global_state)
     , config_(config)
     , cached_backend_(translate::Backend::OpenAI)
-    , settings_view_(state_, font_manager_, session_, config)
+    , settings_view_(state_, font_manager_, session_, config, global_state)
 {
 
     name_ = name;
@@ -515,7 +516,7 @@ void DialogWindow::render()
     bool using_global = usingGlobalTranslation();
     if (using_global)
     {
-        std::uint64_t version = config_.globalTranslationVersion();
+        std::uint64_t version = global_state_.translationVersion();
         if (version != observed_global_translation_version_)
         {
             observed_global_translation_version_ = version;
@@ -660,7 +661,7 @@ void DialogWindow::renderDialog()
         ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
         ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
     }
-    else if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    else if (global_state_.appMode() == GlobalStateManager::AppMode::Mini)
     {
         ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
     }
@@ -692,7 +693,7 @@ void DialogWindow::renderDialog()
     ImGuiWindowFlags dialog_flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse;
 
-    if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    if (global_state_.appMode() == GlobalStateManager::AppMode::Mini)
     {
         dialog_flags |= ImGuiWindowFlags_NoMove;
     }
@@ -1046,7 +1047,7 @@ const TranslationConfig& DialogWindow::activeTranslationConfig() const
 {
     if (state_.use_global_translation)
     {
-        return config_.globalTranslationConfig();
+        return global_state_.translationConfig();
     }
     return state_.translation_config();
 }
@@ -1146,7 +1147,7 @@ void DialogWindow::renderDialogContextMenu()
 
             if (ImGui::BeginMenu(i18n::get("menu.app_mode")))
             {
-                auto& gs = config_.globalState();
+                auto& gs = global_state_;
                 auto mode = gs.appMode();
                 bool sel_normal = (mode == GlobalStateManager::AppMode::Normal);
                 bool sel_borderless = (mode == GlobalStateManager::AppMode::Borderless);
@@ -1181,7 +1182,7 @@ void DialogWindow::renderSettingsWindow()
         ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
         ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
     }
-    else if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    else if (global_state_.appMode() == GlobalStateManager::AppMode::Mini)
     {
         ImGuiCond cond = DockState::ShouldReDock() ? ImGuiCond_Always : ImGuiCond_Once;
         ImGui::SetNextWindowDockID(DockState::GetDockspace(), cond);

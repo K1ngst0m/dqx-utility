@@ -1,5 +1,5 @@
 #include "HelpWindow.hpp"
-
+#include "../GlobalStateManager.hpp"
 #include "../FontManager.hpp"
 #include "../UITheme.hpp"
 #include "../UIHelper.hpp"
@@ -50,8 +50,9 @@ std::string trimWhitespace(std::string text)
 
 } // namespace
 
-HelpWindow::HelpWindow(FontManager& font_manager, ConfigManager& config, const std::string& name)
+HelpWindow::HelpWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, const std::string& name)
     : font_manager_(font_manager)
+    , global_state_(global_state)
     , config_(config)
     , name_(name)
 {
@@ -282,7 +283,7 @@ void HelpWindow::render()
         ImGui::SetNextWindowDockID(0, ImGuiCond_Always);
         ImGui::SetNextWindowPos(DockState::NextScatterPos(), ImGuiCond_Always);
     }
-    else if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    else if (global_state_.appMode() == GlobalStateManager::AppMode::Mini)
     {
         ImGui::SetNextWindowDockID(DockState::GetDockspace(), ImGuiCond_Always);
     }
@@ -305,7 +306,7 @@ void HelpWindow::render()
 
     ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-    if (config_.globalState().appMode() == GlobalStateManager::AppMode::Mini)
+    if (global_state_.appMode() == GlobalStateManager::AppMode::Mini)
     {
         flags |= ImGuiWindowFlags_NoMove;
     }

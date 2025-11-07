@@ -1,6 +1,7 @@
 #pragma once
 
 #include "WindowRegistry.hpp"
+#include "GlobalStateManager.hpp"
 #include "DQXClarityLauncher.hpp"
 
 #include <array>
@@ -15,7 +16,7 @@ class GlobalSettingsPanel
 public:
     using ExitCallback = std::function<void()>;
 
-    GlobalSettingsPanel(WindowRegistry& registry, ConfigManager& config, ExitCallback exitCallback = nullptr);
+    GlobalSettingsPanel(WindowRegistry& registry, GlobalStateManager& global_state, ConfigManager& config, ExitCallback exitCallback = nullptr);
 
     void render(bool& open);
 
@@ -33,6 +34,7 @@ private:
     std::string readLogFile(const std::string& path, size_t max_lines = 1000);
 
     WindowRegistry& registry_;
+    GlobalStateManager& global_state_;
     ConfigManager& config_;
     ExitCallback exit_callback_;
     UIWindowType selected_type_ = UIWindowType::Dialog;

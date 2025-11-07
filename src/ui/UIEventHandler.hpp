@@ -4,6 +4,7 @@
 
 class AppContext;
 class WindowRegistry;
+class GlobalStateManager;
 class ConfigManager;
 
 namespace ui
@@ -12,7 +13,7 @@ namespace ui
 class UIEventHandler
 {
 public:
-    UIEventHandler(AppContext& app_context, WindowRegistry& registry, ConfigManager& config);
+    UIEventHandler(AppContext& context, WindowRegistry& registry, GlobalStateManager& global_state, ConfigManager& config);
 
     /// Check if mouse is currently outside all dialog windows
     bool IsMouseOutsideDialogs() const;
@@ -24,8 +25,9 @@ public:
     void RenderGlobalContextMenu(bool& show_manager, bool& quit_requested);
 
 private:
-    AppContext& app_context_;
+    AppContext& context_;
     WindowRegistry& registry_;
+    GlobalStateManager& global_state_;
     ConfigManager& config_;
 };
 

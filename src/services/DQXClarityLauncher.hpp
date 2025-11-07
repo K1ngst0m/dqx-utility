@@ -24,7 +24,7 @@ enum class DQXClarityStatus
 };
 
 // In-process controller for dqxclarity
-class ConfigManager;
+class GlobalStateManager;
 
 class DQXClarityLauncher
 {
@@ -32,9 +32,9 @@ public:
     DQXClarityLauncher();
     ~DQXClarityLauncher();
 
-    void lateInitialize(ConfigManager& config);
+    void lateInitialize(GlobalStateManager& global_state);
 
-    bool reinitialize(ConfigManager& config);
+    bool reinitialize(GlobalStateManager& global_state);
 
     // Start hook
     bool launch();

@@ -1,7 +1,10 @@
 #include "GlobalStateManager.hpp"
+#include "../config/ConfigManager.hpp"
+#include "../config/StateSerializer.hpp"
 
 #include <algorithm>
 #include <imgui.h>
+#include <toml++/toml.h>
 
 GlobalStateManager::GlobalStateManager()
 {
@@ -60,3 +63,15 @@ void GlobalStateManager::incrementTranslationVersion()
     }
 }
 
+void GlobalStateManager::registerConfigHandler(ConfigManager& config)
+{
+    TableCallbacks cb;
+    cb.load = [this](const toml::table& section) {
+        StateSerializer::deserializeGlobal(section, *this);
+    };
+    cb.save = [this]() -> toml::table {
+        return StateSerializer::serializeGlobal(*this);
+    };
+    
+    config.registerTable("", std::move(cb), {"global", "app"});
+}

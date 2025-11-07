@@ -48,6 +48,8 @@ public:
 
     int loggingLevel() const { return logging_level_; }
     void setLoggingLevel(int level) { logging_level_ = level; }
+    
+    void registerConfigHandler(class ConfigManager& config);
 
     bool verbose() const { return verbose_; }
     void setVerbose(bool enabled) { verbose_ = enabled; }

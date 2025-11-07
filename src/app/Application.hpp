@@ -5,6 +5,7 @@
 
 class AppContext;
 class FontManager;
+class GlobalStateManager;
 class WindowRegistry;
 class ConfigManager;
 class GlobalSettingsPanel;
@@ -61,6 +62,7 @@ private:
 
     std::unique_ptr<AppContext> context_;
     std::unique_ptr<FontManager> font_manager_;
+    std::unique_ptr<GlobalStateManager> global_state_;
     std::unique_ptr<WindowRegistry> registry_;
     std::unique_ptr<ConfigManager> config_;
     std::unique_ptr<GlobalSettingsPanel> settings_panel_;

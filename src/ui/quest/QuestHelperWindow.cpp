@@ -6,6 +6,7 @@
 #include <plog/Log.h>
 
 #include "../../config/ConfigManager.hpp"
+#include "../GlobalStateManager.hpp"
 #include "../../dqxclarity/api/quest_message.hpp"
 #include "../../quest/QuestManager.hpp"
 #include "../../services/DQXClarityService.hpp"
@@ -20,8 +21,9 @@
 
 using json = nlohmann::json;
 
-QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, ConfigManager& config, QuestManager& quest_manager, const std::string& name)
+QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, const std::string& name)
     : font_manager_(font_manager)
+    , global_state_(global_state)
     , config_(config)
     , quest_manager_(quest_manager)
     , name_(name)
@@ -48,7 +50,7 @@ QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, ConfigManager& c
     session_.setCapacity(5000);
     session_.enableCache(true);
 
-    settings_view_ = std::make_unique<QuestHelperSettingsView>(state_, font_manager_, session_, config_);
+    settings_view_ = std::make_unique<QuestHelperSettingsView>(state_, font_manager_, session_, config_, global_state_);
 
     font_manager_.registerDialog(state_.ui);
     refreshFontBinding();
@@ -645,7 +647,7 @@ const TranslationConfig& QuestHelperWindow::activeTranslationConfig() const
 {
     if (state_.use_global_translation)
     {
-        return config_.globalTranslationConfig();
+        return global_state_.translationConfig();
     }
     return state_.translation_config();
 }
