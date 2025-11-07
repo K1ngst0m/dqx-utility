@@ -520,8 +520,16 @@ void Application::setupMiniModeDockspace()
 
 void Application::renderWindows()
 {
-    for (auto& window : registry_->windows())
-        window->render();
+    // Snapshot the current window list to avoid iterator/reference invalidation
+    // if windows_ is mutated during a window's render (e.g. click opens new window).
+    std::vector<UIWindow*> snapshot;
+    snapshot.reserve(registry_->windows().size());
+    for (auto& w : registry_->windows())
+        snapshot.push_back(w.get());
+
+    for (auto* w : snapshot)
+        if (w)
+            w->render();
 
     registry_->processRemovals();
 }

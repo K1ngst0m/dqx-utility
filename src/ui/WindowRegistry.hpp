@@ -9,13 +9,15 @@ enum class UIWindowType
     Dialog = 0,
     Quest = 1,
     Help = 2,
-    QuestHelper = 3
+    QuestHelper = 3,
+    Monster = 4
 };
 
 class DialogWindow;
 class QuestWindow;
 class HelpWindow;
 class QuestHelperWindow;
+class MonsterWindow;
 class FontManager;
 class ConfigManager;
 class GlobalStateManager;
@@ -47,6 +49,8 @@ public:
     QuestWindow& createQuestWindow(bool mark_default = false);
     HelpWindow& createHelpWindow();
     QuestHelperWindow& createQuestHelperWindow(bool mark_default = false);
+    MonsterWindow& createMonsterWindow(const std::string& monster_id);
+    MonsterWindow* findMonsterWindow(const std::string& monster_id);
     void removeWindow(UIWindow* window);
     void processRemovals(); // Remove windows marked for removal
 
@@ -76,6 +80,7 @@ private:
     std::string makeQuestName();
     std::string makeHelpName();
     std::string makeQuestHelperName();
+    std::string makeMonsterName();
 
     FontManager& font_manager_;
     GlobalStateManager& global_state_;
@@ -87,6 +92,7 @@ private:
     int quest_counter_ = 0;
     int help_counter_ = 0;
     int quest_helper_counter_ = 0;
+    int monster_counter_ = 0;
     DialogWindow* default_dialog_ = nullptr;
     QuestWindow* default_quest_ = nullptr;
     QuestHelperWindow* default_quest_helper_ = nullptr;

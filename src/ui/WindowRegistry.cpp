@@ -4,6 +4,7 @@
 #include "quest/QuestWindow.hpp"
 #include "quest/QuestHelperWindow.hpp"
 #include "help/HelpWindow.hpp"
+#include "monster/MonsterWindow.hpp"
 #include "UIHelper.hpp"
 #include "FontManager.hpp"
 #include "ui/Localization.hpp"
@@ -26,6 +27,10 @@ WindowRegistry::WindowRegistry(FontManager& font_manager, GlobalStateManager& gl
     , quest_manager_(quest_manager)
     , monster_manager_(monster_manager)
 {
+    // Wire monster link handler to open MonsterWindow
+    ui::SetMonsterLinkHandler([this](const std::string& monster_id) {
+        this->createMonsterWindow(monster_id);
+    });
 }
 
 WindowRegistry::~WindowRegistry() = default;
@@ -70,6 +75,41 @@ QuestHelperWindow& WindowRegistry::createQuestHelperWindow(bool mark_default)
     if (mark_default)
         markQuestHelperAsDefault(ref);
     return ref;
+}
+
+MonsterWindow& WindowRegistry::createMonsterWindow(const std::string& monster_id)
+{
+    // Check if a window for this monster already exists
+    auto* existing = findMonsterWindow(monster_id);
+    if (existing)
+    {
+        // Focus existing window on next render
+        existing->requestFocus();
+        return *existing;
+    }
+
+    // Create new window
+    auto monster_window = std::make_unique<MonsterWindow>(font_manager_, global_state_, config_, monster_manager_, monster_id, makeMonsterName());
+    MonsterWindow& ref = *monster_window;
+    windows_.push_back(std::move(monster_window));
+    ++monster_counter_;
+    return ref;
+}
+
+MonsterWindow* WindowRegistry::findMonsterWindow(const std::string& monster_id)
+{
+    for (auto& window : windows_)
+    {
+        if (window->type() == UIWindowType::Monster)
+        {
+            if (auto* monster_window = dynamic_cast<MonsterWindow*>(window.get()))
+            {
+                if (monster_window->monsterId() == monster_id)
+                    return monster_window;
+            }
+        }
+    }
+    return nullptr;
 }
 
 // Removes a window from the registry.
@@ -264,6 +304,15 @@ std::string WindowRegistry::makeQuestHelperName()
         return ui::LocalizedOrFallback("window.quest_helper.default_name", "Quest Helper");
     }
     return ui::LocalizedOrFallback("window.quest_helper.default_name", "Quest Helper") + " " + std::to_string(quest_helper_counter_ + 1);
+}
+
+std::string WindowRegistry::makeMonsterName()
+{
+    if (monster_counter_ == 0)
+    {
+        return ui::LocalizedOrFallback("window.monster.default_name", "Monster Info");
+    }
+    return ui::LocalizedOrFallback("window.monster.default_name", "Monster Info") + " " + std::to_string(monster_counter_ + 1);
 }
 
 void WindowRegistry::setDefaultDialogEnabled(bool enabled)

@@ -7,6 +7,13 @@
 namespace ui
 {
 
+static MonsterLinkHandler g_monster_link_handler = nullptr;
+
+void SetMonsterLinkHandler(MonsterLinkHandler handler)
+{
+    g_monster_link_handler = std::move(handler);
+}
+
 void RenderAnnotatedText(const char* text, const ImVec2& position, ImFont* font, float font_size_px, float wrap_width, MonsterManager* monster_mgr)
 {
     if (!text || !text[0])
@@ -79,7 +86,12 @@ void RenderAnnotatedText(const char* text, const ImVec2& position, ImFont* font,
                 
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                 {
-                    if (monster_mgr)
+                    // Use handler if set, otherwise fall back to logging
+                    if (g_monster_link_handler)
+                    {
+                        g_monster_link_handler(span.entity_id);
+                    }
+                    else if (monster_mgr)
                     {
                         auto monster_info = monster_mgr->findMonsterById(span.entity_id);
                         if (monster_info.has_value())
@@ -87,91 +99,6 @@ void RenderAnnotatedText(const char* text, const ImVec2& position, ImFont* font,
                             PLOG_INFO << "=== Monster Info: " << monster_info->name << " ===";
                             PLOG_INFO << "ID: " << monster_info->id;
                             PLOG_INFO << "Category: " << monster_info->category;
-                            
-                            PLOG_INFO << "Stats:";
-                            if (monster_info->stats.hp.has_value())
-                                PLOG_INFO << "  HP: " << monster_info->stats.hp.value();
-                            if (monster_info->stats.mp.has_value())
-                                PLOG_INFO << "  MP: " << monster_info->stats.mp.value();
-                            if (monster_info->stats.attack.has_value())
-                                PLOG_INFO << "  Attack: " << monster_info->stats.attack.value();
-                            if (monster_info->stats.defense.has_value())
-                                PLOG_INFO << "  Defense: " << monster_info->stats.defense.value();
-                            if (monster_info->stats.exp.has_value())
-                                PLOG_INFO << "  EXP: " << monster_info->stats.exp.value();
-                            if (monster_info->stats.gold.has_value())
-                                PLOG_INFO << "  Gold: " << monster_info->stats.gold.value();
-                            if (monster_info->stats.training.has_value())
-                                PLOG_INFO << "  Training: " << monster_info->stats.training.value();
-                            if (monster_info->stats.weak_level.has_value())
-                                PLOG_INFO << "  Weak Level: " << monster_info->stats.weak_level.value();
-                            if (monster_info->stats.crystal_level.has_value() && !monster_info->stats.crystal_level.value().empty())
-                                PLOG_INFO << "  Crystal Level: " << monster_info->stats.crystal_level.value();
-                            
-                            PLOG_INFO << "Resistances:";
-                            if (monster_info->resistances.fire.has_value())
-                                PLOG_INFO << "  Fire: " << monster_info->resistances.fire.value();
-                            if (monster_info->resistances.ice.has_value())
-                                PLOG_INFO << "  Ice: " << monster_info->resistances.ice.value();
-                            if (monster_info->resistances.wind.has_value())
-                                PLOG_INFO << "  Wind: " << monster_info->resistances.wind.value();
-                            if (monster_info->resistances.thunder.has_value())
-                                PLOG_INFO << "  Thunder: " << monster_info->resistances.thunder.value();
-                            if (monster_info->resistances.earth.has_value())
-                                PLOG_INFO << "  Earth: " << monster_info->resistances.earth.value();
-                            if (monster_info->resistances.dark.has_value())
-                                PLOG_INFO << "  Dark: " << monster_info->resistances.dark.value();
-                            if (monster_info->resistances.light.has_value())
-                                PLOG_INFO << "  Light: " << monster_info->resistances.light.value();
-                            
-                            if (!monster_info->locations.empty())
-                            {
-                                PLOG_INFO << "Locations (" << monster_info->locations.size() << "):";
-                                for (const auto& loc : monster_info->locations)
-                                {
-                                    if (loc.notes.has_value() && !loc.notes.value().empty())
-                                        PLOG_INFO << "  - " << loc.area << " (" << loc.notes.value() << ")";
-                                    else
-                                        PLOG_INFO << "  - " << loc.area;
-                                }
-                            }
-                            
-                            if (!monster_info->drops.normal.empty())
-                            {
-                                PLOG_INFO << "Normal Drops:";
-                                for (const auto& drop : monster_info->drops.normal)
-                                    PLOG_INFO << "  - " << drop;
-                            }
-                            
-                            if (!monster_info->drops.rare.empty())
-                            {
-                                PLOG_INFO << "Rare Drops:";
-                                for (const auto& drop : monster_info->drops.rare)
-                                    PLOG_INFO << "  - " << drop;
-                            }
-                            
-                            if (!monster_info->drops.orbs.empty())
-                            {
-                                PLOG_INFO << "Orbs:";
-                                for (const auto& orb : monster_info->drops.orbs)
-                                {
-                                    if (!orb.effect.empty())
-                                        PLOG_INFO << "  - [" << orb.orb_type << "] " << orb.effect;
-                                    else
-                                        PLOG_INFO << "  - [" << orb.orb_type << "]";
-                                }
-                            }
-                            
-                            if (!monster_info->drops.white_treasure.empty())
-                            {
-                                PLOG_INFO << "White Treasure:";
-                                for (const auto& treasure : monster_info->drops.white_treasure)
-                                    PLOG_INFO << "  - " << treasure;
-                            }
-                            
-                            if (!monster_info->source_url.empty())
-                                PLOG_INFO << "Source URL: " << monster_info->source_url;
-                            
                             PLOG_INFO << "==========================================";
                         }
                     }

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <imgui.h>
 #include <string>
 
@@ -107,6 +108,9 @@ class MonsterManager;
 namespace ui
 {
 
+using MonsterLinkHandler = std::function<void(const std::string&)>;
+
+void SetMonsterLinkHandler(MonsterLinkHandler handler);
 void RenderAnnotatedText(const char* text, const ImVec2& position, ImFont* font, float font_size_px, float wrap_width, MonsterManager* monster_mgr = nullptr);
 
 } // namespace ui
