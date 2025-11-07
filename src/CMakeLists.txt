@@ -43,6 +43,8 @@ target_sources(dqxu_core
     ui/AppModeManager.hpp
     ui/DockState.cpp
     ui/DockState.hpp
+    ui/EntityAnnotation.cpp
+    ui/EntityAnnotation.hpp
     ui/ErrorDialog.cpp
     ui/ErrorDialog.hpp
     ui/FontManager.cpp
@@ -57,6 +59,7 @@ target_sources(dqxu_core
     ui/MiniModeManager.hpp
     ui/UIEventHandler.cpp
     ui/UIEventHandler.hpp
+    ui/UIHelper.cpp
     ui/UIHelper.hpp
     ui/UITheme.cpp
     ui/UITheme.hpp
@@ -135,6 +138,8 @@ target_sources(dqxu_core
     processing/UnknownLabelRepository.hpp
     processing/NFKCTextNormalizer.cpp
     processing/NFKCTextNormalizer.hpp
+    processing/TextUtils.cpp
+    processing/TextUtils.hpp
 )
 
 target_sources(dqxu_core

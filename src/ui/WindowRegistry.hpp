@@ -20,6 +20,7 @@ class FontManager;
 class ConfigManager;
 class GlobalStateManager;
 class QuestManager;
+class MonsterManager;
 struct DialogStateManager;
 struct QuestStateManager;
 struct QuestHelperStateManager;
@@ -39,7 +40,7 @@ public:
 class WindowRegistry
 {
 public:
-    WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager);
+    WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, MonsterManager& monster_manager);
     ~WindowRegistry();
 
     DialogWindow& createDialogWindow(bool mark_default = false);
@@ -80,6 +81,7 @@ private:
     GlobalStateManager& global_state_;
     ConfigManager& config_;
     QuestManager& quest_manager_;
+    MonsterManager& monster_manager_;
     std::vector<std::unique_ptr<UIWindow>> windows_;
     int dialog_counter_ = 0;
     int quest_counter_ = 0;

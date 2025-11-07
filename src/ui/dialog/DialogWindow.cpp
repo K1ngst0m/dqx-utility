@@ -26,6 +26,7 @@
 #include "../../dqxclarity/api/corner_text.hpp"
 #include "../../dqxclarity/api/dqxclarity.hpp"
 #include "../Localization.hpp"
+#include "../EntityAnnotation.hpp"
 
 namespace
 {
@@ -306,10 +307,11 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
     return static_cast<int>(state_.content_state().segments.size()) - 1;
 }
 
-DialogWindow::DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, int instance_id, const std::string& name, bool is_default)
+DialogWindow::DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, MonsterManager& monster_manager, int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
     , global_state_(global_state)
     , config_(config)
+    , monster_manager_(monster_manager)
     , cached_backend_(translate::Backend::OpenAI)
     , settings_view_(state_, font_manager_, session_, config, global_state)
 {
@@ -441,6 +443,8 @@ void DialogWindow::applyPending()
             last_applied_seq_ = std::max(last_applied_seq_, m.seq);
             continue;
         }
+        
+        processed_text = ui::entity::annotateMonsters(processed_text, &monster_manager_);
 
         std::string speaker = m.speaker;
         if (speaker.empty() && m.is_corner_text)
@@ -821,7 +825,7 @@ void DialogWindow::renderDialog()
                 ImGui::PushStyleColor(ImGuiCol_Text, err_color);
             }
 
-            renderOutlinedText(txt, pos, ImGui::GetFont(), ImGui::GetFontSize(), wrap_width);
+            ui::RenderAnnotatedText(txt, pos, ImGui::GetFont(), ImGui::GetFontSize(), wrap_width, &monster_manager_);
 
             if (placeholder_failed)
             {

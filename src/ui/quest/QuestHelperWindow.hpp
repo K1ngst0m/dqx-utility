@@ -20,11 +20,13 @@ namespace translate
 class ITranslator;
 }
 
+class MonsterManager;
+
 class QuestHelperWindow : public UIWindow
 {
     friend class QuestWindow;
 public:
-    QuestHelperWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, const std::string& name);
+    QuestHelperWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, MonsterManager& monster_manager, const std::string& name);
     ~QuestHelperWindow() override;
 
     UIWindowType type() const override { return UIWindowType::QuestHelper; }
@@ -116,6 +118,7 @@ private:
     GlobalStateManager& global_state_;
     ConfigManager& config_;
     QuestManager& quest_manager_;
+    MonsterManager& monster_manager_;
     QuestHelperStateManager state_{};
     std::unique_ptr<QuestHelperSettingsView> settings_view_;
 

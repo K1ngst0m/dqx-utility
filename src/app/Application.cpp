@@ -15,6 +15,7 @@
 #include "utils/ErrorReporter.hpp"
 #include "utils/LogManager.hpp"
 #include "services/DQXClarityService.hpp"
+#include "monster/MonsterManager.hpp"
 #include "processing/Diagnostics.hpp"
 #include "utils/Profile.hpp"
 #include "platform/SingleInstanceGuard.hpp"
@@ -222,12 +223,18 @@ void Application::setupManagers()
     {
         PLOG_ERROR << "Failed to initialize QuestManager";
     }
+    
+    monster_manager_ = std::make_unique<MonsterManager>();
+    if (!monster_manager_->initialize("assets/monsters.jsonl"))
+    {
+        PLOG_ERROR << "Failed to initialize MonsterManager";
+    }
 
     global_state_ = std::make_unique<GlobalStateManager>();
     global_state_->applyDefaults();
     
     config_ = std::make_unique<ConfigManager>();
-    registry_ = std::make_unique<WindowRegistry>(*font_manager_, *global_state_, *config_, *quest_manager_);
+    registry_ = std::make_unique<WindowRegistry>(*font_manager_, *global_state_, *config_, *quest_manager_, *monster_manager_);
 
     event_handler_ = std::make_unique<ui::UIEventHandler>(*context_, *registry_, *global_state_, *config_);
     mini_manager_ = std::make_unique<ui::MiniModeManager>(*context_, *registry_);

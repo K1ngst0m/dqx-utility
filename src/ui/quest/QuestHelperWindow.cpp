@@ -18,14 +18,16 @@
 #include "../UITheme.hpp"
 #include "../Localization.hpp"
 #include "../DockState.hpp"
+#include "../EntityAnnotation.hpp"
 
 using json = nlohmann::json;
 
-QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, const std::string& name)
+QuestHelperWindow::QuestHelperWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, MonsterManager& monster_manager, const std::string& name)
     : font_manager_(font_manager)
     , global_state_(global_state)
     , config_(config)
     , quest_manager_(quest_manager)
+    , monster_manager_(monster_manager)
     , name_(name)
 {
     static int quest_helper_counter = 0;
@@ -238,7 +240,7 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
         ImVec2 title_pos = ImGui::GetCursorScreenPos();
         title_pos.x = ImGui::GetWindowPos().x + ImGui::GetCursorPosX() + center_offset;
 
-        ui::RenderOutlinedText(title.c_str(), title_pos, ImGui::GetFont(), title_font_size, wrap_width);
+        ui::RenderAnnotatedText(title.c_str(), title_pos, ImGui::GetFont(), title_font_size, wrap_width, &monster_manager_);
 
         const float title_height = ImGui::GetTextLineHeightWithSpacing() * title_font_scale;
         ImGui::Dummy(ImVec2(0.0f, title_height));
@@ -275,7 +277,7 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
         
         // Draw center text with outline
         ImVec2 text_pos(cursor_pos.x + line_width + 10.0f, cursor_pos.y);
-        ui::RenderOutlinedText(step_index.c_str(), text_pos, ImGui::GetFont(), base_font_size, wrap_width);
+        ui::RenderAnnotatedText(step_index.c_str(), text_pos, ImGui::GetFont(), base_font_size, wrap_width, &monster_manager_);
         
         // Draw right line
         if (line_width > 0)
@@ -312,7 +314,7 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
         }
 
         ImVec2 step_pos = ImGui::GetCursorScreenPos();
-        ui::RenderOutlinedText(step_text.c_str(), step_pos, ImGui::GetFont(), base_font_size, wrap_width);
+        ui::RenderAnnotatedText(step_text.c_str(), step_pos, ImGui::GetFont(), base_font_size, wrap_width, &monster_manager_);
         ImVec2 step_size = ImGui::CalcTextSize(step_text.c_str(), nullptr, false, wrap_width);
         ImGui::Dummy(ImVec2(0.0f, step_size.y));
 
@@ -348,7 +350,7 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
             komento_text = "   " + komento_text;
             ImVec2 komento_pos = ImGui::GetCursorScreenPos();
             ImGui::PushStyleColor(ImGuiCol_Text, komento_color);
-            ui::RenderOutlinedText(komento_text.c_str(), komento_pos, ImGui::GetFont(), base_font_size, wrap_width);
+            ui::RenderAnnotatedText(komento_text.c_str(), komento_pos, ImGui::GetFont(), base_font_size, wrap_width, &monster_manager_);
             ImGui::PopStyleColor();
             ImVec2 komento_size = ImGui::CalcTextSize(komento_text.c_str(), nullptr, false, wrap_width);
             ImGui::Dummy(ImVec2(0.0f, komento_size.y));
@@ -426,7 +428,8 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
                             continue;
                         }
                         
-                        auto submit = session_.submit(steps_[i].komento[k], config.translation_backend, 
+                        std::string annotated_komento = ui::entity::annotateMonsters(steps_[i].komento[k], &monster_manager_);
+                        auto submit = session_.submit(annotated_komento, config.translation_backend, 
                                                      config.target_lang_enum, translator_.get());
                         
                         if (submit.kind == TranslateSession::SubmitKind::Cached)
@@ -818,7 +821,8 @@ void QuestHelperWindow::submitTranslationRequest()
                 continue;
             }
 
-            auto submit = session_.submit(steps_[i].komento[k], config.translation_backend, config.target_lang_enum, translator_.get());
+            std::string annotated_komento = ui::entity::annotateMonsters(steps_[i].komento[k], &monster_manager_);
+            auto submit = session_.submit(annotated_komento, config.translation_backend, config.target_lang_enum, translator_.get());
 
             if (submit.kind == TranslateSession::SubmitKind::Cached)
             {
@@ -849,7 +853,8 @@ void QuestHelperWindow::submitStepTranslation(std::size_t step_index, const std:
         return;
     }
 
-    auto submit = session_.submit(text, config.translation_backend, config.target_lang_enum, translator_.get());
+    std::string annotated_text = ui::entity::annotateMonsters(text, &monster_manager_);
+    auto submit = session_.submit(annotated_text, config.translation_backend, config.target_lang_enum, translator_.get());
 
     if (submit.kind == TranslateSession::SubmitKind::Cached)
     {

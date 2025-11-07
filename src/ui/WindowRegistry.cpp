@@ -19,11 +19,12 @@
 #include <algorithm>
 #include <toml++/toml.h>
 
-WindowRegistry::WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager)
+WindowRegistry::WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, MonsterManager& monster_manager)
     : font_manager_(font_manager)
     , global_state_(global_state)
     , config_(config)
     , quest_manager_(quest_manager)
+    , monster_manager_(monster_manager)
 {
 }
 
@@ -31,7 +32,7 @@ WindowRegistry::~WindowRegistry() = default;
 
 DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 {
-    auto dialog = std::make_unique<DialogWindow>(font_manager_, global_state_, config_, dialog_counter_, makeDialogName(), mark_default);
+    auto dialog = std::make_unique<DialogWindow>(font_manager_, global_state_, config_, monster_manager_, dialog_counter_, makeDialogName(), mark_default);
     DialogWindow& ref = *dialog;
     windows_.push_back(std::move(dialog));
     ++dialog_counter_;
@@ -42,7 +43,7 @@ DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 
 QuestWindow& WindowRegistry::createQuestWindow(bool mark_default)
 {
-    auto quest = std::make_unique<QuestWindow>(font_manager_, global_state_, config_, quest_manager_, quest_counter_, makeQuestName(), mark_default);
+    auto quest = std::make_unique<QuestWindow>(font_manager_, global_state_, config_, quest_manager_, monster_manager_, quest_counter_, makeQuestName(), mark_default);
     QuestWindow& ref = *quest;
     windows_.push_back(std::move(quest));
     ++quest_counter_;
@@ -62,7 +63,7 @@ HelpWindow& WindowRegistry::createHelpWindow()
 
 QuestHelperWindow& WindowRegistry::createQuestHelperWindow(bool mark_default)
 {
-    auto quest_helper = std::make_unique<QuestHelperWindow>(font_manager_, global_state_, config_, quest_manager_, makeQuestHelperName());
+    auto quest_helper = std::make_unique<QuestHelperWindow>(font_manager_, global_state_, config_, quest_manager_, monster_manager_, makeQuestHelperName());
     QuestHelperWindow& ref = *quest_helper;
     windows_.push_back(std::move(quest_helper));
     ++quest_helper_counter_;

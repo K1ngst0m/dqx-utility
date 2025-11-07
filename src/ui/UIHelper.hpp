@@ -101,3 +101,12 @@ inline void DrawDefaultSeparator()
 }
 
 } // namespace ui
+
+class MonsterManager;
+
+namespace ui
+{
+
+void RenderAnnotatedText(const char* text, const ImVec2& position, ImFont* font, float font_size_px, float wrap_width, MonsterManager* monster_mgr = nullptr);
+
+} // namespace ui

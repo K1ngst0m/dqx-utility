@@ -20,11 +20,12 @@ class ConfigManager;
 class QuestManager;
 class QuestSettingsView;
 class QuestHelperWindow;
+class MonsterManager;
 
 class QuestWindow : public UIWindow
 {
 public:
-    QuestWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, int instance_id, const std::string& name, bool is_default = false);
+    QuestWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, MonsterManager& monster_manager, int instance_id, const std::string& name, bool is_default = false);
     ~QuestWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Quest; }
@@ -95,6 +96,7 @@ private:
     GlobalStateManager& global_state_;
     ConfigManager& config_;
     QuestManager& quest_manager_;
+    MonsterManager& monster_manager_;
     QuestStateManager state_{};
     std::unique_ptr<QuestSettingsView> settings_view_;
 

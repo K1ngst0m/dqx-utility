@@ -33,6 +33,11 @@ public:
     /// Get total number of loaded monsters
     std::size_t getMonsterCount() const;
 
+    /// Annotate monster names in text with PUA markers for rendering
+    /// Scans text for monster names and wraps them with Unicode PUA markers (U+E100-E102)
+    /// Returns annotated text with embedded monster IDs
+    std::string annotateText(const std::string& text) const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

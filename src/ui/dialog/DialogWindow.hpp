@@ -34,10 +34,12 @@ class TextPipeline;
 class ITextNormalizer;
 }
 
+class MonsterManager;
+
 class DialogWindow : public UIWindow
 {
 public:
-    DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, int instance_id, const std::string& name, bool is_default = false);
+    DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, MonsterManager& monster_manager, int instance_id, const std::string& name, bool is_default = false);
     ~DialogWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Dialog; }
@@ -106,6 +108,7 @@ private:
     FontManager& font_manager_;
     GlobalStateManager& global_state_;
     ConfigManager& config_;
+    MonsterManager& monster_manager_;
     DialogStateManager state_{};
     std::string name_;
     std::string window_label_;

@@ -1,11 +1,11 @@
 #include "MonsterManager.hpp"
+#include "../processing/JapaneseFuzzyMatcher.hpp"
+#include "../processing/NFKCTextNormalizer.hpp"
+#include "../processing/TextUtils.hpp"
 
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <plog/Log.h>
-#include <unordered_map>
-
-#include "processing/JapaneseFuzzyMatcher.hpp"
 
 using json = nlohmann::json;
 
@@ -84,10 +84,12 @@ std::vector<monster::MonsterLocation> parseLocations(const json& locations_json)
     for (const auto& loc : locations_json)
     {
         monster::MonsterLocation location;
-        location.area = loc.value("area", "");
+        location.area = loc.value("name", loc.value("area", ""));
         location.url = loc.value("url", "");
         
-        if (loc.contains("notes") && !loc["notes"].is_null())
+        if (loc.contains("note") && !loc["note"].is_null())
+            location.notes = loc["note"].get<std::string>();
+        else if (loc.contains("notes") && !loc["notes"].is_null())
             location.notes = loc["notes"].get<std::string>();
         
         locations.push_back(location);
@@ -106,7 +108,10 @@ monster::MonsterDrops parseDrops(const json& drops_json)
     {
         for (const auto& item : drops_json["normal"])
         {
-            drops.normal.push_back(item.get<std::string>());
+            if (item.is_string())
+                drops.normal.push_back(item.get<std::string>());
+            else if (item.is_object() && item.contains("name"))
+                drops.normal.push_back(item["name"].get<std::string>());
         }
     }
     
@@ -115,7 +120,10 @@ monster::MonsterDrops parseDrops(const json& drops_json)
     {
         for (const auto& item : drops_json["rare"])
         {
-            drops.rare.push_back(item.get<std::string>());
+            if (item.is_string())
+                drops.rare.push_back(item.get<std::string>());
+            else if (item.is_object() && item.contains("name"))
+                drops.rare.push_back(item["name"].get<std::string>());
         }
     }
     
@@ -136,7 +144,10 @@ monster::MonsterDrops parseDrops(const json& drops_json)
     {
         for (const auto& item : drops_json["white_treasure"])
         {
-            drops.white_treasure.push_back(item.get<std::string>());
+            if (item.is_string())
+                drops.white_treasure.push_back(item.get<std::string>());
+            else if (item.is_object() && item.contains("name"))
+                drops.white_treasure.push_back(item["name"].get<std::string>());
         }
     }
     
@@ -157,7 +168,20 @@ std::optional<monster::MonsterInfo> parseMonsterInfo(const std::string& jsonl_li
         }
         
         monster::MonsterInfo info;
-        info.id = monster_json["id"].get<std::string>();
+        
+        if (monster_json["id"].is_string())
+        {
+            info.id = monster_json["id"].get<std::string>();
+        }
+        else if (monster_json["id"].is_number())
+        {
+            info.id = std::to_string(monster_json["id"].get<int>());
+        }
+        else
+        {
+            return std::nullopt;
+        }
+        
         info.name = monster_json["name"].get<std::string>();
         info.category = monster_json.value("category", "");
         info.source_url = monster_json.value("source_url", "");
@@ -197,6 +221,9 @@ struct MonsterManager::Impl
     // Name-based lookup: monster_name (Japanese) -> MonsterInfo
     std::unordered_map<std::string, monster::MonsterInfo> monsters_by_name_;
 
+    // Normalized (NFKC) name-based lookup
+    std::unordered_map<std::string, monster::MonsterInfo> monsters_by_name_nfkc_;
+
     // ID-based lookup: monster_id -> MonsterInfo
     std::unordered_map<std::string, monster::MonsterInfo> monsters_by_id_;
 
@@ -228,6 +255,8 @@ bool MonsterManager::initialize(const std::string& monsterDataPath)
     std::size_t loaded_count = 0;
     std::size_t error_count = 0;
 
+    processing::NFKCTextNormalizer normalizer;
+
     while (std::getline(file, line))
     {
         ++line_number;
@@ -242,6 +271,9 @@ bool MonsterManager::initialize(const std::string& monsterDataPath)
             // Store in both maps
             impl_->monsters_by_id_[monster_info->id] = *monster_info;
             impl_->monsters_by_name_[monster_info->name] = *monster_info;
+            // Normalized key
+            std::string norm_name = normalizer.normalize(monster_info->name);
+            impl_->monsters_by_name_nfkc_[norm_name] = *monster_info;
             ++loaded_count;
         }
         else
@@ -279,10 +311,12 @@ std::optional<monster::MonsterInfo> MonsterManager::findMonsterById(const std::s
 
 std::optional<monster::MonsterInfo> MonsterManager::findMonsterByName(const std::string& name) const
 {
-    // Exact match only (O(1) hash lookup)
-    auto it = impl_->monsters_by_name_.find(name);
-    if (it != impl_->monsters_by_name_.end())
-        return it->second;
+    // Exact match (normalized)
+    processing::NFKCTextNormalizer normalizer;
+    std::string norm = normalizer.normalize(name);
+    auto itn = impl_->monsters_by_name_nfkc_.find(norm);
+    if (itn != impl_->monsters_by_name_nfkc_.end())
+        return itn->second;
     return std::nullopt;
 }
 
@@ -325,4 +359,83 @@ std::optional<monster::MonsterInfo> MonsterManager::findMonsterByNameFuzzy(const
 std::size_t MonsterManager::getMonsterCount() const
 {
     return impl_->monsters_by_name_.size();
+}
+
+std::string MonsterManager::annotateText(const std::string& text) const
+{
+    if (text.empty())
+        return text;
+    
+    PLOG_DEBUG << "MonsterManager: Annotating text: " << text;
+    
+    processing::NFKCTextNormalizer normalizer;
+    std::u32string u32text = processing::utf8ToUtf32(text);
+    std::u32string result;
+    result.reserve(u32text.size() * 2);
+    
+    int match_count = 0;
+    size_t pos = 0;
+    while (pos < u32text.size())
+    {
+        bool found_match = false;
+        
+        for (size_t len = std::min<size_t>(20, u32text.size() - pos); len >= 3; --len)
+        {
+            std::u32string candidate(u32text.begin() + pos, u32text.begin() + pos + len);
+            std::string candidate_utf8 = processing::utf32ToUtf8(candidate);
+            std::string normalized_candidate = normalizer.normalize(candidate_utf8);
+            
+            auto monster_info = findMonsterByName(normalized_candidate);
+            
+            if (monster_info.has_value())
+            {
+                bool accept = true;
+                if (processing::isPureKatakana(candidate))
+                {
+                    bool left_ok = (pos == 0) || !processing::isKatakanaChar(u32text[pos - 1]);
+                    bool right_ok = (pos + len >= u32text.size()) || !processing::isKatakanaChar(u32text[pos + len]);
+                    accept = left_ok && right_ok;
+                    if (!accept)
+                    {
+                        std::u32string prev_s, next_s;
+                        if (pos > 0) prev_s.push_back(u32text[pos - 1]);
+                        if (pos + len < u32text.size()) next_s.push_back(u32text[pos + len]);
+                        PLOG_DEBUG << "MonsterManager: Skip candidate due to katakana boundary: '" << candidate_utf8
+                                   << "' prev='" << processing::utf32ToUtf8(prev_s) << "' next='" << processing::utf32ToUtf8(next_s) << "'";
+                    }
+                }
+
+                if (!accept)
+                    continue;
+
+                PLOG_DEBUG << "MonsterManager: Matched monster '" << candidate_utf8 
+                          << "' (normalized: '" << normalized_candidate << "') -> ID " << monster_info->id;
+                
+                result.push_back(processing::MARKER_START);
+                std::u32string id_u32 = processing::utf8ToUtf32(monster_info->id);
+                result.append(id_u32);
+                result.push_back(processing::MARKER_SEP);
+                result.append(candidate);
+                result.push_back(processing::MARKER_END);
+                
+                pos += len;
+                found_match = true;
+                match_count++;
+                break;
+            }
+        }
+        
+        if (!found_match)
+        {
+            result.push_back(u32text[pos]);
+            ++pos;
+        }
+    }
+    
+    if (match_count > 0)
+    {
+        PLOG_INFO << "MonsterManager: Annotated " << match_count << " monster(s) in text";
+    }
+    
+    return processing::utf32ToUtf8(result);
 }

@@ -17,6 +17,7 @@
 #include "../../translate/ITranslator.hpp"
 #include "../../translate/TranslateSession.hpp"
 #include "../../dqxclarity/api/quest_message.hpp"
+#include "../EntityAnnotation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -491,11 +492,12 @@ bool translatorConfigIncomplete(const translate::BackendConfig& cfg, std::string
 
 } // namespace
 
-QuestWindow::QuestWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, int instance_id, const std::string& name, bool is_default)
+QuestWindow::QuestWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, MonsterManager& monster_manager, int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
     , global_state_(global_state)
     , config_(config)
     , quest_manager_(quest_manager)
+    , monster_manager_(monster_manager)
     , name_(name)
 {
     static int quest_counter = 0;
@@ -519,7 +521,7 @@ QuestWindow::QuestWindow(FontManager& font_manager, GlobalStateManager& global_s
     settings_view_ = std::make_unique<QuestSettingsView>(state_, font_manager_, session_, config_, global_state_);
 
     std::string drawer_name = name_ + " Helper (Drawer)";
-    drawer_helper_ = std::make_unique<QuestHelperWindow>(font_manager_, global_state_, config_, quest_manager_, drawer_name);
+    drawer_helper_ = std::make_unique<QuestHelperWindow>(font_manager_, global_state_, config_, quest_manager_, monster_manager_, drawer_name);
     drawer_helper_->setDefaultInstance(false);
     drawer_helper_->setDrawerMode(true);
     drawer_helper_->initTranslatorIfEnabled();
@@ -893,7 +895,7 @@ void QuestWindow::renderQuestContent(float wrap_width)
         ImVec2 original_pos = ImGui::GetCursorPos();
         ImGui::SetCursorPosX(start_x);
         ImVec2 sub_pos = ImGui::GetCursorScreenPos();
-        ui::RenderOutlinedText(subquest_text.c_str(), sub_pos, ImGui::GetFont(), ImGui::GetFontSize(), wrap_width);
+        ui::RenderAnnotatedText(subquest_text.c_str(), sub_pos, ImGui::GetFont(), ImGui::GetFontSize(), wrap_width, &monster_manager_);
         ImGui::Dummy(ImVec2(0.0f, sub_size.y));
         ImGui::SetCursorPosX(original_pos.x);
         ImGui::Spacing();
@@ -908,7 +910,7 @@ void QuestWindow::renderQuestContent(float wrap_width)
     float start_x = ImGui::GetCursorPosX() + std::max(0.0f, (wrap_width - title_size.x) * 0.5f);
     ImVec2 title_pos = ImGui::GetCursorScreenPos();
     title_pos.x = ImGui::GetWindowPos().x + start_x;
-    ui::RenderOutlinedText(quest_label.c_str(), title_pos, ImGui::GetFont(), title_font_size, wrap_width);
+    ui::RenderAnnotatedText(quest_label.c_str(), title_pos, ImGui::GetFont(), title_font_size, wrap_width, &monster_manager_);
     const float title_height = ImGui::GetTextLineHeightWithSpacing() * title_font_scale;
     ImGui::Dummy(ImVec2(0.0f, title_height));
 
@@ -929,8 +931,8 @@ void QuestWindow::renderQuestContent(float wrap_width)
     {
         ImVec2 desc_pos = ImGui::GetCursorScreenPos();
         desc_pos.x += description_side_margin;
-        ui::RenderOutlinedText(description_text.c_str(), desc_pos, ImGui::GetFont(), ImGui::GetFontSize(),
-                               description_wrap_width);
+        ui::RenderAnnotatedText(description_text.c_str(), desc_pos, ImGui::GetFont(), ImGui::GetFontSize(),
+                               description_wrap_width, &monster_manager_);
         ImVec2 desc_size = ImGui::CalcTextSize(description_text.c_str(), nullptr, false, description_wrap_width);
         ImGui::Dummy(ImVec2(0.0f, desc_size.y));
     }
@@ -941,8 +943,8 @@ void QuestWindow::renderQuestContent(float wrap_width)
             ui::LocalizedOrFallback("quest.description.empty", "No quest description available");
         ImVec2 desc_pos = ImGui::GetCursorScreenPos();
         desc_pos.x += description_side_margin;
-        ui::RenderOutlinedText(fallback.c_str(), desc_pos, ImGui::GetFont(), ImGui::GetFontSize(),
-                               description_wrap_width);
+        ui::RenderAnnotatedText(fallback.c_str(), desc_pos, ImGui::GetFont(), ImGui::GetFontSize(),
+                               description_wrap_width, &monster_manager_);
         ImVec2 desc_size = ImGui::CalcTextSize(fallback.c_str(), nullptr, false, description_wrap_width);
         ImGui::Dummy(ImVec2(0.0f, desc_size.y));
         ImGui::PopStyleColor();
@@ -1009,16 +1011,16 @@ void QuestWindow::renderRewardsRow(float wrap_width)
         ImGui::TableNextColumn();
         float rewards_header_wrap = std::max(1.0f, ImGui::GetColumnWidth() - style.CellPadding.x * 2.0f);
         ImVec2 rewards_header_pos = ImGui::GetCursorScreenPos();
-        ui::RenderOutlinedText(rewards_label.c_str(), rewards_header_pos, ImGui::GetFont(), ImGui::GetFontSize(),
-                               rewards_header_wrap);
+        ui::RenderAnnotatedText(rewards_label.c_str(), rewards_header_pos, ImGui::GetFont(), ImGui::GetFontSize(),
+                               rewards_header_wrap, &monster_manager_);
         ImVec2 rewards_header_size = ImGui::CalcTextSize(rewards_label.c_str(), nullptr, false, rewards_header_wrap);
         ImGui::Dummy(ImVec2(0.0f, rewards_header_size.y));
 
         ImGui::TableNextColumn();
         float repeat_header_wrap = std::max(1.0f, ImGui::GetColumnWidth() - style.CellPadding.x * 2.0f);
         ImVec2 repeat_header_pos = ImGui::GetCursorScreenPos();
-        ui::RenderOutlinedText(repeat_label.c_str(), repeat_header_pos, ImGui::GetFont(), ImGui::GetFontSize(),
-                               repeat_header_wrap);
+        ui::RenderAnnotatedText(repeat_label.c_str(), repeat_header_pos, ImGui::GetFont(), ImGui::GetFontSize(),
+                               repeat_header_wrap, &monster_manager_);
         ImVec2 repeat_header_size = ImGui::CalcTextSize(repeat_label.c_str(), nullptr, false, repeat_header_wrap);
         ImGui::Dummy(ImVec2(0.0f, repeat_header_size.y));
 
@@ -1027,16 +1029,16 @@ void QuestWindow::renderRewardsRow(float wrap_width)
         divider_y = ImGui::GetCursorScreenPos().y;
         float wrap_limit_left = std::max(1.0f, ImGui::GetColumnWidth() - style.CellPadding.x * 2.0f);
         ImVec2 rewards_pos = ImGui::GetCursorScreenPos();
-        ui::RenderOutlinedText(formatted_rewards.c_str(), rewards_pos, ImGui::GetFont(), ImGui::GetFontSize(),
-                               wrap_limit_left);
+        ui::RenderAnnotatedText(formatted_rewards.c_str(), rewards_pos, ImGui::GetFont(), ImGui::GetFontSize(),
+                               wrap_limit_left, &monster_manager_);
         ImVec2 rewards_size = ImGui::CalcTextSize(formatted_rewards.c_str(), nullptr, false, wrap_limit_left);
         ImGui::Dummy(ImVec2(0.0f, rewards_size.y));
 
         ImGui::TableNextColumn();
         float wrap_limit_right = std::max(1.0f, ImGui::GetColumnWidth() - style.CellPadding.x * 2.0f);
         ImVec2 repeat_pos = ImGui::GetCursorScreenPos();
-        ui::RenderOutlinedText(formatted_repeat.c_str(), repeat_pos, ImGui::GetFont(), ImGui::GetFontSize(),
-                               wrap_limit_right);
+        ui::RenderAnnotatedText(formatted_repeat.c_str(), repeat_pos, ImGui::GetFont(), ImGui::GetFontSize(),
+                               wrap_limit_right, &monster_manager_);
         ImVec2 repeat_size = ImGui::CalcTextSize(formatted_repeat.c_str(), nullptr, false, wrap_limit_right);
         ImGui::Dummy(ImVec2(0.0f, repeat_size.y));
 
@@ -1395,7 +1397,8 @@ void QuestWindow::submitFieldTranslation(QuestField field, const std::string& te
         return;
     }
 
-    auto submit = session_.submit(text, config.translation_backend, config.target_lang_enum, translator_.get());
+    std::string annotated_text = ui::entity::annotateMonsters(text, &monster_manager_);
+    auto submit = session_.submit(annotated_text, config.translation_backend, config.target_lang_enum, translator_.get());
 
     if (submit.kind == TranslateSession::SubmitKind::Cached)
     {
