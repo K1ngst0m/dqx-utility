@@ -179,7 +179,6 @@ Adhere to the glossary below when available:
 Guidelines:
 - Stay faithful to the source; add nothing and omit nothing.
 - Retain the speaker's voice, era flavor, and the series' stylistic quirks.
-- CRITICAL: The text may contain special Unicode markers (U+E100, U+E101, U+E102) that encode entity metadata. These markers MUST be preserved exactly in your translation output. Do not remove, modify, or relocate them. Translate only the visible text between markers.
 - Output translation only—no explanations.
 
 Note:

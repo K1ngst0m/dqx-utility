@@ -284,13 +284,23 @@ Adhere to the glossary below when available:
 Guidelines:
 - Stay faithful to the source; add nothing and omit nothing.
 - Retain the speaker's voice, era flavor, and the series' stylistic quirks.
-- CRITICAL: The text may contain special Unicode markers (U+E100, U+E101, U+E102) that encode entity metadata. These markers MUST be preserved exactly in your translation output. Do not remove, modify, or relocate them. Translate only the visible text between markers.
 - Output translation only—no explanations.
 Source text:
 {source_text})");
+    
+    // Built-in system instruction for PUA marker preservation (hidden from user configuration)
+    const std::string builtin_instruction =
+        "\n\nIMPORTANT SYSTEM REQUIREMENT: The text may contain special Unicode markers "
+        "(U+E100, U+E101, U+E102) that encode entity metadata. These markers MUST be preserved "
+        "exactly in your translation output. Do not remove, modify, or relocate them. "
+        "Translate only the visible text between markers.";
+    
     std::string system_prompt = cfg_.prompt.empty() ? default_template : cfg_.prompt;
     for (const auto& repl : ctx.replacements)
         replaceAll(system_prompt, repl.first, repl.second);
+    
+    // Append built-in instruction to ensure PUA markers are preserved
+    system_prompt += builtin_instruction;
 
     Prompt prompt;
     if (!system_prompt.empty())
