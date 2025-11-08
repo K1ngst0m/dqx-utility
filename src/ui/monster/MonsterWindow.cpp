@@ -2,6 +2,7 @@
 #include "../FontManager.hpp"
 #include "../GlobalStateManager.hpp"
 #include "../UIHelper.hpp"
+#include "../UITheme.hpp"
 #include "MonsterSettingsView.hpp"
 #include "../DockState.hpp"
 #include "../../config/ConfigManager.hpp"
@@ -130,10 +131,6 @@ void MonsterWindow::render()
         return;
     }
 
-    // Title (with translation and tooltip)
-    std::string translated_name = getTranslatedText(monster_info->name);
-    renderTextWithTooltip(translated_name.c_str(), monster_info->name.c_str());
-    
     // Category with glossary translation
     static processing::GlossaryManager glossary_manager;
     static bool glossary_initialized = false;
@@ -154,20 +151,50 @@ void MonsterWindow::render()
     }
     std::optional<std::string> translated_category = glossary_manager.lookup(monster_info->category, target_lang);
     
-    ImGui::TextDisabled("%s: ", i18n::get("monster.ui.category"));
-    ImGui::SameLine(0.0f, 0.0f);
-    if (translated_category.has_value())
+    // Title with category - centered with separator lines
+    std::string translated_name = getTranslatedText(monster_info->name);
+    std::string category_text = translated_category.has_value() ? translated_category.value() : monster_info->category;
+    std::string display_text = translated_name + " (" + category_text + ")";
+    
+    float base_font_size = ImGui::GetFontSize();
+    float title_font_size = base_font_size + 2.0f;
+    float title_font_scale = title_font_size / base_font_size;
+    
+    ImGui::SetWindowFontScale(title_font_scale);
+    ImVec2 name_size = ImGui::CalcTextSize(display_text.c_str());
+    ImGui::SetWindowFontScale(font_scale);
+    
+    float available_width = ImGui::GetContentRegionAvail().x;
+    float line_width = (available_width - name_size.x - 20.0f) * 0.5f;
+    
+    ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    
+    if (line_width > 0)
     {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-        renderTextWithTooltip(translated_category.value().c_str(), monster_info->category.c_str());
-        ImGui::PopStyleColor();
-    }
-    else
-    {
-        ImGui::TextDisabled("%s", monster_info->category.c_str());
+        ImVec2 line_start(cursor_pos.x, cursor_pos.y + name_size.y * 0.5f);
+        ImVec2 line_end(cursor_pos.x + line_width, cursor_pos.y + name_size.y * 0.5f);
+        draw_list->AddLine(line_start, line_end, ImGui::GetColorU32(UITheme::dialogSeparatorColor()), 
+                         UITheme::dialogSeparatorThickness());
     }
     
-    ui::DrawDefaultSeparator();
+    ImVec2 text_pos(cursor_pos.x + line_width + 10.0f, cursor_pos.y);
+    ImGui::SetCursorScreenPos(text_pos);
+    std::string tooltip = monster_info->name + " (" + monster_info->category + ")";
+    ImGui::SetWindowFontScale(title_font_scale);
+    renderTextWithTooltip(display_text.c_str(), tooltip.c_str());
+    ImGui::SetWindowFontScale(font_scale);
+    
+    if (line_width > 0)
+    {
+        ImVec2 line_start(cursor_pos.x + line_width + name_size.x + 20.0f, cursor_pos.y + name_size.y * 0.5f);
+        ImVec2 line_end(cursor_pos.x + available_width, cursor_pos.y + name_size.y * 0.5f);
+        draw_list->AddLine(line_start, line_end, ImGui::GetColorU32(UITheme::dialogSeparatorColor()), 
+                         UITheme::dialogSeparatorThickness());
+    }
+    
+    ImGui::Dummy(ImVec2(available_width, name_size.y));
+    ImGui::Spacing();
 
     if (ImGui::CollapsingHeader((std::string(i18n::get("monster.sections.stats")) + "##" + monster_id_).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
     {
