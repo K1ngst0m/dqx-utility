@@ -82,7 +82,8 @@ void MonsterWindow::render()
     
     bool window_open = true;
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
-    if (!ImGui::Begin(window_label_.c_str(), &window_open, flags))
+    std::string title = "##" + window_label_;
+    if (!ImGui::Begin(title.c_str(), &window_open, flags))
     {
         ImGui::PopStyleColor();
         ImGui::PopStyleVar(4);
@@ -282,7 +283,7 @@ void MonsterWindow::renderContextMenu()
     bool is_docked = state_.ui.is_docked;
     if (ImGui::BeginPopup(popup_id.c_str()))
     {
-        if (ImGui::MenuItem(ui::LocalizedOrFallback("window.context.settings", "Settings...").c_str()))
+        if (ImGui::MenuItem(ui::LocalizedOrFallback("common.settings", "Settings").c_str()))
             show_settings_window_ = !show_settings_window_;
 
         ImGui::Separator();
