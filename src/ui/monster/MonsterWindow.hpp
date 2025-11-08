@@ -6,13 +6,14 @@
 #include <unordered_map>
 #include "../WindowRegistry.hpp"
 #include "MonsterStateManager.hpp"
+#include "MonsterSettingsView.hpp"
 #include "../../translate/TranslateSession.hpp"
 
 class FontManager;
 class GlobalStateManager;
 class ConfigManager;
 class MonsterManager;
-class AppearanceSettingsPanel;
+class MonsterSettingsView;
 
 namespace translate
 {
@@ -77,7 +78,7 @@ private:
     bool show_settings_window_ = false;
     
     MonsterStateManager state_;
-    std::unique_ptr<AppearanceSettingsPanel> appearance_panel_;
+    std::unique_ptr<MonsterSettingsView> settings_view_;
     
     // Translation support
     TranslateSession session_;
@@ -85,5 +86,11 @@ private:
     translate::Backend cached_backend_ = translate::Backend::OpenAI;
     translate::BackendConfig cached_config_{};
     bool translator_initialized_ = false;
+    bool translator_error_reported_ = false;
     std::unordered_map<std::string, std::string> translation_cache_;
+    bool testing_connection_ = false;
+    std::string test_result_;
+    std::string test_timestamp_;
+    std::string apply_hint_;
+    float apply_hint_timer_ = 0.0f;
 };

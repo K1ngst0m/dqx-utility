@@ -315,7 +315,7 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
 
         ImVec2 step_pos = ImGui::GetCursorScreenPos();
         ui::RenderAnnotatedText(step_text.c_str(), step_pos, ImGui::GetFont(), base_font_size, wrap_width, &monster_manager_);
-        ImVec2 step_size = ImGui::CalcTextSize(step_text.c_str(), nullptr, false, wrap_width);
+        ImVec2 step_size = ui::CalcAnnotatedTextSize(step_text.c_str(), ImGui::GetFont(), base_font_size, wrap_width);
         ImGui::Dummy(ImVec2(0.0f, step_size.y));
 
         // Render komento with translations
@@ -352,7 +352,7 @@ void QuestHelperWindow::renderQuestContent(float wrap_width, float font_scale)
             ImGui::PushStyleColor(ImGuiCol_Text, komento_color);
             ui::RenderAnnotatedText(komento_text.c_str(), komento_pos, ImGui::GetFont(), base_font_size, wrap_width, &monster_manager_);
             ImGui::PopStyleColor();
-            ImVec2 komento_size = ImGui::CalcTextSize(komento_text.c_str(), nullptr, false, wrap_width);
+            ImVec2 komento_size = ui::CalcAnnotatedTextSize(komento_text.c_str(), ImGui::GetFont(), base_font_size, wrap_width);
             ImGui::Dummy(ImVec2(0.0f, komento_size.y));
         }
         

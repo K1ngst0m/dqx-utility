@@ -90,6 +90,8 @@ target_sources(dqxu_core
     ui/quest/QuestHelperSettingsView.hpp
     ui/monster/MonsterWindow.cpp
     ui/monster/MonsterWindow.hpp
+    ui/monster/MonsterSettingsView.cpp
+    ui/monster/MonsterSettingsView.hpp
     ui/monster/MonsterStateManager.hpp
 )
 

@@ -2,7 +2,7 @@
 #include "../FontManager.hpp"
 #include "../GlobalStateManager.hpp"
 #include "../UIHelper.hpp"
-#include "../common/AppearanceSettingsPanel.hpp"
+#include "MonsterSettingsView.hpp"
 #include "../DockState.hpp"
 #include "../../config/ConfigManager.hpp"
 #include "../../monster/MonsterManager.hpp"
@@ -30,7 +30,7 @@ MonsterWindow::MonsterWindow(FontManager& font_manager, GlobalStateManager& glob
     settings_window_label_ = name_ + " Settings##" + settings_id_suffix_;
     
     state_.applyDefaults();
-    appearance_panel_ = std::make_unique<AppearanceSettingsPanel>(state_);
+    settings_view_ = std::make_unique<MonsterSettingsView>(state_, font_manager_, session_, config_, global_state_);
     
     // Initialize translation session
     session_.setCapacity(5000);
@@ -42,7 +42,12 @@ MonsterWindow::MonsterWindow(FontManager& font_manager, GlobalStateManager& glob
 
 MonsterWindow::~MonsterWindow()
 {
-    font_manager_.unregisterDialog(state_.ui_state());
+    if (translator_)
+    {
+        translator_->shutdown();
+        translator_.reset();
+    }
+    session_.clear();
 }
 
 void MonsterWindow::rename(const char* new_name)
@@ -137,7 +142,15 @@ void MonsterWindow::render()
         glossary_initialized = true;
     }
     
-    std::string target_lang = "zh-CN";
+    const auto& translation_config = state_.use_global_translation 
+        ? global_state_.translationConfig() 
+        : state_.translation;
+    std::string target_lang;
+    switch (translation_config.target_lang_enum) {
+        case TranslationConfig::TargetLang::ZH_CN: target_lang = "zh-CN"; break;
+        case TranslationConfig::TargetLang::ZH_TW: target_lang = "zh-TW"; break;
+        default: target_lang = "en-US"; break;
+    }
     std::optional<std::string> translated_category = glossary_manager.lookup(monster_info->category, target_lang);
     
     ImGui::TextDisabled("%s: ", i18n::get("monster.ui.category"));
@@ -335,26 +348,21 @@ void MonsterWindow::renderSettingsWindow()
     
     if (ImGui::Begin(settings_window_label_.c_str(), &show_settings_window_))
     {
-        if (ImGui::CollapsingHeader(ui::LocalizedOrFallback("settings.appearance", "Appearance").c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+        settings_view_->render(
+            translator_.get(),
+            apply_hint_,
+            apply_hint_timer_,
+            testing_connection_,
+            test_result_,
+            test_timestamp_,
+            settings_id_suffix_,
+            [this]() { initTranslatorIfEnabled(); },
+            [this]() -> translate::ITranslator* { return translator_.get(); }
+        );
+        
+        if (apply_hint_timer_ > 0.0f)
         {
-            auto changes = appearance_panel_->render();
-            
-            if (changes.width_changed)
-            {
-                state_.ui.window_size.x = state_.ui.width;
-                state_.ui.pending_resize = true;
-            }
-            
-            if (changes.height_changed)
-            {
-                state_.ui.window_size.y = state_.ui.height;
-                state_.ui.pending_resize = true;
-            }
-            
-            if (changes.font_changed)
-            {
-                refreshFontBinding();
-            }
+            apply_hint_timer_ -= ImGui::GetIO().DeltaTime;
         }
     }
     ImGui::End();
@@ -435,7 +443,7 @@ void MonsterWindow::renderResistancesSection(const monster::MonsterResistances& 
 
 void MonsterWindow::renderLocationsSection(const std::vector<monster::MonsterLocation>& locations)
 {
-    // Get shared glossary manager
+    // Use glossary manager for location translation
     static processing::GlossaryManager glossary_manager;
     static bool initialized = false;
     if (!initialized)
@@ -444,8 +452,16 @@ void MonsterWindow::renderLocationsSection(const std::vector<monster::MonsterLoc
         initialized = true;
     }
     
-    // Get target language from config (assume zh-CN for now)
-    std::string target_lang = "zh-CN";
+    // Get target language from translation config
+    const auto& translation_config = state_.use_global_translation 
+        ? global_state_.translationConfig() 
+        : state_.translation;
+    std::string target_lang;
+    switch (translation_config.target_lang_enum) {
+        case TranslationConfig::TargetLang::ZH_CN: target_lang = "zh-CN"; break;
+        case TranslationConfig::TargetLang::ZH_TW: target_lang = "zh-TW"; break;
+        default: target_lang = "en-US"; break;
+    }
     
     for (size_t i = 0; i < locations.size(); ++i)
     {
