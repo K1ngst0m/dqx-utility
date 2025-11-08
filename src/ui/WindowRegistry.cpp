@@ -162,6 +162,7 @@ void WindowRegistry::processRemovals()
     int dialog_count = 0;
     int quest_count = 0;
     int quest_helper_count = 0;
+    int monster_count = 0;
     
     for (const auto& window : windows_)
     {
@@ -176,13 +177,16 @@ void WindowRegistry::processRemovals()
             case UIWindowType::QuestHelper:
                 ++quest_helper_count;
                 break;
+            case UIWindowType::Monster:
+                ++monster_count;
+                break;
             default:
                 break;
         }
     }
 
     windows_.erase(std::remove_if(windows_.begin(), windows_.end(),
-                                  [this, dialog_count, quest_count, quest_helper_count](const std::unique_ptr<UIWindow>& window)
+                                  [this, dialog_count, quest_count, quest_helper_count, monster_count](const std::unique_ptr<UIWindow>& window)
                                   {
                                       if (window->type() == UIWindowType::Dialog)
                                       {
@@ -225,6 +229,16 @@ void WindowRegistry::processRemovals()
                                                       quest_helper->setDefaultInstance(false);
                                                       default_quest_helper_ = nullptr;
                                                   }
+                                                  return true;
+                                              }
+                                          }
+                                      }
+                                      else if (window->type() == UIWindowType::Monster)
+                                      {
+                                          if (auto* monster = dynamic_cast<MonsterWindow*>(window.get()))
+                                          {
+                                              if (monster->shouldBeRemoved())
+                                              {
                                                   return true;
                                               }
                                           }
@@ -308,11 +322,19 @@ std::string WindowRegistry::makeQuestHelperName()
 
 std::string WindowRegistry::makeMonsterName()
 {
-    if (monster_counter_ == 0)
+    // Count existing monster windows
+    int existing_count = 0;
+    for (const auto& window : windows_)
+    {
+        if (window->type() == UIWindowType::Monster)
+            ++existing_count;
+    }
+    
+    if (existing_count == 0)
     {
         return ui::LocalizedOrFallback("window.monster.default_name", "Monster Info");
     }
-    return ui::LocalizedOrFallback("window.monster.default_name", "Monster Info") + " " + std::to_string(monster_counter_ + 1);
+    return ui::LocalizedOrFallback("window.monster.default_name", "Monster Info") + " " + std::to_string(existing_count + 1);
 }
 
 void WindowRegistry::setDefaultDialogEnabled(bool enabled)

@@ -353,6 +353,43 @@ queue_failed = "Unable to queue translation request."
 title = "Quest Guide"
 auto_popup = "Auto-popup on quest update"
 
+[monster]
+not_found = "Monster not found (ID: {id})"
+
+[monster.sections]
+stats = "Stats"
+resistances = "Resistances"
+locations = "Locations"
+drops = "Drops"
+
+[monster.drops]
+normal = "Normal Drop"
+rare = "Rare Drop"
+orbs = "Orbs"
+white_treasure = "White Treasure"
+
+[monster.stats]
+exp = "EXP"
+gold = "Gold"
+training = "Training"
+weak_lv = "Weak Lv"
+hp = "HP"
+mp = "MP"
+attack = "Attack"
+defense = "Defense"
+crystal_lv = "Crystal Lv"
+
+[monster.resistances]
+fire = "Fire"
+ice = "Ice"
+wind = "Wind"
+thunder = "Thunder"
+earth = "Earth"
+dark = "Dark"
+light = "Light"
+
+[monster.ui]
+category = "Category"
 
 [error.category]
 initialization = "Initialization"

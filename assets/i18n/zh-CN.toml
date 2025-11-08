@@ -352,6 +352,43 @@ queue_failed = "无法加入翻译请求队列。"
 title = "任务指南"
 auto_popup = "在任务更新时自动弹出"
 
+[monster]
+not_found = "未找到怪物（ID：{id}）"
+
+[monster.sections]
+stats = "属性"
+resistances = "抗性"
+locations = "出现地点"
+drops = "掉落"
+
+[monster.drops]
+normal = "普通掉落"
+rare = "稀有掉落"
+orbs = "宝珠"
+white_treasure = "白宝箱"
+
+[monster.stats]
+exp = "经验值"
+gold = "金币"
+training = "特训"
+weak_lv = "弱敌等级"
+hp = "HP"
+mp = "MP"
+attack = "攻击"
+defense = "防御"
+crystal_lv = "结晶度"
+
+[monster.resistances]
+fire = "火"
+ice = "冰"
+wind = "风"
+thunder = "雷"
+earth = "土"
+dark = "暗"
+light = "光"
+
+[monster.ui]
+category = "分类"
 
 [error.category]
 initialization = "初始化"

@@ -5,6 +5,7 @@
 #include "quest/QuestWindow.hpp"
 #include "quest/QuestHelperWindow.hpp"
 #include "help/HelpWindow.hpp"
+#include "monster/MonsterWindow.hpp"
 #include "config/ConfigManager.hpp"
 #include "Localization.hpp"
 #include "UIHelper.hpp"
@@ -64,6 +65,14 @@ bool UIEventHandler::IsMouseOutsideDialogs() const
                                                      state.ui_state().window_pos.y + state.ui_state().window_size.y),
                                               false);
         }
+        if (auto* monster = dynamic_cast<MonsterWindow*>(window))
+        {
+            const auto& state = monster->state();
+            return ImGui::IsMouseHoveringRect(state.ui.window_pos,
+                                              ImVec2(state.ui.window_pos.x + state.ui.window_size.x,
+                                                     state.ui.window_pos.y + state.ui.window_size.y),
+                                              false);
+        }
         return false;
     };
 
@@ -90,6 +99,13 @@ bool UIEventHandler::IsMouseOutsideDialogs() const
 
     auto helps = registry_.windowsByType(UIWindowType::Help);
     for (auto* window : helps)
+    {
+        if (is_mouse_over(window))
+            return false;
+    }
+
+    auto monsters = registry_.windowsByType(UIWindowType::Monster);
+    for (auto* window : monsters)
     {
         if (is_mouse_over(window))
             return false;
