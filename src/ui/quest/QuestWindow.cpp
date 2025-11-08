@@ -1751,6 +1751,12 @@ void QuestWindow::renderDrawerHelper()
     ImVec2 quest_size = state_.ui_state().window_size;
     ImVec2 drawer_pos(quest_pos.x, quest_pos.y + quest_size.y);
     
+    bool width_changed = std::abs(drawer_helper_->state().ui.width - quest_size.x) > 1.0f;
+    if (width_changed)
+    {
+        drawer_helper_->state().ui.pending_resize = true;
+    }
+    
     drawer_helper_->state().ui.window_pos = drawer_pos;
     drawer_helper_->state().ui.width = quest_size.x;
     drawer_helper_->state().ui.window_size.x = quest_size.x;
@@ -1769,15 +1775,7 @@ void QuestWindow::renderDrawerHelper()
     drawer_helper_->state().ui.font_base_size = state_.ui_state().font_base_size;
     
     ImGui::SetNextWindowPos(drawer_pos, ImGuiCond_Always);
-    
-    if (drawer_helper_->state().ui.pending_resize)
-    {
-        ImGui::SetNextWindowSize(ImVec2(quest_size.x, drawer_helper_->state().ui.height), ImGuiCond_Always);
-    }
-    else
-    {
-        ImGui::SetNextWindowSize(ImVec2(quest_size.x, drawer_helper_->state().ui.height), ImGuiCond_Once);
-    }
+    ImGui::SetNextWindowSize(ImVec2(quest_size.x, drawer_helper_->state().ui.height), ImGuiCond_Always);
     
     ImGuiWindowFlags drawer_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | 
                                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
@@ -1798,6 +1796,7 @@ void QuestWindow::renderDrawerHelper()
         drawer_helper_->state().ui.window_size = win_size;
         
         if (drawer_helper_->state().ui.pending_resize && 
+            std::abs(win_size.x - quest_size.x) < 2.0f &&
             std::abs(win_size.y - drawer_helper_->state().ui.height) < 2.0f)
         {
             drawer_helper_->state().ui.pending_resize = false;
