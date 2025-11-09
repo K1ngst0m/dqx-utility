@@ -2,9 +2,41 @@
 #include <libmem/libmem.hpp>
 #include <algorithm>
 #include <cctype>
+#include <mutex>
 
 namespace dqxclarity
 {
+
+// Cached current process information (initialized once on first access)
+static struct CurrentProcessCache
+{
+    pid_t pid = 0;
+    std::string exe_path;
+    std::filesystem::path runtime_dir;
+    bool initialized = false;
+} s_current_process_cache;
+
+static std::once_flag s_init_flag;
+
+// Initialize current process cache (called once via std::call_once)
+static void InitializeCurrentProcessCache()
+{
+    auto process = libmem::GetProcess();
+    if (process)
+    {
+        s_current_process_cache.pid = static_cast<pid_t>(process->pid);
+        s_current_process_cache.exe_path = process->path;
+        
+        auto exe_dir = std::filesystem::path(process->path).parent_path();
+        auto runtime_dir = exe_dir / ".dqxu-runtime";
+        
+        std::error_code ec;
+        std::filesystem::create_directories(runtime_dir, ec);
+        
+        s_current_process_cache.runtime_dir = runtime_dir;
+        s_current_process_cache.initialized = true;
+    }
+}
 
 std::string ProcessFinder::ToLower(const std::string& str)
 {
@@ -148,26 +180,14 @@ bool ProcessFinder::IsProcessAlive(pid_t pid)
 
 pid_t ProcessFinder::GetCurrentProcessId()
 {
-    auto process = libmem::GetProcess();
-    if (!process)
-        return 0;
-    
-    return static_cast<pid_t>(process->pid);
+    std::call_once(s_init_flag, InitializeCurrentProcessCache);
+    return s_current_process_cache.pid;
 }
 
 std::filesystem::path ProcessFinder::GetRuntimeDirectory()
 {
-    auto current_process = libmem::GetProcess();
-    if (!current_process)
-        return {};
-    
-    auto exe_dir = std::filesystem::path(current_process->path).parent_path();
-    auto runtime_dir = exe_dir / ".dqxu-runtime";
-    
-    std::error_code ec;
-    std::filesystem::create_directories(runtime_dir, ec);
-    
-    return runtime_dir;
+    std::call_once(s_init_flag, InitializeCurrentProcessCache);
+    return s_current_process_cache.runtime_dir;
 }
 
 bool ProcessFinder::IsWineProcess(pid_t pid)
