@@ -23,7 +23,7 @@ enum class UpdateState
 // Information about an available update
 struct UpdateInfo
 {
-    std::string version; // e.g., "0.2.0"
+    std::string version; // e.g., "0.2.1"
     std::string downloadUrl; // GitHub release asset URL
     std::string changelogUrl; // GitHub release page URL
     size_t packageSize; // Size in bytes

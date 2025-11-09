@@ -17,7 +17,8 @@ enum class ScannerType
     Dialog,
     NoticeScreen,
     PostLogin,
-    PlayerName
+    PlayerName,
+    Quest
 };
 
 /**

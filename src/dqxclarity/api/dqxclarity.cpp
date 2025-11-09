@@ -15,6 +15,7 @@
 #include "../hooking/HookRegistry.hpp"
 #include "../scanning/ScannerManager.hpp"
 #include "../scanning/DialogScanner.hpp"
+#include "../scanning/QuestScanner.hpp"
 #include "../scanning/NoticeScreenScanner.hpp"
 #include "../scanning/PostLoginScanner.hpp"
 #include "../scanning/PlayerNameScanner.hpp"
@@ -45,6 +46,23 @@ struct PendingDialog
 {
     std::string text;
     std::string speaker;
+    std::chrono::steady_clock::time_point capture_time;
+
+    enum Source
+    {
+        Hook,
+        Scanner
+    } source;
+};
+
+struct PendingQuest
+{
+    std::string key;
+    std::string subquest_name;
+    std::string quest_name;
+    std::string description;
+    std::string rewards;
+    std::string repeat_rewards;
     std::chrono::steady_clock::time_point capture_time;
 
     enum Source
@@ -121,6 +139,18 @@ struct Engine::Impl
     std::vector<PublishedDialog> published_cache;
     std::mutex cache_mutex;
     static constexpr std::chrono::milliseconds CACHE_EXPIRY_MS{ 5000 }; // 5 seconds
+
+    // Quest pending queue and cache (hook priority, scanner fallback)
+    std::vector<PendingQuest> pending_quests;
+    std::mutex pending_quest_mutex;
+    struct PublishedQuest
+    {
+        std::string key;
+        std::chrono::steady_clock::time_point publish_time;
+    };
+    std::vector<PublishedQuest> quest_published_cache;
+    std::mutex quest_cache_mutex;
+    static constexpr std::chrono::milliseconds QUEST_CACHE_EXPIRY_MS{ 5000 };
 
     // Diagnostics: latency tracking for both capture methods
     struct CaptureTimings
@@ -341,6 +371,24 @@ bool Engine::start_hook(StartPolicy policy)
         }
         if (impl_->log.info)
             impl_->log.info("Dialog scanner initialized successfully (compatibility mode)");
+
+        // Quest scanner in compatibility mode
+        ScannerCreateInfo quest_info;
+        quest_info.memory = impl_->memory.get();
+        quest_info.logger = impl_->log;
+        quest_info.verbose = impl_->cfg.verbose;
+        quest_info.cached_regions = cached_regions;
+        {
+            auto quest_scanner = std::make_unique<QuestScanner>(quest_info);
+            if (quest_scanner->Initialize())
+            {
+                impl_->scanner_manager->RegisterScanner(ScannerType::Quest, std::move(quest_scanner));
+            }
+            else if (impl_->log.warn)
+            {
+                impl_->log.warn("Failed to initialize Quest scanner in compatibility mode");
+            }
+        }
     }
     // Mode 2: Auto mode (hook + dialog scanner for maximum coverage)
     else
@@ -460,6 +508,23 @@ bool Engine::start_hook(StartPolicy policy)
         if (player_scanner->Initialize())
         {
             impl_->scanner_manager->RegisterScanner(ScannerType::PlayerName, std::move(player_scanner));
+        }
+
+        ScannerCreateInfo quest_info;
+        quest_info.memory = impl_->memory.get();
+        quest_info.logger = impl_->log;
+        quest_info.verbose = impl_->cfg.verbose;
+        quest_info.cached_regions = cached_regions;
+        {
+            auto quest_scanner = std::make_unique<QuestScanner>(quest_info);
+            if (quest_scanner->Initialize())
+            {
+                impl_->scanner_manager->RegisterScanner(ScannerType::Quest, std::move(quest_scanner));
+            }
+            else if (impl_->log.warn)
+            {
+                impl_->log.warn("Failed to initialize Quest scanner; will retry during polling");
+            }
         }
     }
 
@@ -938,23 +1003,43 @@ bool Engine::start_hook(StartPolicy policy)
                             }
                         }
                     }
-                    // Quest hook polling (safe pointer capture to avoid TOCTOU race)
-                    auto quest_hook_ptr = dynamic_cast<QuestHook*>(impl_->hook_manager.GetHook(persistence::HookType::Quest));
-                    if (quest_hook_ptr && quest_hook_ptr->PollQuestData())
                     {
-                        QuestMessage snapshot;
-                        const auto& quest = quest_hook_ptr->GetLastQuest();
-                        snapshot.subquest_name = quest.subquest_name;
-                        snapshot.quest_name = quest.quest_name;
-                        snapshot.description = quest.description;
-                        snapshot.rewards = quest.rewards;
-                        snapshot.repeat_rewards = quest.repeat_rewards;
-                        snapshot.seq = impl_->quest_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
-
+                        auto quest_hook_ptr = dynamic_cast<QuestHook*>(impl_->hook_manager.GetHook(persistence::HookType::Quest));
+                        if (quest_hook_ptr && quest_hook_ptr->PollQuestData())
                         {
-                            std::lock_guard<std::mutex> lock(impl_->quest_mutex);
-                            impl_->quest_snapshot = std::move(snapshot);
-                            impl_->quest_valid = true;
+                            const auto& q = quest_hook_ptr->GetLastQuest();
+                            PendingQuest pq;
+                            pq.key = q.quest_name;
+                            pq.subquest_name = q.subquest_name;
+                            pq.quest_name = q.quest_name;
+                            pq.description = q.description;
+                            pq.rewards = q.rewards;
+                            pq.repeat_rewards = q.repeat_rewards;
+                            pq.capture_time = now;
+                            pq.source = PendingQuest::Hook;
+                            {
+                                std::lock_guard<std::mutex> ql(impl_->pending_quest_mutex);
+                                impl_->pending_quests.push_back(std::move(pq));
+                            }
+                        }
+
+                        auto quest_scanner = dynamic_cast<QuestScanner*>(impl_->scanner_manager->GetScanner(ScannerType::Quest));
+                        if (quest_scanner && quest_scanner->Poll())
+                        {
+                            PendingQuest pq;
+                            pq.key = quest_scanner->GetLastQuestName();
+                            pq.subquest_name = quest_scanner->GetLastSubquestName();
+                            pq.quest_name = quest_scanner->GetLastQuestName();
+                            pq.description = quest_scanner->GetLastDescription();
+                            pq.rewards.clear();
+                            pq.repeat_rewards.clear();
+                            pq.capture_time = now;
+                            pq.source = PendingQuest::Scanner;
+                            if (!pq.key.empty())
+                            {
+                                std::lock_guard<std::mutex> ql(impl_->pending_quest_mutex);
+                                impl_->pending_quests.push_back(std::move(pq));
+                            }
                         }
                     }
                     // Player hook polling (captures player data)
@@ -983,6 +1068,100 @@ bool Engine::start_hook(StartPolicy policy)
                             impl_->corner_text_ring.try_push(std::move(corner_item));
                         }
                     }
+                    {
+                        std::lock_guard<std::mutex> lock(impl_->pending_quest_mutex);
+                        auto hook_wait_ms = std::chrono::milliseconds(impl_->cfg.hook_wait_timeout_ms);
+
+                        std::vector<PendingQuest> hooks;
+                        std::vector<PendingQuest> scanner_results;
+                        for (auto& q : impl_->pending_quests)
+                        {
+                            if (q.source == PendingQuest::Hook)
+                                hooks.push_back(std::move(q));
+                            else
+                                scanner_results.push_back(std::move(q));
+                        }
+                        impl_->pending_quests.clear();
+
+                        std::set<size_t> scanner_indices_to_skip;
+                        std::vector<PendingQuest> ready;
+
+                        for (auto& h : hooks)
+                        {
+                            for (size_t i = 0; i < scanner_results.size(); ++i)
+                            {
+                                if (scanner_results[i].key == h.key)
+                                {
+                                    scanner_indices_to_skip.insert(i);
+                                    break;
+                                }
+                            }
+                            ready.push_back(std::move(h));
+                        }
+
+                        for (size_t i = 0; i < scanner_results.size(); ++i)
+                        {
+                            if (scanner_indices_to_skip.count(i) > 0)
+                                continue;
+                            auto age = now - scanner_results[i].capture_time;
+                            if (age >= hook_wait_ms)
+                                ready.push_back(std::move(scanner_results[i]));
+                            else
+                                impl_->pending_quests.push_back(std::move(scanner_results[i]));
+                        }
+
+                        // Cleanup quest cache
+                        {
+                            std::lock_guard<std::mutex> cache_lock(impl_->quest_cache_mutex);
+                            auto it = impl_->quest_published_cache.begin();
+                            while (it != impl_->quest_published_cache.end())
+                            {
+                                auto cache_age = now - it->publish_time;
+                                if (cache_age > impl_->QUEST_CACHE_EXPIRY_MS)
+                                    it = impl_->quest_published_cache.erase(it);
+                                else
+                                    ++it;
+                            }
+                        }
+
+                        for (auto& q : ready)
+                        {
+                            bool dup = false;
+                            {
+                                std::lock_guard<std::mutex> cache_lock(impl_->quest_cache_mutex);
+                                for (const auto& cached : impl_->quest_published_cache)
+                                {
+                                    if (cached.key == q.key)
+                                    {
+                                        dup = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (dup)
+                                continue;
+
+                            QuestMessage snapshot;
+                            snapshot.subquest_name = q.subquest_name;
+                            snapshot.quest_name = q.quest_name;
+                            snapshot.description = q.description;
+                            snapshot.rewards = q.rewards;
+                            snapshot.repeat_rewards = q.repeat_rewards;
+                            snapshot.seq = impl_->quest_seq.fetch_add(1, std::memory_order_relaxed) + 1ull;
+
+                            {
+                                std::lock_guard<std::mutex> lock2(impl_->quest_mutex);
+                                impl_->quest_snapshot = std::move(snapshot);
+                                impl_->quest_valid = true;
+                            }
+
+                            {
+                                std::lock_guard<std::mutex> cache_lock(impl_->quest_cache_mutex);
+                                impl_->quest_published_cache.push_back({ q.key, now });
+                            }
+                        }
+                    }
+
                     std::this_thread::sleep_for(100ms);
                 }
             }

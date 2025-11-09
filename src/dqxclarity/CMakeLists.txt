@@ -41,6 +41,7 @@ set(DQXCLARITY_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/scanning/ScannerBase.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/scanning/ScannerManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/scanning/DialogScanner.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scanning/QuestScanner.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/scanning/NoticeScreenScanner.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/scanning/PostLoginScanner.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/scanning/PlayerNameScanner.cpp

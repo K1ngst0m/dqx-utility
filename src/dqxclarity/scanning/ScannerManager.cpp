@@ -85,6 +85,8 @@ const char* ScannerManager::GetScannerTypeName(ScannerType type)
             return "PostLogin";
         case ScannerType::PlayerName:
             return "PlayerName";
+        case ScannerType::Quest:
+            return "Quest";
         default:
             return "Unknown";
     }
