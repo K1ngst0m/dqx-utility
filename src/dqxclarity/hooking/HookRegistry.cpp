@@ -84,7 +84,11 @@ std::filesystem::path HookRegistry::GetRegistryPath()
     }
 #endif
 
-    return exe_path.parent_path() / "hook_registry.bin";
+    auto runtime_dir = exe_path.parent_path() / ".dqxu-runtime";
+    std::error_code ec;
+    std::filesystem::create_directories(runtime_dir, ec);
+    
+    return runtime_dir / "hook_registry.bin";
 }
 
 bool HookRegistry::IsProcessAlive(uint32_t pid)

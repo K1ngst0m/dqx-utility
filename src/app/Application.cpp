@@ -24,6 +24,7 @@
 #include "updater/Version.hpp"
 #include "updater/ManifestParser.hpp"
 #include "quest/QuestManager.hpp"
+#include "dqxclarity/hooking/HookGuardian.hpp"
 
 #include <plog/Log.h>
 #include <plog/Init.h>
@@ -138,6 +139,12 @@ bool Application::initialize()
 
     setupManagers();
     initializeConfig();
+
+    // Start guardian process for hook cleanup monitoring
+    if (!dqxclarity::persistence::HookGuardian::StartGuardian())
+    {
+        PLOG_WARNING << "Failed to start hook guardian process";
+    }
 
     last_time_ = SDL_GetTicks();
     return true;
@@ -370,6 +377,9 @@ void Application::mainLoop()
         renderFrame(delta_time);
         handleQuitRequests();
 
+        // Update heartbeat for guardian monitoring
+        dqxclarity::persistence::HookGuardian::UpdateHeartbeat();
+
         PROFILE_FRAME_STATS(frame_stats_);
     }
 }
@@ -434,6 +444,9 @@ void Application::handleQuitRequests()
         UpdaterService_Set(nullptr);
     }
 
+    // Signal guardian to exit gracefully
+    dqxclarity::persistence::HookGuardian::SignalShutdown();
+
     config_->save();
     running_ = false;
 }
@@ -445,6 +458,10 @@ void Application::cleanup()
         updater_service_->shutdown();
         UpdaterService_Set(nullptr);
     }
+    
+    // Ensure guardian is signaled on cleanup
+    dqxclarity::persistence::HookGuardian::SignalShutdown();
+    
     config_->save();
 }
 
