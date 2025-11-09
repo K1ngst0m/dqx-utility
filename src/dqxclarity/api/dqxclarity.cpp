@@ -38,6 +38,13 @@
 #include <map>
 #include <set>
 #include <unordered_map>
+#include <future>
+
+#ifdef _WIN32
+#undef min
+#undef max
+#endif
+#include "../util/BS_thread_pool.hpp"
 
 namespace dqxclarity
 {
@@ -124,6 +131,9 @@ struct Engine::Impl
     std::condition_variable warmup_cv;
     std::mutex warmup_mutex;
     std::jthread delayed_enable_thread;
+    
+    // Thread pool for parallel scanner polling
+    std::unique_ptr<BS::light_thread_pool> scanner_pool;
 
     // Two-phase commit: pending queue for deduplication
     std::vector<PendingDialog> pending_dialogs;
@@ -318,6 +328,9 @@ bool Engine::start_hook(StartPolicy policy)
         if (impl_->log.info)
             impl_->log.info("Attached to DQXGame.exe successfully");
     }
+
+    // Initialize thread pool for parallel scanner polling (4 workers)
+    impl_->scanner_pool = std::make_unique<BS::light_thread_pool>(4);
 
     // Parse memory regions once to avoid repeated parsing (optimization)
     std::vector<MemoryRegion> cached_regions;
@@ -803,51 +816,70 @@ bool Engine::start_hook(StartPolicy policy)
                         }
                     }
 
-                    // Dialog scanner capture (safe pointer capture to avoid TOCTOU race)
-                    auto dialog_scanner = dynamic_cast<DialogScanner*>(impl_->scanner_manager->GetScanner(ScannerType::Dialog));
-                    if (dialog_scanner && dialog_scanner->Poll())
+                    // Parallel scanner polling using thread pool
+                    struct ScannerResult
                     {
-                        std::string text = dialog_scanner->GetLastDialogText();
-                        std::string speaker = dialog_scanner->GetLastNpcName();
-                        if (!text.empty())
+                        bool has_dialog = false;
+                        std::string dialog_text;
+                        std::string dialog_speaker;
+                    };
+
+                    auto dialog_future = impl_->scanner_pool->submit_task([&]() -> ScannerResult {
+                        ScannerResult result;
+                        auto dialog_scanner = dynamic_cast<DialogScanner*>(impl_->scanner_manager->GetScanner(ScannerType::Dialog));
+                        if (dialog_scanner && dialog_scanner->Poll())
                         {
-                            // Add to pending queue
-                            {
-                                std::lock_guard<std::mutex> lock(impl_->pending_mutex);
-                                PendingDialog pending;
-                                pending.text = text;
-                                pending.speaker = speaker;
-                                pending.capture_time = now;
-                                pending.source = PendingDialog::Scanner;
-                                impl_->pending_dialogs.push_back(std::move(pending));
-                            }
-
-                            // Diagnostics: track dialog scanner capture time
-                            {
-                                std::lock_guard<std::mutex> lock(impl_->diagnostics_mutex);
-                                impl_->last_capture_timings.scanner_captured = now;
-                                impl_->last_capture_timings.scanner_valid = true;
-
-                                if (impl_->cfg.verbose && impl_->log.info)
-                                {
-                                    impl_->log.info("Dialog scanner captured dialog");
-                                }
-                            }
+                            result.has_dialog = true;
+                            result.dialog_text = dialog_scanner->GetLastDialogText();
+                            result.dialog_speaker = dialog_scanner->GetLastNpcName();
                         }
-                    }
-                    
-                    // Poll other scanners
-                    {
+                        return result;
+                    });
+
+                    auto notice_future = impl_->scanner_pool->submit_task([&]() {
                         auto notice_scanner = dynamic_cast<NoticeScreenScanner*>(impl_->scanner_manager->GetScanner(ScannerType::NoticeScreen));
                         if (notice_scanner)
                         {
                             notice_scanner->Poll();
                         }
-                        
+                    });
+
+                    auto postlogin_future = impl_->scanner_pool->submit_task([&]() {
                         auto postlogin_scanner = dynamic_cast<PostLoginScanner*>(impl_->scanner_manager->GetScanner(ScannerType::PostLogin));
                         if (postlogin_scanner)
                         {
                             postlogin_scanner->Poll();
+                        }
+                    });
+
+                    ScannerResult dialog_result = dialog_future.get();
+                    notice_future.get();
+                    postlogin_future.get();
+
+                    // Process dialog scanner results if captured
+                    if (dialog_result.has_dialog && !dialog_result.dialog_text.empty())
+                    {
+                        // Add to pending queue
+                        {
+                            std::lock_guard<std::mutex> lock(impl_->pending_mutex);
+                            PendingDialog pending;
+                            pending.text = dialog_result.dialog_text;
+                            pending.speaker = dialog_result.dialog_speaker;
+                            pending.capture_time = now;
+                            pending.source = PendingDialog::Scanner;
+                            impl_->pending_dialogs.push_back(std::move(pending));
+                        }
+
+                        // Diagnostics: track dialog scanner capture time
+                        {
+                            std::lock_guard<std::mutex> lock(impl_->diagnostics_mutex);
+                            impl_->last_capture_timings.scanner_captured = now;
+                            impl_->last_capture_timings.scanner_valid = true;
+
+                            if (impl_->cfg.verbose && impl_->log.info)
+                            {
+                                impl_->log.info("Dialog scanner captured dialog");
+                            }
                         }
                     }
 
@@ -1003,6 +1035,7 @@ bool Engine::start_hook(StartPolicy policy)
                             }
                         }
                     }
+                    // Quest polling (hook + parallel scanner)
                     {
                         auto quest_hook_ptr = dynamic_cast<QuestHook*>(impl_->hook_manager.GetHook(persistence::HookType::Quest));
                         if (quest_hook_ptr && quest_hook_ptr->PollQuestData())
@@ -1023,19 +1056,42 @@ bool Engine::start_hook(StartPolicy policy)
                             }
                         }
 
-                        auto quest_scanner = dynamic_cast<QuestScanner*>(impl_->scanner_manager->GetScanner(ScannerType::Quest));
-                        if (quest_scanner && quest_scanner->Poll())
+                        struct QuestScanResult
+                        {
+                            bool has_quest = false;
+                            std::string key;
+                            std::string subquest_name;
+                            std::string quest_name;
+                            std::string description;
+                        };
+
+                        auto quest_scanner_future = impl_->scanner_pool->submit_task([&]() -> QuestScanResult {
+                            QuestScanResult result;
+                            auto quest_scanner = dynamic_cast<QuestScanner*>(impl_->scanner_manager->GetScanner(ScannerType::Quest));
+                            if (quest_scanner && quest_scanner->Poll())
+                            {
+                                result.has_quest = true;
+                                result.key = quest_scanner->GetLastQuestName();
+                                result.subquest_name = quest_scanner->GetLastSubquestName();
+                                result.quest_name = quest_scanner->GetLastQuestName();
+                                result.description = quest_scanner->GetLastDescription();
+                            }
+                            return result;
+                        });
+
+                        QuestScanResult quest_result = quest_scanner_future.get();
+
+                        if (quest_result.has_quest && !quest_result.key.empty())
                         {
                             PendingQuest pq;
-                            pq.key = quest_scanner->GetLastQuestName();
-                            pq.subquest_name = quest_scanner->GetLastSubquestName();
-                            pq.quest_name = quest_scanner->GetLastQuestName();
-                            pq.description = quest_scanner->GetLastDescription();
+                            pq.key = quest_result.key;
+                            pq.subquest_name = quest_result.subquest_name;
+                            pq.quest_name = quest_result.quest_name;
+                            pq.description = quest_result.description;
                             pq.rewards.clear();
                             pq.repeat_rewards.clear();
                             pq.capture_time = now;
                             pq.source = PendingQuest::Scanner;
-                            if (!pq.key.empty())
                             {
                                 std::lock_guard<std::mutex> ql(impl_->pending_quest_mutex);
                                 impl_->pending_quests.push_back(std::move(pq));
