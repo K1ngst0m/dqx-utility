@@ -1,16 +1,11 @@
 #pragma once
 
+#include "../process/ProcessTypes.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
-
-#ifdef _WIN32
-#include <windows.h>
-using pid_t = DWORD;
-#else
-#include <sys/types.h>
-#endif
 
 namespace dqxclarity
 {

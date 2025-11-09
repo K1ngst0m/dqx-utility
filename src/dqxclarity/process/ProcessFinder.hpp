@@ -1,15 +1,11 @@
 #pragma once
 
+#include "ProcessTypes.hpp"
+
 #include <vector>
 #include <string>
 #include <optional>
-
-#ifdef _WIN32
-#include <windows.h>
-using pid_t = DWORD;
-#else
-#include <sys/types.h>
-#endif
+#include <filesystem>
 
 namespace dqxclarity
 {
@@ -32,6 +28,12 @@ public:
     static std::vector<pid_t> FindByExePath(const std::string& path);
 
     static std::optional<ProcessInfo> GetProcessInfo(pid_t pid);
+    
+    static bool IsProcessAlive(pid_t pid);
+    
+    static pid_t GetCurrentProcessId();
+    
+    static std::filesystem::path GetRuntimeDirectory();
 
     static bool IsWineProcess(pid_t pid);
 

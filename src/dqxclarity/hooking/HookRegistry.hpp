@@ -136,17 +136,6 @@ public:
     static std::filesystem::path GetRegistryPath();
 
     /**
-     * @brief Check if a process is currently running
-     *
-     * Uses libmem APIs to verify if the process with given PID exists and
-     * matches the expected characteristics.
-     *
-     * @param pid Process ID to check
-     * @return true if process is alive, false otherwise
-     */
-    static bool IsProcessAlive(uint32_t pid);
-
-    /**
      * @brief Convert hook type to string for logging
      *
      * @param type Hook type enum value

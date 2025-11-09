@@ -8,10 +8,6 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#else
-#include <unistd.h>
-#include <sys/types.h>
-#include <signal.h>
 #endif
 
 namespace dqxclarity
@@ -24,52 +20,12 @@ static constexpr bool kEnableGuardian = true;
 
 std::string HookGuardian::GetHeartbeatPath()
 {
-    std::filesystem::path exe_path;
-    
-#ifdef _WIN32
-    wchar_t buffer[MAX_PATH];
-    GetModuleFileNameW(NULL, buffer, MAX_PATH);
-    exe_path = buffer;
-#else
-    char buffer[1024];
-    ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
-    if (len != -1)
-    {
-        buffer[len] = '\0';
-        exe_path = buffer;
-    }
-#endif
-    
-    auto runtime_dir = exe_path.parent_path() / ".dqxu-runtime";
-    std::error_code ec;
-    std::filesystem::create_directories(runtime_dir, ec);
-    
-    return (runtime_dir / "guardian_heartbeat.tmp").string();
+    return (ProcessFinder::GetRuntimeDirectory() / "guardian_heartbeat.tmp").string();
 }
 
 std::string HookGuardian::GetShutdownSignalPath()
 {
-    std::filesystem::path exe_path;
-    
-#ifdef _WIN32
-    wchar_t buffer[MAX_PATH];
-    GetModuleFileNameW(NULL, buffer, MAX_PATH);
-    exe_path = buffer;
-#else
-    char buffer[1024];
-    ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
-    if (len != -1)
-    {
-        buffer[len] = '\0';
-        exe_path = buffer;
-    }
-#endif
-    
-    auto runtime_dir = exe_path.parent_path() / ".dqxu-runtime";
-    std::error_code ec;
-    std::filesystem::create_directories(runtime_dir, ec);
-    
-    return (runtime_dir / "guardian_shutdown.tmp").string();
+    return (ProcessFinder::GetRuntimeDirectory() / "guardian_shutdown.tmp").string();
 }
 
 bool HookGuardian::IsDQXGameRunning()
@@ -102,27 +58,10 @@ bool HookGuardian::IsMainProcessAlive()
         return false;
     }
     
-#ifdef _WIN32
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
-    if (!hProcess)
+    if (!ProcessFinder::IsProcessAlive(static_cast<pid_t>(pid)))
     {
         return false;
     }
-    
-    DWORD exitCode = 0;
-    bool alive = GetExitCodeProcess(hProcess, &exitCode) && exitCode == STILL_ACTIVE;
-    CloseHandle(hProcess);
-    
-    if (!alive)
-    {
-        return false;
-    }
-#else
-    if (kill(static_cast<pid_t>(pid), 0) != 0)
-    {
-        return false;
-    }
-#endif
     
     auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
@@ -146,11 +85,7 @@ void HookGuardian::UpdateHeartbeat()
         return;
     }
     
-#ifdef _WIN32
-    uint64_t pid = GetCurrentProcessId();
-#else
-    uint64_t pid = getpid();
-#endif
+    uint64_t pid = static_cast<uint64_t>(ProcessFinder::GetCurrentProcessId());
     
     auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();

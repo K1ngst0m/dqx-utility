@@ -137,6 +137,39 @@ std::optional<ProcessInfo> ProcessFinder::GetProcessInfo(pid_t pid)
     return info;
 }
 
+bool ProcessFinder::IsProcessAlive(pid_t pid)
+{
+    auto process = libmem::GetProcess(static_cast<libmem::Pid>(pid));
+    if (!process)
+        return false;
+
+    return libmem::IsProcessAlive(&*process);
+}
+
+pid_t ProcessFinder::GetCurrentProcessId()
+{
+    auto process = libmem::GetProcess();
+    if (!process)
+        return 0;
+    
+    return static_cast<pid_t>(process->pid);
+}
+
+std::filesystem::path ProcessFinder::GetRuntimeDirectory()
+{
+    auto current_process = libmem::GetProcess();
+    if (!current_process)
+        return {};
+    
+    auto exe_dir = std::filesystem::path(current_process->path).parent_path();
+    auto runtime_dir = exe_dir / ".dqxu-runtime";
+    
+    std::error_code ec;
+    std::filesystem::create_directories(runtime_dir, ec);
+    
+    return runtime_dir;
+}
+
 bool ProcessFinder::IsWineProcess(pid_t pid)
 {
 #ifdef _WIN32

@@ -2,6 +2,7 @@
 #include "../api/dqxclarity.hpp"
 #include "../memory/MemoryFactory.hpp"
 #include "../memory/IProcessMemory.hpp"
+#include "../process/ProcessFinder.hpp"
 
 #include <libmem/libmem.hpp>
 
@@ -68,36 +69,7 @@ bool HookRegistry::CheckAndCleanup()
 
 std::filesystem::path HookRegistry::GetRegistryPath()
 {
-    std::filesystem::path exe_path;
-
-#ifdef _WIN32
-    wchar_t buffer[MAX_PATH];
-    GetModuleFileNameW(NULL, buffer, MAX_PATH);
-    exe_path = buffer;
-#else
-    char buffer[1024];
-    ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
-    if (len != -1)
-    {
-        buffer[len] = '\0';
-        exe_path = buffer;
-    }
-#endif
-
-    auto runtime_dir = exe_path.parent_path() / ".dqxu-runtime";
-    std::error_code ec;
-    std::filesystem::create_directories(runtime_dir, ec);
-    
-    return runtime_dir / "hook_registry.bin";
-}
-
-bool HookRegistry::IsProcessAlive(uint32_t pid)
-{
-    auto process = libmem::GetProcess(static_cast<libmem::Pid>(pid));
-    if (!process)
-        return false;
-
-    return libmem::IsProcessAlive(&*process);
+    return ProcessFinder::GetRuntimeDirectory() / "hook_registry.bin";
 }
 
 const char* HookRegistry::HookTypeToString(HookType type)
@@ -390,7 +362,7 @@ size_t HookRegistry::CleanupOrphanedHooks(const std::vector<HookRecord>& orphans
                            std::to_string(record.hook_address) + ")");
         }
 
-        if (!IsProcessAlive(record.process_id))
+        if (!ProcessFinder::IsProcessAlive(static_cast<pid_t>(record.process_id)))
         {
             if (s_logger_.info)
                 s_logger_.info("Process " + std::to_string(record.process_id) + " not running, marking as cleaned");

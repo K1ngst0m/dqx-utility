@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <dqxclarity/hooking/HookRegistry.hpp>
+#include <dqxclarity/process/ProcessFinder.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -206,7 +207,7 @@ TEST_CASE("HookRegistry - IsProcessAlive", "[hook_registry]")
     SECTION("Non-existent PID returns false")
     {
         // Use an extremely high PID that's unlikely to exist
-        REQUIRE_FALSE(HookRegistry::IsProcessAlive(999999999));
+        REQUIRE_FALSE(dqxclarity::ProcessFinder::IsProcessAlive(999999999));
     }
 
     // Note: We can't reliably test a positive case without knowing a valid PID,
