@@ -23,7 +23,11 @@ void GlobalStateManager::applyDefaults()
     profiling_level_ = 0;
     logging_level_ = 4;
     verbose_ = false;
-    compatibility_mode_ = false;
+#ifdef _WIN32
+    compatibility_mode_ = false;  // Windows: default to auto mode (hooks work reliably)
+#else
+    compatibility_mode_ = true;   // Linux/Wine: default to compatibility mode (memory scanning only)
+#endif
     hook_wait_timeout_ms_ = 200;
 
     default_dialog_enabled_ = true;

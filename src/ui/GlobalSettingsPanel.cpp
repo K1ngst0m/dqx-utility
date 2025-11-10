@@ -4,7 +4,6 @@
 #include "dialog/DialogWindow.hpp"
 #include "quest/QuestWindow.hpp"
 #include "help/HelpWindow.hpp"
-#include "ProcessDetector.hpp"
 #include "ProcessLocaleChecker.hpp"
 #include "DQXClarityLauncher.hpp"
 #include "config/ConfigManager.hpp"
@@ -12,6 +11,7 @@
 #include "DQXClarityService.hpp"
 #include "dqxclarity/api/dqxclarity.hpp"
 #include "dqxclarity/api/player_info.hpp"
+#include "dqxclarity/process/ProcessFinder.hpp"
 #include "ui/Localization.hpp"
 #include "ui/DockState.hpp"
 #include "UIHelper.hpp"
@@ -426,8 +426,14 @@ void GlobalSettingsPanel::renderDQXClaritySection()
     // Compatibility mode checkbox
     bool compat_mode = global_state_.compatibilityMode();
 
+#ifndef _WIN32
+    // On Linux/Wine, compatibility mode is forced (hooks don't work reliably)
+    ImGui::BeginDisabled();
+#endif
+
     if (ImGui::Checkbox(i18n::get("settings.dqxc.compatibility_mode"), &compat_mode))
     {
+#ifdef _WIN32
         global_state_.setCompatibilityMode(compat_mode);
         config_.save();
 
@@ -436,11 +442,20 @@ void GlobalSettingsPanel::renderDQXClaritySection()
         {
             dqxc_launcher_->reinitialize(global_state_);
         }
+#endif
     }
+
+#ifndef _WIN32
+    ImGui::EndDisabled();
+#endif
 
     if (ImGui::IsItemHovered())
     {
+#ifndef _WIN32
+        ImGui::SetTooltip("Compatibility mode is required on Linux/Wine (hooks are not supported)");
+#else
         ImGui::SetTooltip("%s", i18n::get("settings.dqxc.compatibility_mode_tooltip"));
+#endif
     }
 
     dqxclarity::PlayerInfo player_info;
@@ -700,7 +715,7 @@ void GlobalSettingsPanel::renderStatusSection()
 {
     if (ImGui::CollapsingHeader(i18n::get("settings.sections.status"), ImGuiTreeNodeFlags_DefaultOpen))
     {
-        bool dqx_running = ProcessDetector::isProcessRunning("DQXGame.exe");
+        bool dqx_running = dqxclarity::ProcessFinder::IsProcessRunning("DQXGame.exe", false);
         ImVec4 game_status_color = dqx_running ? UITheme::successColor() : UITheme::errorColor();
         const char* game_status_text =
             dqx_running ? i18n::get("settings.status.running") : i18n::get("settings.status.not_running");

@@ -64,61 +64,48 @@ jobs:
             assets/
           retention-days: 7
 
-  # Linux builds temporarily disabled - will be re-enabled in future
-  # build-linux:
-  #   runs-on: ubuntu-22.04
-  #   strategy:
-  #     matrix:
-  #       build_type: [debug, release]
-  #
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Install dependencies
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y \
-  #           clang \
-  #           pkg-config \
-  #           cmake \
-  #           ninja-build \
-  #           libcurl4-openssl-dev \
-  #           libx11-dev \
-  #           libxext-dev \
-  #           libxrandr-dev \
-  #           libxcursor-dev \
-  #           libxfixes-dev \
-  #           libxi-dev \
-  #           libxss-dev \
-  #           libxtst-dev \
-  #           libxkbcommon-dev \
-  #           libdrm-dev \
-  #           libgbm-dev \
-  #           libgl1-mesa-dev \
-  #           libgles2-mesa-dev \
-  #           libegl1-mesa-dev \
-  #           libdbus-1-dev \
-  #           libibus-1.0-dev \
-  #           libudev-dev \
-  #           libwayland-dev \
-  #           libdecor-0-dev
-  #
-  #     - name: Cache CPM dependencies
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: |
-  #           out/linux-clang-${{ matrix.build_type }}/_deps
-  #           out/linux-clang-${{ matrix.build_type }}/cmake/CPM.cmake
-  #         key: deps-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('CMakeLists.txt') }}
-  #         restore-keys: |
-  #           deps-${{ runner.os }}-${{ matrix.build_type }}-
-  #
-  #     - name: Configure
-  #       run: cmake --preset linux-clang-${{ matrix.build_type }}
-  #
-  #     - name: Build
-  #       run: cmake --build --preset linux-clang-${{ matrix.build_type }}
-  #
-  #     - name: Test
-  #       run: ./out/linux-clang-${{ matrix.build_type }}/dqx_utility_tests
+  build-linux:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libssl-dev \
+            zlib1g-dev \
+            libx11-dev \
+            libxext-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev \
+            libegl1-mesa-dev \
+            libdbus-1-dev \
+            libudev-dev
+
+      - name: Cache CPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cpm-cache
+            out/linux-clang-release/_deps
+          key: linux-deps-${{ hashFiles('cmake/Dependencies.cmake', 'CMakeLists.txt') }}
+          restore-keys: |
+            linux-deps-
+
+      - name: Configure
+        run: cmake --preset linux-clang-release
+
+      - name: Build
+        run: cmake --build --preset linux-clang-release -j$(nproc)
+
+      - name: Test
+        working-directory: ${{ github.workspace }}
+        run: ./out/linux-clang-release/Release/tests/dqxu_tests

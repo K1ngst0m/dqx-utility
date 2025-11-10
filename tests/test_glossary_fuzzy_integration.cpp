@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "processing/GlossaryManager.hpp"
+#include <algorithm>
 #include <fstream>
 #include <filesystem>
 

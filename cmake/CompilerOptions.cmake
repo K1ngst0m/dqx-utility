@@ -33,7 +33,10 @@ if(PROFILING_LEVEL GREATER 0)
 endif()
 
 if(WIN32)
-  target_compile_definitions(project_options INTERFACE PLOG_CHAR_IS_UTF8=1)
+  target_compile_definitions(project_options INTERFACE 
+    PLOG_CHAR_IS_UTF8=1
+    NOMINMAX  # Prevent windows.h from defining min/max macros that break std::min/std::max
+  )
 endif()
 
 function(configure_target_properties target)

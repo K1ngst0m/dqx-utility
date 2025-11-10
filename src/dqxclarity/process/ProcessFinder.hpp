@@ -25,6 +25,8 @@ public:
 
     static std::vector<pid_t> FindByName(const std::string& name, bool case_sensitive = false);
 
+    static bool IsProcessRunning(const std::string& name, bool case_sensitive = false);
+
     static std::vector<pid_t> FindByExePath(const std::string& path);
 
     static std::optional<ProcessInfo> GetProcessInfo(pid_t pid);

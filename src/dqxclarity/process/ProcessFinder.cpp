@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <mutex>
+#include <fstream>
 
 namespace dqxclarity
 {
@@ -122,7 +123,50 @@ std::vector<pid_t> ProcessFinder::FindByName(const std::string& name, bool case_
         }
     }
 
+#ifndef _WIN32
+    // Fallback: On Linux/Wine, also check /proc/[pid]/comm which contains truncated process name
+    // This is needed because libmem might return different names for Wine processes
+    if (matching_pids.empty() && !case_sensitive)
+    {
+        std::filesystem::path proc_dir("/proc");
+        if (std::filesystem::exists(proc_dir))
+        {
+            for (const auto& entry : std::filesystem::directory_iterator(proc_dir))
+            {
+                if (!entry.is_directory())
+                    continue;
+
+                std::string dirname = entry.path().filename().string();
+                if (dirname.empty() || !std::all_of(dirname.begin(), dirname.end(), ::isdigit))
+                    continue;
+
+                std::filesystem::path comm_path = entry.path() / "comm";
+                std::ifstream comm_file(comm_path);
+                if (!comm_file.is_open())
+                    continue;
+
+                std::string comm_name;
+                if (std::getline(comm_file, comm_name))
+                {
+                    std::string comm_lower = ToLower(comm_name);
+                    if (comm_lower == search_name)
+                    {
+                        pid_t pid_value = static_cast<pid_t>(std::strtol(dirname.c_str(), nullptr, 10));
+                        matching_pids.push_back(pid_value);
+                    }
+                }
+            }
+        }
+    }
+#endif
+
     return matching_pids;
+}
+
+bool ProcessFinder::IsProcessRunning(const std::string& name, bool case_sensitive)
+{
+    auto pids = FindByName(name, case_sensitive);
+    return !pids.empty();
 }
 
 std::vector<pid_t> ProcessFinder::FindByExePath(const std::string& path)

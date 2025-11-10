@@ -1,5 +1,4 @@
 #include "DQXClarityLauncher.hpp"
-#include "ProcessDetector.hpp"
 
 #include <plog/Log.h>
 
@@ -15,6 +14,7 @@
 #include "dqxclarity/api/corner_text.hpp"
 #include "dqxclarity/api/player_info.hpp"
 #include "dqxclarity/api/quest_message.hpp"
+#include "dqxclarity/process/ProcessFinder.hpp"
 #include "DQXClarityService.hpp"
 
 #include <atomic>
@@ -212,6 +212,21 @@ void DQXClarityLauncher::lateInitialize(GlobalStateManager& global_state)
     cfg.verbose = gs.verbose();
     cfg.compatibility_mode = gs.compatibilityMode();
     cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();
+    
+#ifndef _WIN32
+    // On Linux/Wine, FORCE compatibility mode regardless of config
+    // Wine cannot reliably allocate executable memory for hooks - always use memory scanning
+    if (!cfg.compatibility_mode)
+    {
+        PLOG_WARNING << "Forcing compatibility mode on Linux/Wine (hooks are not supported)";
+        cfg.compatibility_mode = true;
+        gs.setCompatibilityMode(true); // Update global state so UI reflects this
+    }
+    
+    // Disable proactive verification to avoid false positives from memory cache issues
+    cfg.proactive_verify_after_enable_ms = 0;
+#endif
+    
     pimpl_->engine_cfg = cfg;
     dqxclarity::Logger log{};
     log.info = [](const std::string& m)
@@ -527,7 +542,10 @@ bool DQXClarityLauncher::getLatestPlayer(dqxclarity::PlayerInfo& out) const
     return true;
 }
 
-bool DQXClarityLauncher::isDQXGameRunning() const { return ProcessDetector::isProcessRunning("DQXGame.exe"); }
+bool DQXClarityLauncher::isDQXGameRunning() const
+{
+    return dqxclarity::ProcessFinder::IsProcessRunning("DQXGame.exe", false);
+}
 
 bool DQXClarityLauncher::launch()
 {
@@ -597,6 +615,21 @@ bool DQXClarityLauncher::reinitialize(GlobalStateManager& global_state)
     cfg.verbose = gs.verbose();
     cfg.compatibility_mode = gs.compatibilityMode();
     cfg.hook_wait_timeout_ms = gs.hookWaitTimeoutMs();
+    
+#ifndef _WIN32
+    // On Linux/Wine, FORCE compatibility mode regardless of config
+    // Wine cannot reliably allocate executable memory for hooks - always use memory scanning
+    if (!cfg.compatibility_mode)
+    {
+        PLOG_WARNING << "Forcing compatibility mode on Linux/Wine (hooks are not supported)";
+        cfg.compatibility_mode = true;
+        gs.setCompatibilityMode(true); // Update global state so UI reflects this
+    }
+    
+    // Disable proactive verification to avoid false positives from memory cache issues
+    cfg.proactive_verify_after_enable_ms = 0;
+#endif
+    
     pimpl_->engine_cfg = cfg;
     pimpl_->enable_post_login_heuristics = cfg.enable_post_login_heuristics;
 

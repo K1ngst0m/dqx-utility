@@ -36,7 +36,7 @@ void DebugSettingsPanel::render(const std::string& settingsIdSuffix)
     ImGui::Spacing();
 
     ImGui::TextUnformatted(i18n::get("dialog.settings.appended_texts"));
-    if (ImGui::BeginChild("SegmentsChild", ImVec2(0, 220.0f), ImGuiChildFlags_Border))
+    if (ImGui::BeginChild("SegmentsChild", ImVec2(0, 220.0f), ImGuiChildFlags_Borders))
     {
         renderSegmentList();
     }

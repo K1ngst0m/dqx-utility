@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project("DQX Utility" VERSION 0.2.1 LANGUAGES CXX)
+project("DQX Utility" VERSION 0.2.1 LANGUAGES C CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 

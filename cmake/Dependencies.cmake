@@ -72,6 +72,10 @@ else()
       "SDL_STATIC ON"
       "SDL_AUDIO OFF"
   )
+
+  if(SDL3_ADDED)
+    message(STATUS "Building SDL3 from source for Linux: ${SDL3_SOURCE_DIR}")
+  endif()
 endif()
 
 # plog - Logging library
@@ -89,6 +93,18 @@ CPMAddPackage(
   GIT_TAG docking
 )
 
+add_library(imgui STATIC
+  ${imgui_SOURCE_DIR}/imgui.cpp
+  ${imgui_SOURCE_DIR}/imgui_demo.cpp
+  ${imgui_SOURCE_DIR}/imgui_draw.cpp
+  ${imgui_SOURCE_DIR}/imgui_tables.cpp
+  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
+)
+target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+target_link_libraries(imgui PUBLIC SDL3::SDL3)
+
 # CPR - HTTP client library
 CPMAddPackage(
   NAME cpr
@@ -98,7 +114,6 @@ CPMAddPackage(
     "CPR_BUILD_TESTS OFF"
     "CPR_USE_SYSTEM_CURL OFF"
     "CPR_USE_SYSTEM_LIB_PSL ON"
-    "CPR_FORCE_WINSSL_BACKEND ON"
     "CPR_ENABLE_CURL_HTTP_ONLY ON"
     "CURL_USE_LIBPSL OFF"
     "CURL_DISABLE_COOKIES ON"
@@ -161,7 +176,7 @@ CPMAddPackage(
     "CPPTRACE_STATIC_LIB ON"
 )
 
-# libmem - Cross-platform process memory library (MSVC prebuilt binary)
+# libmem - Cross-platform process memory library (prebuilt binaries)
 if(MSVC)
   CPMAddPackage(
     NAME libmem
@@ -170,18 +185,15 @@ if(MSVC)
   )
 
   if(libmem_ADDED)
-    # Create imported static library target
     add_library(libmem STATIC IMPORTED GLOBAL)
     add_library(libmem::libmem ALIAS libmem)
 
-    # Set include directories and define LM_EXPORT to prevent dllimport decoration
     set_target_properties(libmem PROPERTIES
       INTERFACE_INCLUDE_DIRECTORIES "${libmem_SOURCE_DIR}/include"
       INTERFACE_COMPILE_DEFINITIONS "LM_EXPORT"
       INTERFACE_LINK_LIBRARIES "ntdll"
     )
 
-    # Set library locations for multi-config generators (Visual Studio)
     set_target_properties(libmem PROPERTIES
       IMPORTED_LOCATION_DEBUG "${libmem_SOURCE_DIR}/lib/debug/libmem.lib"
       IMPORTED_LOCATION_RELEASE "${libmem_SOURCE_DIR}/lib/release/libmem.lib"
@@ -189,17 +201,37 @@ if(MSVC)
       IMPORTED_LOCATION_MINSIZEREL "${libmem_SOURCE_DIR}/lib/release/libmem.lib"
     )
 
-    # Also set the default configuration
     set_target_properties(libmem PROPERTIES
       IMPORTED_CONFIGURATIONS "RELEASE;DEBUG;RELWITHDEBINFO;MINSIZEREL"
     )
 
     message(STATUS "Using libmem prebuilt static library from: ${libmem_SOURCE_DIR}")
-    message(STATUS "  Debug lib: ${libmem_SOURCE_DIR}/lib/debug/libmem.lib")
-    message(STATUS "  Release lib: ${libmem_SOURCE_DIR}/lib/release/libmem.lib")
+  endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  CPMAddPackage(
+    NAME libmem
+    URL https://github.com/rdbo/libmem/releases/download/5.2.0-pre1/libmem-5.2.0-pre1-x86_64-linux-gnu-static.tar.gz
+    DOWNLOAD_ONLY YES
+  )
+
+  if(libmem_ADDED)
+    add_library(libmem STATIC IMPORTED GLOBAL)
+    add_library(libmem::libmem ALIAS libmem)
+
+    set_target_properties(libmem PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${libmem_SOURCE_DIR}/include"
+      INTERFACE_COMPILE_DEFINITIONS "LM_EXPORT"
+      INTERFACE_LINK_LIBRARIES "dl"
+    )
+
+    set_target_properties(libmem PROPERTIES
+      IMPORTED_LOCATION "${libmem_SOURCE_DIR}/lib/liblibmem.a"
+    )
+
+    message(STATUS "Using libmem prebuilt static library from: ${libmem_SOURCE_DIR}")
   endif()
 else()
-  message(WARNING "libmem prebuilt binary only supports MSVC. MinGW/Linux builds will fail.")
+  message(WARNING "libmem prebuilt binary only supports MSVC and Linux. MinGW builds will fail.")
   set(libmem_ADDED FALSE)
 endif()
 
@@ -249,61 +281,4 @@ if(BUILD_TESTS)
 To fix, ensure network access during configure, enable CPM local cache, or install Catch2 on the system.")
     endif()
   endif()
-endif()
-
-if(NOT SDL3_ADDED)
-  message(FATAL_ERROR "Required dependency SDL3 was not acquired.")
-endif()
-
-if(NOT imgui_ADDED)
-  message(FATAL_ERROR "Required dependency imgui was not acquired.")
-endif()
-
-if(NOT plog_ADDED)
-  message(FATAL_ERROR "Required dependency plog was not acquired.")
-endif()
-
-if(NOT cpr_ADDED)
-  message(FATAL_ERROR "Required dependency cpr was not acquired.")
-endif()
-
-if(NOT tomlplusplus_ADDED AND NOT tomlplusplus_SOURCE_DIR)
-  message(FATAL_ERROR "Required dependency tomlplusplus was not acquired.")
-endif()
-
-if(NOT nlohmann_json_ADDED)
-  message(FATAL_ERROR "Required dependency nlohmann_json was not acquired.")
-endif()
-
-if(NOT libmem_ADDED)
-  message(FATAL_ERROR "Required dependency libmem was not acquired.")
-endif()
-
-if(NOT utf8proc_ADDED)
-  message(FATAL_ERROR "Required dependency utf8proc was not acquired.")
-endif()
-
-if(NOT rapidfuzz_ADDED)
-  message(FATAL_ERROR "Required dependency rapidfuzz was not acquired.")
-endif()
-
-if(PROFILING_LEVEL GREATER_EQUAL 2)
-  if(NOT tracy_ADDED)
-    message(FATAL_ERROR "Required dependency tracy was not acquired.")
-  endif()
-endif()
-
-# Setup ImGui library target
-if(imgui_ADDED)
-  add_library(imgui STATIC
-    ${imgui_SOURCE_DIR}/imgui.cpp
-    ${imgui_SOURCE_DIR}/imgui_demo.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
-  )
-  target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
-  target_link_libraries(imgui PUBLIC SDL3::SDL3)
 endif()
