@@ -100,7 +100,11 @@ private:
     int profiling_level_ = 0;
     int logging_level_ = 4;
     bool verbose_ = false;
-    bool compatibility_mode_ = false;
+#ifdef _WIN32
+    bool compatibility_mode_ = false;  // Windows: default to auto mode (hooks work reliably)
+#else
+    bool compatibility_mode_ = true;   // Linux/Wine: default to compatibility mode (memory scanning only)
+#endif
     int hook_wait_timeout_ms_ = 200;
 
     // Default window flags

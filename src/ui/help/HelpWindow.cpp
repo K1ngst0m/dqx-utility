@@ -9,7 +9,7 @@
 #include "../../services/DQXClarityService.hpp"
 #include "../../services/DQXClarityLauncher.hpp"
 #include "../../dqxclarity/api/dqxclarity.hpp"
-#include "../../platform/ProcessDetector.hpp"
+#include "../../dqxclarity/process/ProcessFinder.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -169,7 +169,7 @@ HelpWindow::StatusInfo HelpWindow::evaluateStatus() const
     if (launcher)
         dqx_running = launcher->isDQXGameRunning();
     else
-        dqx_running = ProcessDetector::isProcessRunning("DQXGame.exe");
+        dqx_running = dqxclarity::ProcessFinder::IsProcessRunning("DQXGame.exe", false);
 
     if (!dqx_running)
     {

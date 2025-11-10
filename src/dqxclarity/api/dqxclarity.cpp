@@ -609,153 +609,174 @@ bool Engine::start_hook(StartPolicy policy)
             });
     }
 
-    // PHASE 5: Install hooks
-    impl_->hook_stage.store(HookStage::InstallingHooks, std::memory_order_release);
-
-    // Defer dialog hook installation until after warmup completes (auto mode only)
+    // PHASE 5: Install hooks (AUTO MODE ONLY - skip in compatibility mode)
     if (!impl_->cfg.compatibility_mode)
     {
-        PROFILE_SCOPE_CUSTOM("Engine.InstallDialogHook");
-        dialog_hook_installed = impl_->hook_manager.RegisterHook(
-            persistence::HookType::Dialog,
-            base_hook_info,
-            nullptr,
-            nullptr);
-
-        if (dialog_hook_installed)
-        {
-            if (impl_->log.info)
-                impl_->log.info("Dialog hook installed successfully (deferred)");
-        }
-        else
-        {
-            if (impl_->log.warn)
-                impl_->log.warn("Failed to install dialog hook (deferred)");
-        }
-
-        auto dialog_scanner = impl_->scanner_manager->GetScanner(ScannerType::Dialog);
-        if (!dialog_hook_installed && !dialog_scanner)
-        {
-            impl_->SetError("Failed to initialize dialog capture (both hook and scanner unavailable)");
-            status_ = Status::Error;
-            return false;
-        }
-    }
-
-    // Do NOT pre-change page protections at startup; some builds crash on login if code pages change protection.
-
-    {
-        PROFILE_SCOPE_CUSTOM("Engine.InstallQuestHook");
-        impl_->hook_manager.RegisterHook(
-            persistence::HookType::Quest,
-            base_hook_info,
-            nullptr,  // Integrity will be wired after integrity detour is installed
-            nullptr);
-    }
-
-    {
-        PROFILE_SCOPE_CUSTOM("Engine.InstallPlayerHook");
-        impl_->hook_manager.RegisterHook(
-            persistence::HookType::Player,
-            base_hook_info,
-            nullptr,  // Integrity will be wired after integrity detour is installed
-            nullptr);
-    }
-
-    // Network hook is temporarily disabled
-    // Note: If enabled, register via HookManager::RegisterHook(persistence::HookType::Network, ...)
-
-    {
-        PROFILE_SCOPE_CUSTOM("Engine.InstallCornerTextHook");
-        impl_->hook_manager.RegisterHook(
-            persistence::HookType::Corner,
-            base_hook_info,
-            nullptr,  // Integrity will be wired after integrity detour is installed
-            nullptr);
-    }
-
-    // Install integrity hook through HookManager
-    {
-        PROFILE_SCOPE_CUSTOM("Engine.InstallIntegrityHook");
+        impl_->hook_stage.store(HookStage::InstallingHooks, std::memory_order_release);
         
-        // Configure integrity-specific settings
-        HookCreateInfo integrity_info = base_hook_info;
-        
-        bool integrity_installed = impl_->hook_manager.RegisterHook(
-            persistence::HookType::Integrity,
-            integrity_info,
-            nullptr, nullptr);
+        if (impl_->log.info)
+            impl_->log.info("Installing hook...");
 
-        if (!integrity_installed)
+        // Defer dialog hook installation until after warmup completes (auto mode only)
         {
-            if (impl_->log.error)
-                impl_->log.error("Failed to install integrity hook");
-            impl_->hook_manager.RemoveAllHooks();
-            impl_->memory.reset();
-            status_ = Status::Error;
-            return false;
+            PROFILE_SCOPE_CUSTOM("Engine.InstallDialogHook");
+            dialog_hook_installed = impl_->hook_manager.RegisterHook(
+                persistence::HookType::Dialog,
+                base_hook_info,
+                nullptr,
+                nullptr);
+
+            if (dialog_hook_installed)
+            {
+                if (impl_->log.info)
+                    impl_->log.info("Dialog hook installed successfully (deferred)");
+            }
+            else
+            {
+                if (impl_->log.warn)
+                    impl_->log.warn("Failed to install dialog hook (deferred)");
+            }
+
+            auto dialog_scanner = impl_->scanner_manager->GetScanner(ScannerType::Dialog);
+            if (!dialog_hook_installed && !dialog_scanner)
+            {
+                impl_->SetError("Failed to initialize dialog capture (both hook and scanner unavailable)");
+                status_ = Status::Error;
+                return false;
+            }
         }
-        
-        // Configure integrity-specific settings
-        auto* integrity_hook = impl_->hook_manager.GetIntegrityHook();
-        if (integrity_hook)
+
+        // Do NOT pre-change page protections at startup; some builds crash on login if code pages change protection.
+
+        if (impl_->log.info)
+            impl_->log.info("Installing hook...");
         {
-            integrity_hook->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
+            PROFILE_SCOPE_CUSTOM("Engine.InstallQuestHook");
+            impl_->hook_manager.RegisterHook(
+                persistence::HookType::Quest,
+                base_hook_info,
+                nullptr,  // Integrity will be wired after integrity detour is installed
+                nullptr);
+        }
+
+        if (impl_->log.info)
+            impl_->log.info("Installing hook...");
+        {
+            PROFILE_SCOPE_CUSTOM("Engine.InstallPlayerHook");
+            impl_->hook_manager.RegisterHook(
+                persistence::HookType::Player,
+                base_hook_info,
+                nullptr,  // Integrity will be wired after integrity detour is installed
+                nullptr);
+        }
+
+        // Network hook is temporarily disabled
+        // Note: If enabled, register via HookManager::RegisterHook(persistence::HookType::Network, ...)
+
+        if (impl_->log.info)
+            impl_->log.info("Installing hook...");
+        {
+            PROFILE_SCOPE_CUSTOM("Engine.InstallCornerTextHook");
+            impl_->hook_manager.RegisterHook(
+                persistence::HookType::Corner,
+                base_hook_info,
+                nullptr,  // Integrity will be wired after integrity detour is installed
+                nullptr);
+        }
+
+        // Install integrity hook through HookManager
+        if (impl_->log.info)
+            impl_->log.info("Installing hook...");
+        {
+            PROFILE_SCOPE_CUSTOM("Engine.InstallIntegrityHook");
             
-            // Wire all hooks to integrity system
-            impl_->hook_manager.WireIntegrityCallbacks(integrity_hook, nullptr);
-        }
-    }
+            // Configure integrity-specific settings
+            HookCreateInfo integrity_info = base_hook_info;
+            
+            bool integrity_installed = impl_->hook_manager.RegisterHook(
+                persistence::HookType::Integrity,
+                integrity_info,
+                nullptr, nullptr);
 
-    // Optionally enable hooks immediately based on policy
-    const bool enable_patch_now = (policy == StartPolicy::EnableImmediately);
-    if (enable_patch_now)
-    {
-        impl_->hook_manager.EnableAllPatches(impl_->log);
-        
-        // Proactive verification after immediate enable
-        if (impl_->cfg.proactive_verify_after_enable_ms > 0)
-        {
-            auto delay = std::chrono::milliseconds(impl_->cfg.proactive_verify_after_enable_ms);
-            std::jthread([this, delay](std::stop_token) {
-                std::this_thread::sleep_for(delay);
-                impl_->hook_manager.VerifyAllPatches(impl_->log, impl_->cfg.verbose);
-            }).detach();
+            if (!integrity_installed)
+            {
+                if (impl_->log.error)
+                    impl_->log.error("Failed to install integrity hook");
+                impl_->hook_manager.RemoveAllHooks();
+                impl_->memory.reset();
+                status_ = Status::Error;
+                return false;
+            }
+            
+            // Configure integrity-specific settings
+            auto* integrity_hook = impl_->hook_manager.GetIntegrityHook();
+            if (integrity_hook)
+            {
+                integrity_hook->SetDiagnosticsEnabled(impl_->cfg.enable_integrity_diagnostics);
+                
+                // Wire all hooks to integrity system
+                impl_->hook_manager.WireIntegrityCallbacks(integrity_hook, nullptr);
+            }
         }
-    }
-
-    // Start integrity monitor
-    auto* integrity_hook = impl_->hook_manager.GetIntegrityHook();
-    auto state_addr = integrity_hook ? integrity_hook->GetStateAddress() : 0;
-    if (state_addr == 0)
-    {
-        if (impl_->log.warn)
-            impl_->log.warn("No integrity state address; skipping monitor");
     }
     else
     {
-        impl_->monitor = std::make_unique<dqxclarity::IntegrityMonitor>(
-            impl_->memory.get(), impl_->log, state_addr,
-            [this](bool first)
+        if (impl_->log.info)
+            impl_->log.info("Compatibility mode: Skipping all hooks, using memory scanning only");
+    }
+
+    // Optionally enable hooks immediately based on policy (AUTO MODE ONLY)
+    if (!impl_->cfg.compatibility_mode)
+    {
+        const bool enable_patch_now = (policy == StartPolicy::EnableImmediately);
+        if (enable_patch_now)
+        {
+            impl_->hook_manager.EnableAllPatches(impl_->log);
+            
+            // Proactive verification after immediate enable
+            if (impl_->cfg.proactive_verify_after_enable_ms > 0)
             {
-                if (first)
+                auto delay = std::chrono::milliseconds(impl_->cfg.proactive_verify_after_enable_ms);
+                std::jthread([this, delay](std::stop_token) {
+                    std::this_thread::sleep_for(delay);
+                    impl_->hook_manager.VerifyAllPatches(impl_->log, impl_->cfg.verbose);
+                }).detach();
+            }
+        }
+
+        // Start integrity monitor (AUTO MODE ONLY)
+        auto* integrity_hook = impl_->hook_manager.GetIntegrityHook();
+        auto state_addr = integrity_hook ? integrity_hook->GetStateAddress() : 0;
+        if (state_addr == 0)
+        {
+            if (impl_->log.warn)
+                impl_->log.warn("No integrity state address; skipping monitor");
+        }
+        else
+        {
+            impl_->monitor = std::make_unique<dqxclarity::IntegrityMonitor>(
+                impl_->memory.get(), impl_->log, state_addr,
+                [this](bool first)
                 {
-                    if (impl_->log.debug)
-                        impl_->log.debug("[warmup] Integrity monitor first tick - enabling hook patches");
-                    impl_->hook_manager.EnableAllPatches(impl_->log);
-                }
-                else
-                {
-                    if (impl_->cfg.verbose && impl_->log.info)
-                        impl_->log.info("[warmup] Integrity monitor reapplying hook patches");
-                    impl_->hook_manager.ReapplyAllPatches(impl_->log);
-                }
-            });
-        
-        // Wire all hooks to integrity monitor
-        impl_->hook_manager.WireIntegrityCallbacks(integrity_hook, impl_->monitor.get());
-        
-        (void)impl_->monitor->start();
+                    if (first)
+                    {
+                        if (impl_->log.debug)
+                            impl_->log.debug("[warmup] Integrity monitor first tick - enabling hook patches");
+                        impl_->hook_manager.EnableAllPatches(impl_->log);
+                    }
+                    else
+                    {
+                        if (impl_->cfg.verbose && impl_->log.info)
+                            impl_->log.info("[warmup] Integrity monitor reapplying hook patches");
+                        impl_->hook_manager.ReapplyAllPatches(impl_->log);
+                    }
+                });
+            
+            // Wire all hooks to integrity monitor
+            impl_->hook_manager.WireIntegrityCallbacks(integrity_hook, impl_->monitor.get());
+            
+            (void)impl_->monitor->start();
+        }
     }
 
     if (impl_->log.info)
