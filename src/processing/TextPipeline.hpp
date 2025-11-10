@@ -7,10 +7,12 @@
 namespace processing
 {
 
+class GlossaryManager;
+
 class TextPipeline
 {
 public:
-    explicit TextPipeline(UnknownLabelRepository* repo = nullptr);
+    explicit TextPipeline(UnknownLabelRepository* repo = nullptr, GlossaryManager* glossary = nullptr);
     ~TextPipeline();
 
     [[nodiscard]] std::string process(const std::string& input, const std::string& target_lang = "",

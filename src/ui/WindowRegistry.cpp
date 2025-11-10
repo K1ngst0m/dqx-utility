@@ -20,12 +20,15 @@
 #include <algorithm>
 #include <toml++/toml.h>
 
-WindowRegistry::WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, MonsterManager& monster_manager)
+WindowRegistry::WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, 
+                               QuestManager& quest_manager, MonsterManager& monster_manager,
+                               processing::GlossaryManager& glossary_manager)
     : font_manager_(font_manager)
     , global_state_(global_state)
     , config_(config)
     , quest_manager_(quest_manager)
     , monster_manager_(monster_manager)
+    , glossary_manager_(glossary_manager)
 {
     // Wire monster link handler to open MonsterWindow
     ui::SetMonsterLinkHandler([this](const std::string& monster_id) {
@@ -37,7 +40,7 @@ WindowRegistry::~WindowRegistry() = default;
 
 DialogWindow& WindowRegistry::createDialogWindow(bool mark_default)
 {
-    auto dialog = std::make_unique<DialogWindow>(font_manager_, global_state_, config_, monster_manager_, dialog_counter_, makeDialogName(), mark_default);
+    auto dialog = std::make_unique<DialogWindow>(font_manager_, global_state_, config_, monster_manager_, glossary_manager_, dialog_counter_, makeDialogName(), mark_default);
     DialogWindow& ref = *dialog;
     windows_.push_back(std::move(dialog));
     ++dialog_counter_;
@@ -89,7 +92,7 @@ MonsterWindow& WindowRegistry::createMonsterWindow(const std::string& monster_id
     }
 
     // Create new window
-    auto monster_window = std::make_unique<MonsterWindow>(font_manager_, global_state_, config_, monster_manager_, monster_id, makeMonsterName());
+    auto monster_window = std::make_unique<MonsterWindow>(font_manager_, global_state_, config_, monster_manager_, glossary_manager_, monster_id, makeMonsterName());
     MonsterWindow& ref = *monster_window;
     windows_.push_back(std::move(monster_window));
     ++monster_counter_;

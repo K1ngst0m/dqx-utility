@@ -14,6 +14,11 @@ class SingleInstanceGuard;
 class QuestManager;
 class MonsterManager;
 
+namespace processing
+{
+class GlossaryManager;
+}
+
 namespace updater
 {
 class UpdaterService;
@@ -77,6 +82,7 @@ private:
     std::unique_ptr<updater::UpdaterService> updater_service_;
     std::unique_ptr<QuestManager> quest_manager_;
     std::unique_ptr<MonsterManager> monster_manager_;
+    std::unique_ptr<processing::GlossaryManager> glossary_manager_;
 
     bool show_settings_ = false;
     bool quit_requested_ = false;

@@ -32,6 +32,7 @@ namespace processing
 {
 class TextPipeline;
 class ITextNormalizer;
+class GlossaryManager;
 }
 
 class MonsterManager;
@@ -39,7 +40,9 @@ class MonsterManager;
 class DialogWindow : public UIWindow
 {
 public:
-    DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, MonsterManager& monster_manager, int instance_id, const std::string& name, bool is_default = false);
+    DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, 
+                 MonsterManager& monster_manager, processing::GlossaryManager& glossary_manager,
+                 int instance_id, const std::string& name, bool is_default = false);
     ~DialogWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Dialog; }
@@ -109,6 +112,7 @@ private:
     GlobalStateManager& global_state_;
     ConfigManager& config_;
     MonsterManager& monster_manager_;
+    processing::GlossaryManager& glossary_manager_;
     DialogStateManager state_{};
     std::string name_;
     std::string window_label_;

@@ -27,6 +27,11 @@ struct DialogStateManager;
 struct QuestStateManager;
 struct QuestHelperStateManager;
 
+namespace processing
+{
+class GlossaryManager;
+}
+
 class UIWindow
 {
 public:
@@ -42,7 +47,9 @@ public:
 class WindowRegistry
 {
 public:
-    WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, QuestManager& quest_manager, MonsterManager& monster_manager);
+    WindowRegistry(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, 
+                   QuestManager& quest_manager, MonsterManager& monster_manager, 
+                   processing::GlossaryManager& glossary_manager);
     ~WindowRegistry();
 
     DialogWindow& createDialogWindow(bool mark_default = false);
@@ -87,6 +94,7 @@ private:
     ConfigManager& config_;
     QuestManager& quest_manager_;
     MonsterManager& monster_manager_;
+    processing::GlossaryManager& glossary_manager_;
     std::vector<std::unique_ptr<UIWindow>> windows_;
     int dialog_counter_ = 0;
     int quest_counter_ = 0;

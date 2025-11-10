@@ -307,23 +307,28 @@ int DialogWindow::appendSegmentInternal(const std::string& speaker, const std::s
     return static_cast<int>(state_.content_state().segments.size()) - 1;
 }
 
-DialogWindow::DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, MonsterManager& monster_manager, int instance_id, const std::string& name, bool is_default)
+DialogWindow::DialogWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config, 
+                           MonsterManager& monster_manager, processing::GlossaryManager& glossary_manager,
+                           int instance_id, const std::string& name, bool is_default)
     : font_manager_(font_manager)
     , global_state_(global_state)
     , config_(config)
     , monster_manager_(monster_manager)
+    , glossary_manager_(glossary_manager)
     , cached_backend_(translate::Backend::OpenAI)
     , settings_view_(state_, font_manager_, session_, config, global_state)
 {
+    static int dialog_window_counter = 0;
+    ++dialog_window_counter;
 
     name_ = name;
-    id_suffix_ = "dialog_window_" + std::to_string(instance_id);
-    settings_id_suffix_ = "dialog_settings_" + std::to_string(instance_id);
-    window_label_ = name_ + "###" + id_suffix_;
+    window_label_ = name_ + "##Dialog_" + std::to_string(instance_id);
+    id_suffix_ = "Dialog_" + std::to_string(instance_id);
+    settings_id_suffix_ = "DialogSettings_" + std::to_string(dialog_window_counter);
     settings_window_label_ = name_ + " Settings###" + settings_id_suffix_;
     is_default_instance_ = is_default;
 
-    text_pipeline_ = std::make_unique<processing::TextPipeline>();
+    text_pipeline_ = std::make_unique<processing::TextPipeline>(nullptr, &glossary_manager_);
     text_normalizer_ = std::make_unique<processing::NFKCTextNormalizer>();
 
     state_.applyDefaults();

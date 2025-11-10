@@ -16,11 +16,13 @@
 #include <plog/Log.h>
 
 MonsterWindow::MonsterWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config,
-                             MonsterManager& monster_manager, const std::string& monster_id, const std::string& name)
+                             MonsterManager& monster_manager, processing::GlossaryManager& glossary_manager,
+                             const std::string& monster_id, const std::string& name)
     : font_manager_(font_manager)
     , global_state_(global_state)
     , config_(config)
     , monster_manager_(monster_manager)
+    , glossary_manager_(glossary_manager)
     , monster_id_(monster_id)
     , name_(name)
     , window_label_(name + "##Monster_" + monster_id)
@@ -132,14 +134,6 @@ void MonsterWindow::render()
     }
 
     // Category with glossary translation
-    static processing::GlossaryManager glossary_manager;
-    static bool glossary_initialized = false;
-    if (!glossary_initialized)
-    {
-        glossary_manager.initialize();
-        glossary_initialized = true;
-    }
-    
     const auto& translation_config = state_.use_global_translation 
         ? global_state_.translationConfig() 
         : state_.translation;
@@ -149,7 +143,7 @@ void MonsterWindow::render()
         case TranslationConfig::TargetLang::ZH_TW: target_lang = "zh-TW"; break;
         default: target_lang = "en-US"; break;
     }
-    std::optional<std::string> translated_category = glossary_manager.lookup(monster_info->category, target_lang);
+    std::optional<std::string> translated_category = glossary_manager_.lookup(monster_info->category, target_lang);
     
     // Title with category - centered with separator lines
     std::string translated_name = getTranslatedText(monster_info->name);
@@ -471,15 +465,6 @@ void MonsterWindow::renderResistancesSection(const monster::MonsterResistances& 
 
 void MonsterWindow::renderLocationsSection(const std::vector<monster::MonsterLocation>& locations)
 {
-    // Use glossary manager for location translation
-    static processing::GlossaryManager glossary_manager;
-    static bool initialized = false;
-    if (!initialized)
-    {
-        glossary_manager.initialize();
-        initialized = true;
-    }
-    
     // Get target language from translation config
     const auto& translation_config = state_.use_global_translation 
         ? global_state_.translationConfig() 
@@ -498,12 +483,12 @@ void MonsterWindow::renderLocationsSection(const std::vector<monster::MonsterLoc
         ImGui::Bullet();
         
         // Try exact match first
-        std::optional<std::string> translated = glossary_manager.lookup(loc.area, target_lang);
+        std::optional<std::string> translated = glossary_manager_.lookup(loc.area, target_lang);
         
         // If exact match fails, try fuzzy matching
         if (!translated.has_value())
         {
-            auto fuzzy_results = glossary_manager.fuzzyLookup(loc.area, target_lang, 0.8);
+            auto fuzzy_results = glossary_manager_.fuzzyLookup(loc.area, target_lang, 0.8);
             if (!fuzzy_results.empty())
             {
                 // Use the best fuzzy match

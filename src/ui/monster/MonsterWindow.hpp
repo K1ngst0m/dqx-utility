@@ -28,11 +28,17 @@ struct MonsterLocation;
 struct MonsterDrops;
 }
 
+namespace processing
+{
+class GlossaryManager;
+}
+
 class MonsterWindow : public UIWindow
 {
 public:
     MonsterWindow(FontManager& font_manager, GlobalStateManager& global_state, ConfigManager& config,
-                  MonsterManager& monster_manager, const std::string& monster_id, const std::string& name);
+                  MonsterManager& monster_manager, processing::GlossaryManager& glossary_manager,
+                  const std::string& monster_id, const std::string& name);
     ~MonsterWindow() override;
 
     UIWindowType type() const override { return UIWindowType::Monster; }
@@ -67,6 +73,7 @@ private:
     GlobalStateManager& global_state_;
     ConfigManager& config_;
     MonsterManager& monster_manager_;
+    processing::GlossaryManager& glossary_manager_;
     
     std::string monster_id_;
     std::string name_;

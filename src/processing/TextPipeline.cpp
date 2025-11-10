@@ -98,20 +98,20 @@ void logCompletion(const std::string& output)
 
 struct TextPipeline::Impl
 {
-    explicit Impl(UnknownLabelRepository* repo)
+    explicit Impl(UnknownLabelRepository* repo, GlossaryManager* glossary)
         : label_processor(repo)
         , normalizer(std::make_unique<NFKCTextNormalizer>())
+        , glossary_manager_(glossary)
     {
-        glossary_manager.initialize();
     }
 
     LabelProcessor label_processor;
-    GlossaryManager glossary_manager;
+    GlossaryManager* glossary_manager_;
     std::unique_ptr<ITextNormalizer> normalizer;
 };
 
-TextPipeline::TextPipeline(UnknownLabelRepository* repo)
-    : impl_(std::make_unique<Impl>(repo))
+TextPipeline::TextPipeline(UnknownLabelRepository* repo, GlossaryManager* glossary)
+    : impl_(std::make_unique<Impl>(repo, glossary))
 {
 }
 
@@ -124,13 +124,13 @@ std::string TextPipeline::process(const std::string& input, const std::string& t
     logInput(input);
 
     // Glossary stage: Check for exact match before any processing
-    if (use_glossary && !target_lang.empty())
+    if (use_glossary && !target_lang.empty() && impl_->glossary_manager_)
     {
         auto glossary_stage =
             run_stage<std::optional<std::string>>("glossary",
                                                   [&]()
                                                   {
-                                                      return impl_->glossary_manager.lookup(input, target_lang);
+                                                      return impl_->glossary_manager_->lookup(input, target_lang);
                                                   });
 
         if (glossary_stage.succeeded && glossary_stage.result.has_value())
