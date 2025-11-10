@@ -108,4 +108,4 @@ jobs:
 
       - name: Test
         working-directory: ${{ github.workspace }}
-        run: ./out/linux-clang-release/tests/dqxu_tests
+        run: ./out/linux-clang-release/Release/tests/dqxu_tests
