@@ -24,6 +24,15 @@ Utility for Dragon Quest X.
 - Fuzzy matching to find quests even when names don't match exactly
 - Quick access via "Open Guide" button in quest windows
 
+### Monster Information System
+
+- **Comprehensive monster database**: Click on monster names in quests or dialogs to view detailed information
+- Displays monster stats (HP, MP, Attack, Defense, EXP, Gold, Training levels)
+- Elemental resistances (Fire, Ice, Wind, Thunder, Earth, Dark, Light)
+- Monster locations and spawn areas
+- Complete drop lists including normal drops, rare drops, orbs, and treasure
+- Automatic translation support for monster names and categories
+
 ## Quick Start
 
 1. Download the latest release, Extract the archive
