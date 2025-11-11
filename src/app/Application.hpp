@@ -59,7 +59,6 @@ private:
     void setupMiniModeDockspace();
     void renderWindows();
     void handleUIRequests();
-    void renderFPSMetrics();
 
     void handleQuitRequests();
     void cleanup();
@@ -90,12 +89,8 @@ private:
     Uint64 last_time_ = 0;
     bool last_window_topmost_ = false;
 
-    // FPS metrics tracking
-    bool show_fps_metrics_ = false;
-    static constexpr int kFPSSampleCount = 100;
-    float frame_times_[kFPSSampleCount] = {};
-    int frame_time_index_ = 0;
-    float accumulated_time_ = 0.0f;
+    // ImGui metrics window
+    bool show_imgui_metrics_ = false;
 
     [[maybe_unused]] int argc_ = 0;
     [[maybe_unused]] char** argv_ = nullptr;

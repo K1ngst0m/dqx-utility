@@ -34,7 +34,6 @@
 #include <plog/Initializers/RollingFileInitializer.h>
 #include <toml++/toml.h>
 #include <imgui.h>
-#include <algorithm>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -411,11 +410,6 @@ void Application::renderFrame(float deltaTime)
 {
     PROFILE_SCOPE_FRAME();
 
-    // Track frame time for FPS metrics
-    frame_times_[frame_time_index_] = deltaTime;
-    frame_time_index_ = (frame_time_index_ + 1) % kFPSSampleCount;
-    accumulated_time_ += deltaTime;
-
     context_->beginFrame();
 
     // Poll for quest changes before rendering windows
@@ -429,8 +423,8 @@ void Application::renderFrame(float deltaTime)
     if (show_settings_)
         settings_panel_->render(show_settings_);
 
-    if (show_fps_metrics_)
-        renderFPSMetrics();
+    if (show_imgui_metrics_)
+        ImGui::ShowMetricsWindow(&show_imgui_metrics_);
 
     event_handler_->HandleTransparentAreaClick();
     context_->updateVignette(deltaTime);
@@ -582,62 +576,4 @@ void Application::handleUIRequests()
     }
 }
 
-void Application::renderFPSMetrics()
-{
-    // Calculate FPS statistics
-    float avg_frame_time = 0.0f;
-    float min_frame_time = frame_times_[0];
-    float max_frame_time = frame_times_[0];
-    int valid_samples = 0;
-
-    for (int i = 0; i < kFPSSampleCount; ++i)
-    {
-        if (frame_times_[i] > 0.0f)
-        {
-            avg_frame_time += frame_times_[i];
-            min_frame_time = std::min(min_frame_time, frame_times_[i]);
-            max_frame_time = std::max(max_frame_time, frame_times_[i]);
-            valid_samples++;
-        }
-    }
-
-    if (valid_samples > 0)
-    {
-        avg_frame_time /= static_cast<float>(valid_samples);
-    }
-
-    float avg_fps = (avg_frame_time > 0.0f) ? (1.0f / avg_frame_time) : 0.0f;
-    float min_fps = (max_frame_time > 0.0f) ? (1.0f / max_frame_time) : 0.0f;
-    float max_fps = (min_frame_time > 0.0f) ? (1.0f / min_frame_time) : 0.0f;
-
-    // Render FPS window
-    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(300, 150), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowBgAlpha(0.85f);
-
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-    if (ImGui::Begin("FPS Metrics", &show_fps_metrics_, window_flags))
-    {
-        ImGui::Text("Performance Metrics");
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::Text("Average FPS: %.1f", avg_fps);
-        ImGui::Text("Min FPS: %.1f", min_fps);
-        ImGui::Text("Max FPS: %.1f", max_fps);
-        ImGui::Spacing();
-        ImGui::Text("Frame Time: %.3f ms", avg_frame_time * 1000.0f);
-        ImGui::Text("Min Frame Time: %.3f ms", min_frame_time * 1000.0f);
-        ImGui::Text("Max Frame Time: %.3f ms", max_frame_time * 1000.0f);
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Text("Total Time: %.2f s", accumulated_time_);
-
-        // Plot frame time graph
-        ImGui::Spacing();
-        ImGui::PlotLines("Frame Times", frame_times_, kFPSSampleCount, frame_time_index_, nullptr, 
-                         0.0f, max_frame_time * 1.2f, ImVec2(0, 60));
-    }
-    ImGui::End();
-}
 
